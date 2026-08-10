@@ -1,0 +1,29 @@
+# Auto-label rules for PRs
+# Matches file paths to label names
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ".github/**/*"
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: "*.md"
+
+source:
+  - changed-files:
+      - any-glob-to-any-file: "src/**/*"
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file: "tests/**/*"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "pyproject.toml"
+          - "uv.lock"
+          - ".github/dependabot.yml"
+
+examples:
+  - changed-files:
+      - any-glob-to-any-file: "examples/**/*"
