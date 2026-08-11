@@ -1,9 +1,7 @@
 # summonpot
 
-**An AI-native API framework. Every endpoint is an agent that runs automatically.**
-
 <p align="center">
-  <em>Define routes. The framework runs the agents. No agent configuration. No framework ontology. Just endpoints that think.</em>
+  <img src="summonpot_image.png" alt="IntPot" width="600">
 </p>
 
 [![CI](https://github.com/tugrulguner/summonpot/actions/workflows/ci.yml/badge.svg)](https://github.com/tugrulguner/summonpot/actions/workflows/ci.yml)
@@ -11,7 +9,9 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/summonpot)](https://pypi.org/project/summonpot/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-summonpot is a **full API framework** — with routing, validation, middleware, and serving — but built for the era where APIs don't just respond, they reason.
+**An AI-native API framework. Every endpoint is an agent that runs automatically.**
+
+summonpot is a **full API framework** — with routing, validation, middleware, and serving — but built for the era where APIs don't just respond, they reason. Define routes. The framework runs the agents. No agent configuration. No framework ontology. Just endpoints that think.
 
 You define routes with a function signature, a docstring, and tools. The framework owns the agentic runtime — the LLM call loop, tool orchestration, structured output, and streaming. You don't configure an agent. You define an endpoint. The agent is summoned.
 
