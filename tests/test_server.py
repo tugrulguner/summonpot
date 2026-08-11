@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from summonpot import Pot
+from summonpot import Pot, __version__
 from summonpot.server import build_app
 
 
@@ -50,5 +50,6 @@ def test_build_app_openapi_has_endpoints():
     client = TestClient(app)
     schema = client.get("/openapi.json").json()
     paths = schema["paths"]
+    assert schema["info"]["version"] == __version__
     assert "/analyze" in paths
     assert "post" in paths["/analyze"]

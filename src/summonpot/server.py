@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from summonpot import __version__
+
 if TYPE_CHECKING:
     from summonpot.pot import Pot
 
@@ -15,7 +17,7 @@ def build_app(pot: Pot) -> Any:
     app = FastAPI(
         title=pot.name,
         description="An AI-native API framework. Every endpoint is an agent that runs automatically.",
-        version="0.1.0",
+        version=__version__,
     )
 
     for endpoint in pot.endpoints:

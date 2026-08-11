@@ -163,11 +163,13 @@ uv sync --all-extras
 ```
 
 ```bash
-make check   # lint + test
+make check    # lint + typecheck + test
 make lint     # ruff check + format check
 make test     # pytest
 make format   # auto-format
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for pull-request and single-source release instructions.
 
 ## License
 
