@@ -40,24 +40,7 @@ def build_app(pot: Pot) -> Any:
                 **fields,  # pyright: ignore[reportArgumentType, reportCallIssue]
             )
 
-            # Use a unique module-level attribute so FastAPI/Pydantic can resolve it
-            import sys as _sys
-
-            _attr = f"_RouteModel_{id(RequestModel)}"
-            setattr(_sys.modules[__name__], _attr, RequestModel)
-
-            # Resolve the model for the closure
-            resolved_model = RequestModel
-
-            async def _handle_with_body(
-                body: resolved_model,  # type: ignore[valid-type]
-                _ep=endpoint,
-                _pt=pot,
-            ) -> Any:
-                params = body.model_dump() if hasattr(body, "model_dump") else body
-                return await _pt._runtime.call(_ep, params)
-
-            _handle_with_body.__annotations__["body"] = resolved_model
+            _handle_with_body = _make_body_handler(endpoint, pot, RequestModel)
 
             app.add_api_route(
                 route_path,
@@ -71,9 +54,7 @@ def build_app(pot: Pot) -> Any:
                 description=endpoint.description,
             )
         else:
-
-            async def _handle_without_body(ep=endpoint, pt=pot) -> Any:
-                return await pt._runtime.call(ep, {})
+            _handle_without_body = _make_no_body_handler(endpoint, pot)
 
             app.add_api_route(
                 route_path,
@@ -88,6 +69,26 @@ def build_app(pot: Pot) -> Any:
             )
 
     return app
+
+
+def _make_body_handler(endpoint: Any, pot: Any, request_model: type[Any]) -> Any:
+    """Create a body-only route handler while retaining endpoint context in its closure."""
+
+    async def handle(body: Any) -> Any:
+        params = body.model_dump() if hasattr(body, "model_dump") else body
+        return await pot._runtime.call(endpoint, params)
+
+    handle.__annotations__["body"] = request_model
+    return handle
+
+
+def _make_no_body_handler(endpoint: Any, pot: Any) -> Any:
+    """Create a parameter-free route handler with context retained in its closure."""
+
+    async def handle() -> Any:
+        return await pot._runtime.call(endpoint, {})
+
+    return handle
 
 
 def _str_to_type(type_str: str) -> type:

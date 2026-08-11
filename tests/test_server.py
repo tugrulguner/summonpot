@@ -50,6 +50,27 @@ def test_build_app_openapi_has_endpoints():
     client = TestClient(app)
     schema = client.get("/openapi.json").json()
     paths = schema["paths"]
+    operation = paths["/analyze"]["post"]
     assert schema["info"]["version"] == __version__
+    assert operation.get("parameters", []) == []
+    assert operation["requestBody"]["required"] is True
     assert "/analyze" in paths
     assert "post" in paths["/analyze"]
+
+
+def test_build_app_no_body_route_hides_internal_context(mock_runtime):
+    pot = mock_runtime(mock_response="ready")
+
+    @pot.summon("/health")
+    def health() -> str:
+        """Report readiness."""
+        return ""
+
+    client = TestClient(build_app(pot))
+    operation = client.get("/openapi.json").json()["paths"]["/health"]["post"]
+
+    assert operation.get("parameters", []) == []
+    assert "requestBody" not in operation
+    response = client.post("/health")
+    assert response.status_code == 200
+    assert response.json() == "ready"
