@@ -1,14 +1,17 @@
-# Auto-label rules for PRs
-# Matches file paths to label names
+# Auto-label rules for pull requests.
 
 ci:
   - changed-files:
-      - any-glob-to-any-file: ".github/**/*"
+      - any-glob-to-any-file:
+          - ".github/**/*"
+          - "Makefile"
 
 documentation:
   - changed-files:
       - any-glob-to-any-file:
-          - "**/*.md"
+          - "README.md"
+          - "CONTRIBUTING.md"
+          - "CHANGELOG.md"
           - "docs/**/*"
 
 source:
