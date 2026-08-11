@@ -25,20 +25,23 @@ def build_app(pot: Pot) -> Any:
         method = "POST"
 
         if endpoint.parameters:
-            from pydantic import create_model
+            if endpoint.input_model is not None:
+                RequestModel = endpoint.input_model
+            else:
+                from pydantic import create_model
 
-            fields: dict[str, tuple[type, Any]] = {}
-            for p in endpoint.parameters:
-                field_type = _str_to_type(p.type_annotation)
-                if p.required:
-                    fields[p.name] = (field_type, ...)
-                else:
-                    fields[p.name] = (field_type, p.default)
+                fields: dict[str, tuple[type, Any]] = {}
+                for p in endpoint.parameters:
+                    field_type = _str_to_type(p.type_annotation)
+                    if p.required:
+                        fields[p.name] = (field_type, ...)
+                    else:
+                        fields[p.name] = (field_type, p.default)
 
-            RequestModel = create_model(
-                f"{endpoint.name}Request",
-                **fields,  # pyright: ignore[reportArgumentType, reportCallIssue]
-            )
+                RequestModel = create_model(
+                    f"{endpoint.name}Request",
+                    **fields,  # pyright: ignore[reportArgumentType, reportCallIssue]
+                )
 
             _handle_with_body = _make_body_handler(endpoint, pot, RequestModel)
 
@@ -46,6 +49,7 @@ def build_app(pot: Pot) -> Any:
                 route_path,
                 _handle_with_body,
                 methods=[method],
+                response_model=endpoint.output_model,
                 summary=(
                     endpoint.description.split("\n")[0]
                     if endpoint.description
@@ -60,6 +64,7 @@ def build_app(pot: Pot) -> Any:
                 route_path,
                 _handle_without_body,
                 methods=[method],
+                response_model=endpoint.output_model,
                 summary=(
                     endpoint.description.split("\n")[0]
                     if endpoint.description
@@ -75,7 +80,11 @@ def _make_body_handler(endpoint: Any, pot: Any, request_model: type[Any]) -> Any
     """Create a body-only route handler while retaining endpoint context in its closure."""
 
     async def handle(body: Any) -> Any:
-        params = body.model_dump() if hasattr(body, "model_dump") else body
+        params = (
+            body.model_dump(mode="json", by_alias=True)
+            if hasattr(body, "model_dump")
+            else body
+        )
         return await pot._runtime.call(endpoint, params)
 
     handle.__annotations__["body"] = request_model

@@ -6,6 +6,8 @@ import inspect
 from dataclasses import dataclass, field
 from typing import Any
 
+from pydantic import BaseModel
+
 
 @dataclass
 class ParamDef:
@@ -67,6 +69,8 @@ class EndpointDef:
     description: str  # docstring = system prompt
     parameters: list[ParamDef] = field(default_factory=list)
     return_type: str = "str"
+    input_model: type[BaseModel] | None = None
+    output_model: type[BaseModel] | None = None
     tools: list[ToolDef] = field(default_factory=list)
     stream: bool = False
     model: str | None = None

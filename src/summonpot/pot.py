@@ -6,6 +6,8 @@ import inspect
 from collections.abc import Callable
 from typing import Any
 
+from pydantic import BaseModel
+
 from summonpot.models import EndpointDef, ParamDef
 from summonpot.runtime import Runtime
 from summonpot.tools import build_tool_from_func
@@ -16,13 +18,21 @@ class Pot:
 
     Example::
 
+        from pydantic import BaseModel
         from summonpot import Pot
+
+        class ResearchRequest(BaseModel):
+            query: str
+
+        class ResearchResponse(BaseModel):
+            summary: str
 
         pot = Pot(tools=[search_web])
 
         @pot.summon("/research")
-        def research_topic(query: str) -> str:
+        def research_topic(request: ResearchRequest) -> ResearchResponse:
             \"\"\"Research this topic thoroughly.\"\"\"
+            raise NotImplementedError
 
         pot.serve()
     """
@@ -84,9 +94,13 @@ class Pot:
             sig = inspect.signature(func)
             hints = _safe_get_type_hints(func)
             parameters: list[ParamDef] = []
+            input_model: type[BaseModel] | None = None
             for pname, param in sig.parameters.items():
                 if pname in ("self", "cls"):
                     continue
+                annotation = hints.get(pname, param.annotation)
+                if _is_pydantic_model(annotation):
+                    input_model = annotation
                 type_str = _get_type_str(pname, param, hints)
                 is_required = param.default is inspect.Parameter.empty
                 parameters.append(
@@ -99,8 +113,14 @@ class Pot:
                     )
                 )
 
+            if input_model is not None and len(parameters) != 1:
+                raise TypeError(
+                    "Pydantic endpoints must declare exactly one request parameter"
+                )
+
             # Return type
             return_hint = hints.get("return", sig.return_annotation)
+            output_model = return_hint if _is_pydantic_model(return_hint) else None
             if return_hint is inspect.Parameter.empty or return_hint is None:
                 return_type = "str"
             elif hasattr(return_hint, "__name__"):
@@ -114,6 +134,8 @@ class Pot:
                 description=description,
                 parameters=parameters,
                 return_type=return_type,
+                input_model=input_model,
+                output_model=output_model,
                 tools=all_tools,
                 stream=stream,
                 model=model,
@@ -153,6 +175,10 @@ class Pot:
 
         app = build_app(self)
         uvicorn.run(app, host=host, port=port)  # type: ignore[arg-type]
+
+
+def _is_pydantic_model(annotation: Any) -> bool:
+    return isinstance(annotation, type) and issubclass(annotation, BaseModel)
 
 
 def _get_type_str(

@@ -13,20 +13,32 @@
 
 summonpot is a **full API framework** — with routing, validation, middleware, and serving — but built for the era where APIs don't just respond, they reason. Define routes. The framework runs the agents. No agent configuration. No framework ontology. Just endpoints that think.
 
-You define routes with a function signature, a docstring, and tools. The framework owns the agentic runtime — the LLM call loop, tool orchestration, structured output, and streaming. You don't configure an agent. You define an endpoint. The agent is summoned.
+You define routes with Pydantic request and response models, a docstring, and tools. The framework owns the agentic runtime — the LLM call loop, tool orchestration, structured output, and streaming. You don't configure an agent. You define an endpoint. The agent is summoned.
 
 ```python
+from pydantic import BaseModel, Field
 from summonpot import Pot
+
+
+class ResearchRequest(BaseModel):
+    query: str = Field(min_length=3)
+    depth: int = Field(default=3, ge=1, le=5)
+
+
+class ResearchResponse(BaseModel):
+    summary: str
+    key_findings: list[str]
+    sources: list[str]
+
 
 pot = Pot("my-service", tools=[search_web])
 
-@pot.summon("/research")
-def research_topic(query: str, depth: str = "standard") -> str:
-    """Research this topic thoroughly and return a comprehensive report."""
 
-@pot.summon("/analyze")
-def analyze_sentiment(text: str) -> dict:
-    """Analyze the text and return a JSON object with sentiment and topics."""
+@pot.summon("/research")
+def research_topic(request: ResearchRequest) -> ResearchResponse:
+    """Research this topic thoroughly and return a sourced report."""
+    raise NotImplementedError
+
 
 pot.serve()
 ```
@@ -36,7 +48,7 @@ Call it like any API:
 ```bash
 curl -X POST http://localhost:8000/research \
   -H "Content-Type: application/json" \
-  -d '{"query": "quantum computing", "depth": "deep"}'
+  -d '{"query": "quantum computing", "depth": 5}'
 ```
 
 Behind the scenes, an agent runs — it thinks, uses tools, calls the LLM, enforces structured output, and returns the result. But you never wrote an agent. You wrote a route.
@@ -78,26 +90,36 @@ export SUMMONPOT_BASE_URL=https://api.openai.com/v1   # optional
 Create a file `app.py`:
 
 ```python
+from typing import Literal
+
+from pydantic import BaseModel, Field
 from summonpot import Pot
+
+
+class AnalyzeRequest(BaseModel):
+    text: str = Field(min_length=1)
+    max_topics: int = Field(default=5, ge=1, le=20)
+
+
+class AnalyzeResponse(BaseModel):
+    sentiment: Literal["positive", "negative", "neutral"]
+    topics: list[str]
+    explanation: str
+
 
 # A tool available to every endpoint
 def search_web(query: str) -> list[dict]:
     """Search the web for information."""
     return [{"query": query, "result": "..."}]
 
+
 pot = Pot("my-service", tools=[search_web])
 
-@pot.summon("/research")
-def research_topic(query: str, depth: str = "standard") -> str:
-    """Research this topic thoroughly and return a comprehensive report."""
-
-@pot.summon("/summarize")
-def summarize(text: str) -> str:
-    """Summarize the given text into key bullet points."""
 
 @pot.summon("/analyze")
-def analyze_sentiment(text: str) -> dict:
-    """Analyze the text and return a JSON object with sentiment and topics."""
+def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
+    """Analyze the text and return its sentiment, topics, and explanation."""
+    raise NotImplementedError
 ```
 
 Serve it:
@@ -125,13 +147,47 @@ pot.serve(host="127.0.0.1", port=9000)
 | Return type | What appears |
 | `stream=True` | You asked it to speak continuously |
 
+## Pydantic endpoint contracts
+
+A structured endpoint declares exactly one Pydantic request model and returns one Pydantic response model:
+
+```python
+from pydantic import BaseModel, Field
+
+
+class PlanRequest(BaseModel):
+    goal: str
+    constraints: list[str] = Field(default_factory=list)
+
+
+class PlanResponse(BaseModel):
+    steps: list[str]
+    risks: list[str]
+
+
+@pot.summon("/plan")
+def plan(request: PlanRequest) -> PlanResponse:
+    """Create an actionable plan that respects every constraint."""
+    raise NotImplementedError
+```
+
+Those two annotations are the complete API contract. The decorated function is declarative—the agent runtime does not execute its body. `raise NotImplementedError` makes that explicit while keeping static type checkers satisfied.
+
+- The request model validates incoming JSON, including nested models, defaults, field constraints, aliases, and custom validators.
+- The response model appears in OpenAPI and validates the final HTTP response.
+- Its JSON Schema is sent to the model provider as the structured-output format.
+- The provider response is parsed back into the declared Pydantic class. Invalid output raises a Pydantic validation error instead of silently returning malformed data.
+- Primitive function signatures remain supported for compatibility, but Pydantic models are the primary API for structured endpoints.
+
+A Pydantic request model must be the endpoint's only function parameter. Put all request fields inside that model so there is one unambiguous body schema.
+
 ## How it works
 
 summonpot inspects your endpoint function:
 
 - **Docstring** → becomes the system prompt the agent follows
-- **Parameters** → become the JSON request schema (validated by Pydantic)
-- **Return type** → becomes the output contract (structured JSON for non-`str` types)
+- **Pydantic request model** → becomes the validated JSON request body and OpenAPI input schema
+- **Pydantic response model** → becomes the provider's structured-output schema, runtime validator, and OpenAPI response schema
 - **Tools** → exposed to the agent via function calling, so it can act, not just answer
 
 The framework owns the LLM call loop, tool orchestration, and structured-output enforcement. You provide intent — the endpoint.
@@ -148,8 +204,9 @@ Per-endpoint overrides:
 
 ```python
 @pot.summon("/research", model="gpt-4o", stream=True)
-def research_topic(query: str) -> str:
+def research_topic(request: ResearchRequest) -> ResearchResponse:
     """Research this topic."""
+    raise NotImplementedError
 ```
 
 ## Development

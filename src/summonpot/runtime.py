@@ -59,7 +59,15 @@ class Runtime:
             ],
         }
 
-        if endpoint.return_type.lower() in ("str", "string"):
+        if endpoint.output_model is not None:
+            body["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": endpoint.output_model.__name__,
+                    "schema": endpoint.output_model.model_json_schema(),
+                },
+            }
+        elif endpoint.return_type.lower() in ("str", "string"):
             # Plain text response — no structured output enforcement
             pass
         elif endpoint.return_type in ("dict", "object", "Any"):
@@ -128,6 +136,9 @@ class Runtime:
         content = message.get("content", "")
 
         # Parse structured output if needed
+        if endpoint.output_model is not None:
+            return endpoint.output_model.model_validate_json(content)
+
         if endpoint.return_type.lower() not in ("str", "string", "any"):
             try:
                 return json.loads(content)
