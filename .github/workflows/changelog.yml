@@ -21,6 +21,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
+      REPOSITORY: ${{ github.repository }}
     steps:
       - name: Skip non-user-facing changes
         if: contains(github.event.pull_request.labels.*.name, 'skip-changelog')
@@ -31,7 +32,8 @@ jobs:
         run: |
           set -euo pipefail
           pattern="^changelog\.d/${PR_NUMBER}\.(added|changed|deprecated|removed|fixed)\.md$"
-          if gh pr diff "$PR_NUMBER" --name-only | grep -Eq "$pattern"; then
+          if gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}/files" \
+            --paginate --jq '.[].filename' | grep -Eq "$pattern"; then
             echo "changelog fragment found for PR #${PR_NUMBER}"
             exit 0
           fi
