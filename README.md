@@ -77,13 +77,34 @@ pip install summonpot[cli]       # + Typer CLI
 pip install summonpot[all]       # everything
 ```
 
-You also need an OpenAI-compatible API key:
+Install the provider you want to use:
 
 ```bash
-export SUMMONPOT_API_KEY=sk-...          # or OPENAI_API_KEY
-export SUMMONPOT_MODEL=gpt-4o-mini        # optional, default gpt-4o-mini
-export SUMMONPOT_BASE_URL=https://api.openai.com/v1   # optional
+pip install "summonpot[openai]"       # OpenAI
+pip install "summonpot[anthropic]"    # Anthropic
+pip install "summonpot[google]"       # Google Gemini
+pip install "summonpot[groq]"         # Groq
+pip install "summonpot[mistral]"      # Mistral
+pip install "summonpot[openrouter]"   # OpenRouter
+pip install "summonpot[xai]"          # xAI
+pip install "summonpot[all]"          # serving, CLI, and every provider
 ```
+
+Choose a model with an explicit `provider:model` identifier and set that provider's standard API-key environment variable:
+
+```bash
+export SUMMONPOT_MODEL=anthropic:claude-sonnet-4-5
+export ANTHROPIC_API_KEY=...
+```
+
+OpenRouter keeps the upstream provider and model in the portion after the first colon:
+
+```bash
+export SUMMONPOT_MODEL=openrouter:anthropic/claude-sonnet-4
+export OPENROUTER_API_KEY=...
+```
+
+The endpoint API does not change between providers. Unprefixed legacy model names such as `gpt-4o-mini` continue to resolve as `openai:gpt-4o-mini`.
 
 ## Quick Start
 
@@ -175,8 +196,8 @@ Those two annotations are the complete API contract. The decorated function is d
 
 - The request model validates incoming JSON, including nested models, defaults, field constraints, aliases, and custom validators.
 - The response model appears in OpenAPI and validates the final HTTP response.
-- Its JSON Schema is sent to the model provider as the structured-output format.
-- The provider response is parsed back into the declared Pydantic class. Invalid output raises a Pydantic validation error instead of silently returning malformed data.
+- The runtime gives the provider the response contract through the structured-output strategy that provider supports.
+- The provider result is validated into the declared Pydantic class. Invalid output is retried within a bounded budget, then fails explicitly instead of returning malformed data.
 - Primitive function signatures remain supported for compatibility, but Pydantic models are the primary API for structured endpoints.
 
 A Pydantic request model must be the endpoint's only function parameter. Put all request fields inside that model so there is one unambiguous body schema.
@@ -192,22 +213,40 @@ summonpot inspects your endpoint function:
 
 The framework owns the LLM call loop, tool orchestration, and structured-output enforcement. You provide intent — the endpoint.
 
-## Configuration
+## Provider and model configuration
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `SUMMONPOT_API_KEY` | `OPENAI_API_KEY` | API key for the LLM provider |
-| `SUMMONPOT_BASE_URL` | `OPENAI_BASE_URL` or `https://api.openai.com/v1` | OpenAI-compatible endpoint |
-| `SUMMONPOT_MODEL` | `gpt-4o-mini` | Default model for all endpoints |
+Summonpot uses provider-qualified model identifiers. Provider SDKs, authentication, tool calling, structured-output negotiation, and model-specific behavior are handled internally by the provider-agnostic runtime.
 
-Per-endpoint overrides:
+| Provider | Install extra | Model example | API-key variable |
+|---|---|---|---|
+| OpenAI | `summonpot[openai]` | `openai:gpt-4o-mini` | `OPENAI_API_KEY` |
+| Anthropic | `summonpot[anthropic]` | `anthropic:claude-sonnet-4-5` | `ANTHROPIC_API_KEY` |
+| Google | `summonpot[google]` | `google:gemini-2.5-flash` | `GOOGLE_API_KEY` |
+| Groq | `summonpot[groq]` | `groq:llama-3.3-70b-versatile` | `GROQ_API_KEY` |
+| Mistral | `summonpot[mistral]` | `mistral:mistral-large-latest` | `MISTRAL_API_KEY` |
+| OpenRouter | `summonpot[openrouter]` | `openrouter:anthropic/claude-sonnet-4` | `OPENROUTER_API_KEY` |
+| xAI | `summonpot[xai]` | `xai:grok-4` | `XAI_API_KEY` |
+
+`SUMMONPOT_MODEL` sets the default for every endpoint:
+
+```bash
+export SUMMONPOT_MODEL=openrouter:anthropic/claude-sonnet-4
+```
+
+An endpoint can override it without changing its request, response, or tools:
 
 ```python
-@pot.summon("/research", model="gpt-4o", stream=True)
+@pot.summon(
+    "/research",
+    model="anthropic:claude-sonnet-4-5",
+    stream=True,
+)
 def research_topic(request: ResearchRequest) -> ResearchResponse:
     """Research this topic."""
     raise NotImplementedError
 ```
+
+Pydantic AI is an internal runtime dependency. Summonpot users do not construct Pydantic AI agents or provider clients; the stable public contract remains `Pot`, `@pot.summon`, tools, and Pydantic endpoint models.
 
 ## Development
 

@@ -1,13 +1,14 @@
-"""Tests for Pydantic structured output in the agent runtime."""
+"""Tests for the provider-agnostic agent runtime."""
 
 from __future__ import annotations
 
 import asyncio
-from typing import Any, ClassVar
 
-import httpx
 import pytest
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
+from pydantic_ai import UnexpectedModelBehavior
+from pydantic_ai.messages import ModelResponse, ToolCallPart
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from summonpot import Pot
 from summonpot.runtime import Runtime
@@ -22,88 +23,109 @@ class ResearchResponse(BaseModel):
     confidence: float
 
 
-class FakeResponse:
-    def __init__(self, data: dict[str, Any]) -> None:
-        self._data = data
-
-    def raise_for_status(self) -> None:
-        return None
-
-    def json(self) -> dict[str, Any]:
-        return self._data
-
-
-class FakeAsyncClient:
-    response_data: dict[str, Any]
-    requests: ClassVar[list[dict[str, Any]]] = []
-
-    def __init__(self, *, timeout: float) -> None:
-        self.timeout = timeout
-
-    async def __aenter__(self) -> FakeAsyncClient:
-        return self
-
-    async def __aexit__(self, *args: Any) -> None:
-        return None
-
-    async def post(self, url: str, **kwargs: Any) -> FakeResponse:
-        self.requests.append({"url": url, **kwargs})
-        return FakeResponse(self.response_data)
-
-
-def test_runtime_requests_and_validates_pydantic_structured_output(monkeypatch):
-    pot = Pot("svc")
-
-    @pot.summon("/research")
+def _register_endpoint(pot: Pot, *, model: str | None = None) -> None:
+    @pot.summon("/research", model=model)
     def research(request: ResearchRequest) -> ResearchResponse:
         """Research a topic."""
         raise NotImplementedError
 
-    FakeAsyncClient.requests = []
-    FakeAsyncClient.response_data = {
-        "choices": [
-            {
-                "message": {
-                    "content": '{"summary":"Pydantic contracts","confidence":0.95}'
-                }
-            }
-        ]
-    }
-    monkeypatch.setattr(httpx, "AsyncClient", FakeAsyncClient)
 
-    runtime = Runtime()
-    runtime.api_key = "test-key"
+def test_runtime_normalizes_explicit_and_legacy_model_names():
+    runtime = Runtime(model="anthropic:claude-sonnet-4-5")
+
+    assert runtime.default_model == "anthropic:claude-sonnet-4-5"
+    assert Runtime(model="openrouter:anthropic/claude-sonnet-4").default_model == (
+        "openrouter:anthropic/claude-sonnet-4"
+    )
+    assert Runtime(model="gpt-4o-mini").default_model == "openai:gpt-4o-mini"
+
+
+def test_endpoint_model_override_wins_without_provider_specific_logic():
+    pot = Pot("svc")
+    _register_endpoint(pot, model="groq:llama-3.3-70b-versatile")
+    runtime = Runtime(model="anthropic:claude-sonnet-4-5")
+
+    assert runtime.model_for(pot.endpoints[0]) == "groq:llama-3.3-70b-versatile"
+
+
+def test_runtime_returns_declared_model_with_provider_neutral_engine():
+    def model_function(messages, info: AgentInfo):
+        assert info.output_tools
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    info.output_tools[0].name,
+                    {
+                        "summary": "Provider-neutral contracts",
+                        "confidence": 0.95,
+                    },
+                )
+            ]
+        )
+
+    pot = Pot("svc")
+    _register_endpoint(pot)
+    runtime = Runtime(model=FunctionModel(model_function))
+
     result = asyncio.run(runtime.call(pot.endpoints[0], {"query": "agents"}))
 
     assert result == ResearchResponse(
-        summary="Pydantic contracts",
+        summary="Provider-neutral contracts",
         confidence=0.95,
     )
-    body = FakeAsyncClient.requests[0]["json"]
-    assert body["response_format"] == {
-        "type": "json_schema",
-        "json_schema": {
-            "name": "ResearchResponse",
-            "schema": ResearchResponse.model_json_schema(),
-        },
-    }
 
 
-def test_runtime_rejects_output_that_violates_response_model(monkeypatch):
+def test_runtime_rejects_output_that_violates_response_model():
+    def model_function(messages, info: AgentInfo):
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    info.output_tools[0].name,
+                    {"summary": "Incomplete"},
+                )
+            ]
+        )
+
     pot = Pot("svc")
+    _register_endpoint(pot)
+    runtime = Runtime(model=FunctionModel(model_function), retries=0)
 
-    @pot.summon("/research")
-    def research(request: ResearchRequest) -> ResearchResponse:
-        """Research a topic."""
-        raise NotImplementedError
-
-    FakeAsyncClient.requests = []
-    FakeAsyncClient.response_data = {
-        "choices": [{"message": {"content": '{"summary":"Incomplete"}'}}]
-    }
-    monkeypatch.setattr(httpx, "AsyncClient", FakeAsyncClient)
-
-    runtime = Runtime()
-    runtime.api_key = "test-key"
-    with pytest.raises(ValidationError, match="confidence"):
+    with pytest.raises(UnexpectedModelBehavior, match="maximum output retries"):
         asyncio.run(runtime.call(pot.endpoints[0], {"query": "agents"}))
+
+
+def test_runtime_executes_tools_through_provider_neutral_agent_loop():
+    tool_calls: list[str] = []
+    model_turns = 0
+
+    def search_web(query: str) -> str:
+        """Search the web for a topic."""
+        tool_calls.append(query)
+        return "Grounded result"
+
+    def model_function(messages, info: AgentInfo):
+        nonlocal model_turns
+        model_turns += 1
+        if model_turns == 1:
+            assert info.function_tools[0].name == "search_web"
+            return ModelResponse(
+                parts=[ToolCallPart("search_web", {"query": "agents"})]
+            )
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    info.output_tools[0].name,
+                    {"summary": "Grounded result", "confidence": 1.0},
+                )
+            ]
+        )
+
+    pot = Pot("svc", tools=[search_web])
+    _register_endpoint(pot)
+    runtime = Runtime(model=FunctionModel(model_function))
+
+    result = asyncio.run(runtime.call(pot.endpoints[0], {"query": "agents"}))
+
+    assert tool_calls == ["agents"]
+    assert model_turns == 2
+    assert result == ResearchResponse(summary="Grounded result", confidence=1.0)

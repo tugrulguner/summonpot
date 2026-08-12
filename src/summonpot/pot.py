@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from summonpot.models import EndpointDef, ParamDef
+from summonpot.models import EndpointDef, ParamDef, ToolDef
 from summonpot.runtime import Runtime
 from summonpot.tools import build_tool_from_func
 
@@ -47,7 +47,7 @@ class Pot:
         self._pot_tools: list = []
         if tools:
             for t in tools:
-                if hasattr(t, "to_openai_tool"):
+                if isinstance(t, ToolDef):
                     self._pot_tools.append(t)
                 else:
                     self._pot_tools.append(build_tool_from_func(t))
@@ -85,7 +85,7 @@ class Pot:
             if tools:
                 # Convert raw functions to ToolDefs
                 for t in tools:
-                    if not hasattr(t, "to_openai_tool"):
+                    if not isinstance(t, ToolDef):
                         all_tools.append(build_tool_from_func(t))
                     else:
                         all_tools.append(t)

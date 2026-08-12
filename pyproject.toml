@@ -25,12 +25,18 @@ classifiers = [
 dependencies = [
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
+    "pydantic-ai-slim>=2.27.1,<3",
 ]
 
 [project.optional-dependencies]
 serve = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
 cli = ["typer>=0.9.0"]
-all = ["summonpot[serve,cli]"]
+openai = [
+    "pydantic-ai-slim[openai]>=2.27.1,<3",
+]
+all = [
+    "summonpot[serve,cli,openai,anthropic,google,groq,mistral,openrouter,xai]",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
@@ -40,6 +46,24 @@ dev = [
     "httpx>=0.27.0",
     "summonpot[all]",
     "towncrier>=25.8.0",
+]
+anthropic = [
+    "pydantic-ai-slim[anthropic]>=2.27.1,<3",
+]
+google = [
+    "pydantic-ai-slim[google]>=2.27.1,<3",
+]
+groq = [
+    "pydantic-ai-slim[groq]>=2.27.1,<3",
+]
+mistral = [
+    "pydantic-ai-slim[mistral]>=2.27.1,<3",
+]
+openrouter = [
+    "pydantic-ai-slim[openrouter]>=2.27.1,<3",
+]
+xai = [
+    "pydantic-ai-slim[xai]>=2.27.1,<3",
 ]
 
 [project.urls]
