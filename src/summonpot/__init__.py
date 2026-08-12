@@ -2,6 +2,7 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
+from summonpot.dependencies import Depends, Required
 from summonpot.pot import Pot
 
 try:
@@ -9,4 +10,4 @@ try:
 except PackageNotFoundError:
     __version__ = "0.0.0+unknown"
 
-__all__ = ["Pot"]
+__all__ = ["Depends", "Pot", "Required"]

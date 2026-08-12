@@ -10,7 +10,7 @@ from pydantic_ai import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from summonpot import Pot
+from summonpot import Pot, Required
 from summonpot.runtime import Runtime
 
 
@@ -129,3 +129,55 @@ def test_runtime_executes_tools_through_provider_neutral_agent_loop():
     assert tool_calls == ["agents"]
     assert model_turns == 2
     assert result == ResearchResponse(summary="Grounded result", confidence=1.0)
+
+
+def test_runtime_rejects_final_output_until_required_capability_runs():
+    capability_calls: list[str] = []
+    model_turns = 0
+
+    def load_sources(query: str) -> str:
+        """Load authoritative sources for the query."""
+        capability_calls.append(query)
+        return "Required result"
+
+    pot = Pot("svc")
+
+    @pot.summon("/research")
+    def research(
+        request: ResearchRequest,
+        sources=Required(load_sources),
+    ) -> ResearchResponse:
+        """Research using the declared source capability."""
+        raise NotImplementedError
+
+    def model_function(messages, info: AgentInfo):
+        nonlocal model_turns
+        model_turns += 1
+        if model_turns == 1:
+            return ModelResponse(
+                parts=[
+                    ToolCallPart(
+                        info.output_tools[0].name,
+                        {"summary": "Unsupported", "confidence": 0.1},
+                    )
+                ]
+            )
+        if model_turns == 2:
+            return ModelResponse(
+                parts=[ToolCallPart("load_sources", {"query": "agents"})]
+            )
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    info.output_tools[0].name,
+                    {"summary": "Required result", "confidence": 1.0},
+                )
+            ]
+        )
+
+    runtime = Runtime(model=FunctionModel(model_function), retries=2)
+    result = asyncio.run(runtime.call(pot.endpoints[0], {"query": "agents"}))
+
+    assert capability_calls == ["agents"]
+    assert model_turns == 3
+    assert result == ResearchResponse(summary="Required result", confidence=1.0)

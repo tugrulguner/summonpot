@@ -8,6 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from summonpot.dependencies import Dependency
 from summonpot.models import EndpointDef, ParamDef, ToolDef
 from summonpot.runtime import Runtime
 from summonpot.tools import build_tool_from_func
@@ -94,9 +95,15 @@ class Pot:
             sig = inspect.signature(func)
             hints = _safe_get_type_hints(func)
             parameters: list[ParamDef] = []
+            dependency_tools: list[ToolDef] = []
             input_model: type[BaseModel] | None = None
             for pname, param in sig.parameters.items():
                 if pname in ("self", "cls"):
+                    continue
+                if isinstance(param.default, Dependency):
+                    dependency_tool = build_tool_from_func(param.default.operation)
+                    dependency_tool.required = param.default.required
+                    dependency_tools.append(dependency_tool)
                     continue
                 annotation = hints.get(pname, param.annotation)
                 if _is_pydantic_model(annotation):
@@ -128,6 +135,14 @@ class Pot:
             else:
                 return_type = str(return_hint)
 
+            endpoint_tools = [*all_tools, *dependency_tools]
+            tool_names = [tool.name for tool in endpoint_tools]
+            duplicate_names = sorted(
+                {name for name in tool_names if tool_names.count(name) > 1}
+            )
+            if duplicate_names:
+                raise TypeError(f"Duplicate capability name: {duplicate_names[0]}")
+
             endpoint = EndpointDef(
                 path=path,
                 name=endpoint_name,
@@ -136,7 +151,7 @@ class Pot:
                 return_type=return_type,
                 input_model=input_model,
                 output_model=output_model,
-                tools=all_tools,
+                tools=endpoint_tools,
                 stream=stream,
                 model=model,
             )

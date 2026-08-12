@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+from functools import wraps
 from typing import Any
 
-from pydantic_ai import Agent, Tool
+from pydantic_ai import Agent, ModelRetry, Tool
 from pydantic_ai.models import Model
 
 from summonpot.models import EndpointDef
@@ -42,9 +43,21 @@ class Runtime:
     ) -> Any:
         """Run an endpoint with provider-neutral tools and typed output."""
         output_type: Any = endpoint.output_model or str
+        completed_required: set[str] = set()
+
+        def tracked_operation(tool: Any) -> Any:
+            @wraps(tool.fn)
+            async def execute(*args: Any, **kwargs: Any) -> Any:
+                result = await tool.call(*args, **kwargs)
+                if tool.required:
+                    completed_required.add(tool.name)
+                return result
+
+            return execute
+
         tools = [
             Tool(
-                tool.fn,
+                tracked_operation(tool),
                 name=tool.name,
                 description=tool.description,
                 takes_ctx=False,
@@ -58,6 +71,21 @@ class Runtime:
             tools=tools,
             retries=self.retries,
         )
+
+        @agent.output_validator
+        def require_declared_operations(output: Any) -> Any:
+            missing = {
+                tool.name
+                for tool in endpoint.tools
+                if tool.required and tool.name not in completed_required
+            }
+            if missing:
+                names = ", ".join(sorted(missing))
+                raise ModelRetry(
+                    f"Required capabilities must run before final output: {names}"
+                )
+            return output
+
         result = await agent.run(self._build_user_message(endpoint, params))
         output = result.output
 

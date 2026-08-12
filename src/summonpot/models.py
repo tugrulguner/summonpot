@@ -28,12 +28,13 @@ class ToolDef:
     description: str
     parameters: list[ParamDef] = field(default_factory=list)
     fn: Any = None  # the callable
+    required: bool = False
 
-    async def call(self, **kwargs: Any) -> Any:
+    async def call(self, *args: Any, **kwargs: Any) -> Any:
         """Execute the tool with the given arguments."""
         if inspect.iscoroutinefunction(self.fn):
-            return await self.fn(**kwargs)
-        return self.fn(**kwargs)
+            return await self.fn(*args, **kwargs)
+        return self.fn(*args, **kwargs)
 
 
 @dataclass

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel
 
-from summonpot import Pot
+from summonpot import Depends, Pot, Required
 from summonpot.tools import tool
 
 
@@ -67,6 +67,54 @@ def test_summon_rejects_mixed_pydantic_and_scalar_inputs():
         @pot.summon("/research")
         def research(request: ResearchRequest, trace_id: str) -> ResearchResponse:
             """Research a topic."""
+            raise NotImplementedError
+
+
+def test_summon_compiles_dependency_parameters_as_closed_capabilities():
+    def load_sources(query: str) -> list[str]:
+        """Load sources for the validated query."""
+        return [query]
+
+    def rank_sources(sources: list[str]) -> list[str]:
+        """Rank the loaded sources."""
+        return sources
+
+    pot = Pot("svc")
+
+    @pot.summon("/research")
+    def research(
+        request: ResearchRequest,
+        sources=Depends(load_sources),
+        ranking=Required(rank_sources),
+    ) -> ResearchResponse:
+        """Research a topic using only the declared capabilities."""
+        raise NotImplementedError
+
+    endpoint = pot.endpoints[0]
+    assert endpoint.input_model is ResearchRequest
+    assert [parameter.name for parameter in endpoint.parameters] == ["request"]
+    assert [tool.name for tool in endpoint.tools] == ["load_sources", "rank_sources"]
+    assert [tool.required for tool in endpoint.tools] == [False, True]
+
+
+def test_summon_rejects_duplicate_capability_names():
+    def lookup(query: str) -> str:
+        return query
+
+    def second_lookup(query: str) -> str:
+        return query
+
+    second_lookup.__name__ = "lookup"
+    pot = Pot("svc")
+
+    with pytest.raises(TypeError, match="Duplicate capability name: lookup"):
+
+        @pot.summon("/research")
+        def research(
+            request: ResearchRequest,
+            first=Depends(lookup),
+            second=Depends(second_lookup),
+        ) -> ResearchResponse:
             raise NotImplementedError
 
 

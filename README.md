@@ -13,7 +13,7 @@
 
 summonpot is a **full API framework** — with routing, validation, middleware, and serving — but built for the era where APIs don't just respond, they reason. Define routes. The framework runs the agents. No agent configuration. No framework ontology. Just endpoints that think.
 
-You define routes with Pydantic request and response models, a docstring, and tools. The framework owns the agentic runtime — the LLM call loop, tool orchestration, structured output, and streaming. You don't configure an agent. You define an endpoint. The agent is summoned.
+You define routes with Pydantic request and response models, a docstring, and exact deterministic capabilities. The framework owns the agentic runtime — the LLM call loop, capability orchestration, structured output, and streaming. You don't configure an agent or write handler glue. You define an endpoint. The agent is summoned.
 
 ```python
 from pydantic import BaseModel, Field
@@ -168,12 +168,13 @@ pot.serve(host="127.0.0.1", port=9000)
 | Return type | What appears |
 | `stream=True` | You asked it to speak continuously |
 
-## Pydantic endpoint contracts
+## Declarative dependencies
 
-A structured endpoint declares exactly one Pydantic request model and returns one Pydantic response model:
+An endpoint signature can combine one Pydantic request model, exact deterministic dependencies, and one Pydantic response model:
 
 ```python
 from pydantic import BaseModel, Field
+from summonpot import Depends, Required
 
 
 class PlanRequest(BaseModel):
@@ -186,32 +187,50 @@ class PlanResponse(BaseModel):
     risks: list[str]
 
 
+def load_constraints(goal: str) -> list[str]:
+    """Load exact stored constraints for the goal."""
+    return []
+
+
+def check_capacity(goal: str) -> dict:
+    """Check current capacity with deterministic business logic."""
+    return {"available": True}
+
+
 @pot.summon("/plan")
-def plan(request: PlanRequest) -> PlanResponse:
+def plan(
+    request: PlanRequest,
+    stored_constraints=Depends(load_constraints),
+    capacity=Required(check_capacity),
+) -> PlanResponse:
     """Create an actionable plan that respects every constraint."""
     raise NotImplementedError
 ```
 
-Those two annotations are the complete API contract. The decorated function is declarative—the agent runtime does not execute its body. `raise NotImplementedError` makes that explicit while keeping static type checkers satisfied.
+The signature is the complete execution contract. The decorated function is declarative—the runtime does not execute its body.
 
-- The request model validates incoming JSON, including nested models, defaults, field constraints, aliases, and custom validators.
-- The response model appears in OpenAPI and validates the final HTTP response.
-- The runtime gives the provider the response contract through the structured-output strategy that provider supports.
-- The provider result is validated into the declared Pydantic class. Invalid output is retried within a bounded budget, then fails explicitly instead of returning malformed data.
-- Primitive function signatures remain supported for compatibility, but Pydantic models are the primary API for structured endpoints.
+- The request model alone defines and validates incoming JSON.
+- The response model defines OpenAPI output and validates the final result.
+- `Depends(operation)` gives the agent an exact deterministic operation it may call.
+- `Required(operation)` rejects final output until the exact operation has run successfully.
+- Dependencies never become HTTP request fields.
+- The agent receives no undeclared application operations.
+- Provider output is retried within a bounded budget when it violates the response contract or skips a required operation.
 
-A Pydantic request model must be the endpoint's only function parameter. Put all request fields inside that model so there is one unambiguous body schema.
+A Pydantic endpoint has exactly one request parameter plus any declarative dependencies. Put all incoming fields inside the request model so there is one clear JSON body.
 
 ## How it works
 
 summonpot inspects your endpoint function:
 
-- **Docstring** → becomes the system prompt the agent follows
+- **Docstring** → becomes the fixed endpoint goal
 - **Pydantic request model** → becomes the validated JSON request body and OpenAPI input schema
 - **Pydantic response model** → becomes the provider's structured-output schema, runtime validator, and OpenAPI response schema
-- **Tools** → exposed to the agent via function calling, so it can act, not just answer
+- **Dependencies** → become the endpoint's closed set of optional or mandatory deterministic capabilities
 
-The framework owns the LLM call loop, tool orchestration, and structured-output enforcement. You provide intent — the endpoint.
+The framework owns the agent loop, capability orchestration, required-operation enforcement, and structured-output validation. The endpoint body contains no handler code.
+
+See [Declarative capability endpoints](docs/declarative-capabilities.md) for the execution and security contract.
 
 ## Provider and model configuration
 

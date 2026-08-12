@@ -7,7 +7,7 @@ from typing import Literal
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
 
-from summonpot import Pot, __version__
+from summonpot import Depends, Pot, __version__
 from summonpot.server import build_app
 
 
@@ -66,6 +66,38 @@ def test_build_app_uses_pydantic_request_and_response_models(mock_runtime):
 
     invalid = client.post("/analyze", json={"text": "x"})
     assert invalid.status_code == 422
+
+
+def test_dependency_parameters_do_not_leak_into_http_contract(mock_runtime):
+    def analyze_records(text: str) -> dict[str, str]:
+        """Run exact deterministic analysis."""
+        return {"text": text}
+
+    pot = mock_runtime(
+        mock_response={"sentiment": "positive", "topics": ["capabilities"]}
+    )
+
+    @pot.summon("/analyze")
+    def analyze(
+        request: AnalysisRequest,
+        records=Depends(analyze_records),
+    ) -> AnalysisResponse:
+        """Analyze using only the declared operation."""
+        raise AssertionError("declarative endpoint body must not execute")
+
+    client = TestClient(build_app(pot))
+    operation = client.get("/openapi.json").json()["paths"]["/analyze"]["post"]
+
+    assert operation.get("parameters", []) == []
+    assert operation["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/AnalysisRequest"
+    }
+    response = client.post("/analyze", json={"text": "Exact operation"})
+    assert response.status_code == 200
+    assert response.json() == {
+        "sentiment": "positive",
+        "topics": ["capabilities"],
+    }
 
 
 def test_build_app_requires_body_fields(mock_runtime):
