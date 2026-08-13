@@ -44,6 +44,34 @@ Move from function signatures alone to explicit operation contracts:
 
 Add optional adapters for prepared operations without exposing database authority:
 
+```text
+prepared SQLAlchemy statement or fixed SQLite specification
+→ framework-owned adapter and connection/session lifecycle
+→ Required(...) or Depends(...) endpoint capability
+→ typed callable schema visible to the executor
+```
+
+Target declarations will pass the bounded operation object into the endpoint—not a session, connection, or arbitrary query function:
+
+```python
+customer=Required(
+    SQLAlchemyOperation(
+        statement=customer_select,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=CustomerView,
+    )
+)
+
+receipt=Required(
+    SQLiteOperation(
+        sql=cancel_order_sql,
+        bind={"order_id": FromRequest("order_id")},
+        output=CancelReceipt,
+        exactly_one_row=True,
+    )
+)
+```
+
 - SQLAlchemy `Select`, `Insert`, `Update`, and `Delete` statement objects.
 - Fixed parameterized SQLite operation specifications.
 - Framework-owned sessions, connections, transactions, and serialization.

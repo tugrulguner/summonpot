@@ -46,4 +46,14 @@ Dependency parameters are declaration-only. They do not appear in the HTTP reque
 
 The endpoint agent receives its declared dependencies and no ambient application access. An operation can contain deterministic business logic or a safe database adapter. Raw database sessions, connections, cursors, ORM registries, shells, and arbitrary SQL execution should not be exposed.
 
-Strict SQLAlchemy and SQLite operation objects will build on this capability contract in a separate change.
+For databases, the target adapter API accepts exact prepared operations rather than broad infrastructure objects:
+
+- a developer-declared SQLAlchemy `Select`, `Insert`, `Update`, or `Delete` statement;
+- a fixed parameterized SQLite statement specification;
+- explicit bind sources such as validated request fields;
+- a typed projection or write receipt;
+- a framework-owned session or connection factory that is never agent-visible.
+
+The agent receives the operation's typed callable schema—not the statement, SQL text, ORM metadata, session, engine, connection, or cursor. It cannot edit the query or execute another one.
+
+Strict SQLAlchemy and SQLite operation objects are planned and not yet shipped. See the target API examples in the README and the implementation sequence in the roadmap.

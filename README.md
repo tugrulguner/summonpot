@@ -9,11 +9,21 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/summonpot)](https://pypi.org/project/summonpot/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**An AI-native API framework. Every endpoint is an agent that runs automatically.**
+**One API framework for deterministic and agentic endpoints.**
 
-summonpot is a **full API framework** — with routing, validation, middleware, and serving — but built for the era where APIs don't just respond, they reason. Define routes. The framework runs the agents. No agent configuration. No framework ontology. Just endpoints that think.
+summonpot brings traditional exact API execution and bounded agent reasoning under one endpoint contract. You declare the request model, response model, fixed goal, and exact capabilities. When one complete legal path exists, the target runtime executes it deterministically. When a real choice remains, an agent may choose and order only the declared operations.
 
-You define routes with Pydantic request and response models, a docstring, and exact deterministic capabilities. The framework owns the agentic runtime — the LLM call loop, capability orchestration, and structured output. You don't configure an agent or write handler glue. You define an endpoint. The agent is summoned.
+The public API stays the same in both modes: no separate handler implementation, agent graph, caller-provided `action`, or framework selector. The endpoint declaration defines what must happen; request JSON carries business data; summonpot chooses the least-powerful sufficient execution path.
+
+> **Current status:** Pydantic contracts, provider-neutral agent execution, closed capabilities, and runtime-enforced required operations are shipped. Automatic deterministic endpoint execution and SQLAlchemy/SQLite capability adapters are the next implementation milestones.
+
+You define routes with Pydantic request and response models, a docstring, and exact deterministic capabilities. The framework owns validation, capability orchestration, structured output, and the agent loop when one is needed. You define an endpoint. Summonpot decides whether it needs reasoning.
+
+| Endpoint outcome | Execution path |
+|---|---|
+| Traditional exact API behavior with one legal path | Deterministic, without an LLM *(planned compiler)* |
+| Several valid declared paths require a bounded choice | Agentic, using only declared capabilities |
+| No declared legal path | Typed deterministic error *(planned compiler)* |
 
 ```python
 from my_service.operations import record_research, search_web
@@ -191,6 +201,120 @@ def fulfil_order(
 ```
 
 The endpoint declaration supplies the fixed goal: fulfil the order using the best valid option. The request supplies business data only. If inventory leaves one complete path, the planned compiler can run it deterministically. If several valid substitutions remain, the agent chooses among those bounded results. It cannot call undeclared operations or grant itself a stronger runtime.
+
+## Restricted database operations
+
+Database access follows the same capability rule: pass exact prepared operations, never database authority.
+
+> **Target API — planned, not shipped yet:** the SQLAlchemy and SQLite adapters below show the intended security boundary. Final names may change during implementation.
+
+### SQLAlchemy ORM statement
+
+The developer prepares one exact `Select` using an ORM model. The framework binds `customer_id` from validated request data, opens the session internally, executes the statement, and validates the projected result. The agent sees `load_customer(customer_id) -> CustomerView`; it never receives the statement, ORM registry, session, or engine.
+
+```python
+from orders.database import Customer, orders_session
+from pydantic import BaseModel
+from sqlalchemy import bindparam, select
+from summonpot import FromRequest, Pot, Required, SQLAlchemyOperation
+
+
+class CustomerRequest(BaseModel):
+    customer_id: str
+
+
+class CustomerView(BaseModel):
+    customer_id: str
+    tier: str
+    active: bool
+
+
+customer_statement = (
+    select(
+        Customer.id.label("customer_id"),
+        Customer.tier,
+        Customer.active,
+    )
+    .where(Customer.id == bindparam("customer_id"))
+)
+
+load_customer = SQLAlchemyOperation(
+    name="load_customer",
+    statement=customer_statement,
+    session_factory=orders_session,
+    bind={"customer_id": FromRequest("customer_id")},
+    output=CustomerView,
+)
+
+pot = Pot("customers")
+
+
+@pot.summon("/customers/resolve")
+def resolve_customer(
+    request: CustomerRequest,
+    customer=Required(load_customer),
+) -> CustomerView:
+    """Return the exact approved customer projection."""
+    raise NotImplementedError
+```
+
+Only the predefined `SELECT` can run. The model cannot change the table, columns, predicate, join, or SQL text.
+
+### SQLite operation
+
+The SQLite adapter receives one fixed parameterized statement. The framework owns the connection and parameter binding; the agent cannot access a connection, cursor, or generic SQL executor.
+
+```python
+from orders.database import orders_database
+from pydantic import BaseModel
+from summonpot import FromRequest, Pot, Required, SQLiteOperation
+
+
+class CancelRequest(BaseModel):
+    order_id: str
+
+
+class CancelReceipt(BaseModel):
+    order_id: str
+    rows_affected: int
+    status: str
+
+
+cancel_order = SQLiteOperation(
+    name="cancel_order",
+    database=orders_database,
+    sql="""
+        UPDATE orders
+        SET status = 'cancelled'
+        WHERE id = :order_id AND status = 'pending'
+    """,
+    bind={"order_id": FromRequest("order_id")},
+    output=CancelReceipt,
+    exactly_one_row=True,
+)
+
+pot = Pot("orders")
+
+
+@pot.summon("/orders/cancel")
+def cancel(
+    request: CancelRequest,
+    receipt=Required(cancel_order),
+) -> CancelReceipt:
+    """Cancel this order only when the declared operation permits it."""
+    raise NotImplementedError
+```
+
+The endpoint can execute only that parameterized `UPDATE`. It cannot issue another query, interpolate SQL, inspect unrelated tables, or claim success without the validated receipt.
+
+The planned adapters will enforce these boundaries outside the model:
+
+- only developer-declared `Select`, `Insert`, `Update`, or `Delete` objects and fixed SQLite statements;
+- explicit argument sources such as validated request fields or prior operation results;
+- typed input, projection, and receipt validation;
+- framework-owned sessions, connections, transactions, and serialization;
+- affected-row, call-count, ordering, and once-only constraints;
+- no raw `Session`, `Engine`, `Connection`, cursor, model registry, arbitrary SQL, shell, or filesystem access.
 
 ## Installation
 
