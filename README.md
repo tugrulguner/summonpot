@@ -16,6 +16,7 @@ summonpot is a **full API framework** — with routing, validation, middleware, 
 You define routes with Pydantic request and response models, a docstring, and exact deterministic capabilities. The framework owns the agentic runtime — the LLM call loop, capability orchestration, structured output, and streaming. You don't configure an agent or write handler glue. You define an endpoint. The agent is summoned.
 
 ```python
+from my_service.operations import record_research, search_web
 from pydantic import BaseModel, Field
 from summonpot import Depends, Pot, Required
 
@@ -29,16 +30,6 @@ class ResearchResponse(BaseModel):
     summary: str
     key_findings: list[str]
     sources: list[str]
-
-
-def search_web(query: str) -> list[str]:
-    """Search approved sources for the query."""
-    return []
-
-
-def record_research(query: str) -> dict[str, str]:
-    """Record that the research request was processed."""
-    return {"query": query, "status": "recorded"}
 
 
 pot = Pot("my-service")
@@ -65,7 +56,7 @@ curl -X POST http://localhost:8000/research \
   -d '{"query": "quantum computing", "depth": 5}'
 ```
 
-Behind the scenes, the agent can call only the declared operations. The runtime rejects a final response until `record_research` has completed, validates the Pydantic output locally, and never executes the decorated function body. You wrote an endpoint contract, not an agent loop or handler.
+The imported functions are real, application-owned operations: `search_web` must query the approved source service, and `record_research` must perform the actual write. Summonpot does not replace their implementations with generated behavior. It exposes only those exact operations to the endpoint agent, rejects a final response until `record_research` has completed, validates the Pydantic output locally, and never executes the decorated function body.
 
 ## Why another framework?
 
