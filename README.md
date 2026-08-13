@@ -17,7 +17,7 @@ You define routes with Pydantic request and response models, a docstring, and ex
 
 ```python
 from pydantic import BaseModel, Field
-from summonpot import Pot
+from summonpot import Depends, Pot, Required
 
 
 class ResearchRequest(BaseModel):
@@ -31,11 +31,25 @@ class ResearchResponse(BaseModel):
     sources: list[str]
 
 
-pot = Pot("my-service", tools=[search_web])
+def search_web(query: str) -> list[str]:
+    """Search approved sources for the query."""
+    return []
+
+
+def record_research(query: str) -> dict[str, str]:
+    """Record that the research request was processed."""
+    return {"query": query, "status": "recorded"}
+
+
+pot = Pot("my-service")
 
 
 @pot.summon("/research")
-def research_topic(request: ResearchRequest) -> ResearchResponse:
+def research_topic(
+    request: ResearchRequest,
+    sources=Depends(search_web),
+    receipt=Required(record_research),
+) -> ResearchResponse:
     """Research this topic thoroughly and return a sourced report."""
     raise NotImplementedError
 
@@ -51,7 +65,7 @@ curl -X POST http://localhost:8000/research \
   -d '{"query": "quantum computing", "depth": 5}'
 ```
 
-Behind the scenes, an agent runs — it thinks, uses tools, calls the LLM, enforces structured output, and returns the result. But you never wrote an agent. You wrote a route.
+Behind the scenes, the agent can call only the declared operations. The runtime rejects a final response until `record_research` has completed, validates the Pydantic output locally, and never executes the decorated function body. You wrote an endpoint contract, not an agent loop or handler.
 
 ## Why another framework?
 
@@ -67,6 +81,12 @@ summonpot flips this: the **web framework IS the agent framework**. The routing 
 | Complexity | User manages the loop | Framework owns the loop, user provides intent |
 | Testability | Heavy mocking required | Test like a regular HTTP endpoint |
 | Onboarding | Learn the framework's ontology | If you know HTTP, you know this |
+
+## Project status
+
+The current foundation includes Pydantic request and response contracts, provider-neutral model selection, declarative optional and mandatory capabilities, runtime-enforced required use, HTTP/OpenAPI generation, and local output validation.
+
+Next milestones focus on typed operation inputs and outputs, strict SQLAlchemy and SQLite statement capabilities, deterministic-versus-agentic execution selection, proof-backed write receipts, stable error semantics, and optional larger execution harnesses. See the [roadmap](ROADMAP.md) for scope and ordering.
 
 ## Installation
 
