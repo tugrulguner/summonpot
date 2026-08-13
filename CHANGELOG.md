@@ -10,6 +10,23 @@ release assembles them here — run `make changelog-draft` to preview them.
 
 <!-- towncrier release notes start -->
 
+## [0.2.0] - 2026-08-12
+
+### Added
+
+- Add first-class Pydantic request and response contracts with provider-neutral structured output, tool execution, HTTP validation, OpenAPI schemas, and locally validated runtime results. ([#8](https://github.com/tugrulguner/summonpot/pull/8))
+- Add declarative `Depends` and runtime-enforced `Required` operations so endpoint signatures define a closed deterministic capability set without handler code or extra HTTP fields. ([#9](https://github.com/tugrulguner/summonpot/pull/9))
+- Expand runtime, deterministic operation, and CLI test coverage, including mandatory capability omission and exact command-line failure diagnostics. ([#10](https://github.com/tugrulguner/summonpot/pull/10))
+- Document the shipped declarative capability model and publish the roadmap for typed operations, database adapters, execution selection, receipts, stable failures, and optional larger harnesses. ([#11](https://github.com/tugrulguner/summonpot/pull/11))
+- Document deterministic and agentic endpoint execution modes, decision rules, examples, and the current status of automatic execution selection. ([#13](https://github.com/tugrulguner/summonpot/pull/13))
+- Lead with the signature-only, no-handler endpoint contract for unified deterministic and agentic execution, and document planned SQLAlchemy and SQLite capability adapters with restricted database-operation examples. ([#14](https://github.com/tugrulguner/summonpot/pull/14))
+
+### Fixed
+
+- Stop exposing summonpot's internal endpoint and runtime closure state as query parameters in generated OpenAPI schemas. ([#7](https://github.com/tugrulguner/summonpot/pull/7))
+- Correct README examples and terminology to use real application-owned capabilities consistently and remove placeholder operations and unimplemented streaming claims. ([#12](https://github.com/tugrulguner/summonpot/pull/12))
+
+
 ## [0.1.0] - 2026-08-10
 
 ### Added
