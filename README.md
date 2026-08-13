@@ -79,6 +79,119 @@ The current foundation includes Pydantic request and response contracts, provide
 
 Next milestones focus on typed operation inputs and outputs, strict SQLAlchemy and SQLite statement capabilities, deterministic-versus-agentic execution selection, proof-backed write receipts, stable error semantics, and optional larger execution harnesses. See the [roadmap](ROADMAP.md) for scope and ordering.
 
+## Deterministic and agentic execution
+
+A summonpot endpoint does not need a separate decorator or caller-provided `action` to become deterministic or agentic. It always declares the same four things:
+
+```text
+request model
++ fixed endpoint goal
++ exact capabilities
++ response model
+```
+
+Summonpot's target execution compiler will choose the mode for each validated request:
+
+| Resolved contract | Execution |
+|---|---|
+| One complete legal operation path | Deterministic |
+| A bounded choice remains | Agentic |
+| No legal path exists | Typed deterministic error |
+
+The capabilities themselves remain deterministic in both modes. Agentic execution means the model chooses or orders only those declared operations; it does not gain arbitrary application access.
+
+> **Current status:** declarative capabilities and required-use enforcement are shipped. Automatic deterministic endpoint execution is a planned milestone. Today, `@pot.summon` requests still run through the provider-neutral agent runtime.
+
+### Deterministic example
+
+This endpoint has one fixed result path: load the account, calculate the exact balance, and return it. Once every input and output binding is declared, the planned compiler can execute it without an LLM.
+
+```python
+from accounts.operations import calculate_balance, load_account
+from pydantic import BaseModel
+from summonpot import Pot, Required
+
+
+class BalanceRequest(BaseModel):
+    account_id: str
+
+
+class BalanceResponse(BaseModel):
+    account_id: str
+    balance: str
+    currency: str
+
+
+pot = Pot("accounts")
+
+
+@pot.summon("/balance")
+def get_balance(
+    request: BalanceRequest,
+    account=Required(load_account),
+    balance=Required(calculate_balance),
+) -> BalanceResponse:
+    """Return the exact current balance for this account."""
+    raise NotImplementedError
+```
+
+```json
+{
+  "account_id": "acc_123"
+}
+```
+
+There is no action to interpret and no valid alternative to choose. Hard rules and money calculations remain inside the declared operations.
+
+### Agentic example
+
+This endpoint has a fixed goal, but inventory results may leave several legal fulfilment paths. The agent may compare only the declared options and must complete the real order operation before returning success.
+
+```python
+from orders.operations import check_inventory, create_order, find_substitutes
+from pydantic import BaseModel
+from summonpot import Depends, Pot, Required
+
+
+class OrderItem(BaseModel):
+    sku: str
+    quantity: int
+
+
+class OrderRequest(BaseModel):
+    customer_id: str
+    items: list[OrderItem]
+
+
+class OrderResponse(BaseModel):
+    order_id: str
+    selected_items: list[OrderItem]
+    status: str
+
+
+pot = Pot("orders")
+
+
+@pot.summon("/orders")
+def fulfil_order(
+    request: OrderRequest,
+    inventory=Depends(check_inventory),
+    substitutes=Depends(find_substitutes),
+    creation=Required(create_order),
+) -> OrderResponse:
+    """Fulfil the order using the best valid available option."""
+    raise NotImplementedError
+```
+
+```json
+{
+  "customer_id": "123",
+  "items": [{"sku": "A", "quantity": 1}]
+}
+```
+
+The endpoint declaration supplies the fixed goal: fulfil the order using the best valid option. The request supplies business data only. If inventory leaves one complete path, the planned compiler can run it deterministically. If several valid substitutions remain, the agent chooses among those bounded results. It cannot call undeclared operations or grant itself a stronger runtime.
+
 ## Installation
 
 ```bash

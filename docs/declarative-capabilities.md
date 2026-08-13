@@ -28,6 +28,18 @@ The signature defines four things:
 
 Required use is checked by runtime state. It is not only written into the prompt.
 
+## Deterministic and agentic execution
+
+Capabilities are deterministic operations in both modes. The difference is whether execution still has an unresolved legal choice:
+
+```text
+one complete path → deterministic execution
+bounded choice remains → agentic execution
+no legal path → typed deterministic error
+```
+
+The public endpoint declaration stays the same. The fixed docstring goal and validated request determine the work; callers do not send an `action` field or select an agent framework. Automatic deterministic endpoint execution is planned—the current runtime still executes `@pot.summon` requests through the provider-neutral agent loop.
+
 Dependency parameters are declaration-only. They do not appear in the HTTP request body or OpenAPI request schema, and the decorated function body is never executed.
 
 ## Closed boundary

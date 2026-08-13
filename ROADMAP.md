@@ -7,10 +7,10 @@ Pydantic request model
 + fixed endpoint goal
 + exact deterministic capabilities
 + Pydantic response model
-= executable agentic endpoint
+= executable endpoint
 ```
 
-The endpoint body is declarative and is never the handler. Request JSON carries business data, not an action selector. The agent may orchestrate only the capabilities declared by the endpoint.
+The endpoint body is declarative and is never the handler. Request JSON carries business data, not an action selector. The same contract can support deterministic execution when one complete path exists or agentic execution when a bounded choice remains. In either mode, execution may use only the capabilities declared by the endpoint.
 
 ## Shipped foundation
 
@@ -66,6 +66,13 @@ no valid path
 ```
 
 This decision will use the fixed endpoint goal, validated request, capability graph, and operation results. Callers will not send an `action` field or select an agent framework.
+
+The public declaration remains `@pot.summon` in every mode. Endpoint authors will not maintain separate deterministic and agentic handlers for the same goal:
+
+- A balance endpoint with one exact account lookup and calculation path can run deterministically.
+- An order-fulfilment endpoint can run deterministically when only one valid option remains.
+- The same order endpoint can use the direct agent runtime when several declared substitutions are valid and a semantic choice remains.
+- No executor may add capabilities, weaken validation, or change the response contract.
 
 ### 4. Receipts and stable failures
 
