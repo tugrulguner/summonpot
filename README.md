@@ -15,6 +15,21 @@ summonpot brings traditional exact API execution and bounded agent reasoning und
 
 The public API stays the same in both modes: no separate handler implementation, agent graph, caller-provided `action`, or framework selector. The endpoint declaration defines what must happen; request JSON carries business data; summonpot chooses the least-powerful sufficient execution path.
 
+**The function signature is the endpoint.** Its request model, docstring goal, declared capabilities, and response type form the complete executable contract. You do not write orchestration or business logic under the endpoint:
+
+```text
+request model
++ fixed goal in the docstring
++ Depends(...) / Required(...) capabilities
++ response model
+= executable endpoint
+
+function body
+= raise NotImplementedError
+```
+
+Summonpot inspects the declaration and never calls the decorated function body. Deterministic business logic lives inside the exact application-owned capabilities, not inside a hidden handler.
+
 > **Current status:** Pydantic contracts, provider-neutral agent execution, closed capabilities, and runtime-enforced required operations are shipped. Automatic deterministic endpoint execution and SQLAlchemy/SQLite capability adapters are the next implementation milestones.
 
 You define routes with Pydantic request and response models, a docstring, and exact deterministic capabilities. The framework owns validation, capability orchestration, structured output, and the agent loop when one is needed. You define an endpoint. Summonpot decides whether it needs reasoning.
