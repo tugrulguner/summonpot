@@ -64,23 +64,27 @@ def _load_pot(source: str) -> Pot:
         raise typer.Exit(1)
 
     sys.path.insert(0, str(filepath.parent))
+    # Raised outside the try below: typer.Exit subclasses RuntimeError, so an
+    # `except Exception` around this would catch it and report the exit code
+    # as though it were a load error.
+    spec = importlib.util.spec_from_file_location("_summonpot_user", filepath)
+    if spec is None or spec.loader is None:
+        typer.echo(f"Error: could not load module from {filepath}", err=True)
+        raise typer.Exit(1)
+
+    mod = importlib.util.module_from_spec(spec)
+    # Register before execution: dataclasses, typing.get_type_hints, enum
+    # resolution, and pickling all look the defining module up in sys.modules.
+    sys.modules[spec.name] = mod
     try:
-        spec = importlib.util.spec_from_file_location("_summonpot_user", filepath)
-        if spec is None or spec.loader is None:
-            typer.echo(f"Error: could not load module from {filepath}", err=True)
-            raise typer.Exit(1)
-        mod = importlib.util.module_from_spec(spec)
-        # Register before execution: dataclasses, typing.get_type_hints, enum
-        # resolution, and pickling all look the defining module up in sys.modules.
-        sys.modules[spec.name] = mod
-        try:
-            spec.loader.exec_module(mod)
-        except BaseException:
-            sys.modules.pop(spec.name, None)
-            raise
+        spec.loader.exec_module(mod)
     except Exception as e:
+        sys.modules.pop(spec.name, None)
         typer.echo(f"Error loading {filepath}: {e}", err=True)
         raise typer.Exit(1) from None
+    except BaseException:
+        sys.modules.pop(spec.name, None)
+        raise
 
     pot = getattr(mod, "pot", None)
     if pot is None:

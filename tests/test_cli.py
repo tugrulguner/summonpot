@@ -68,6 +68,20 @@ def test_load_pot_returns_declared_instance(tmp_path: Path):
     assert loaded.name == "loaded"
 
 
+def test_load_pot_reports_unloadable_file_once(tmp_path: Path, capsys):
+    """typer.Exit subclasses RuntimeError and must not be caught as a load error."""
+    source = tmp_path / "app.txt"
+    source.write_text("pot = 1\n")
+
+    with pytest.raises(typer.Exit) as error:
+        _load_pot(str(source))
+
+    assert error.value.exit_code == 1
+    assert capsys.readouterr().err == (
+        f"Error: could not load module from {source.resolve()}\n"
+    )
+
+
 def test_load_pot_supports_dataclasses_in_the_pot_file(tmp_path: Path):
     """dataclasses resolve annotations through sys.modules[cls.__module__]."""
     source = tmp_path / "app.py"
