@@ -68,6 +68,32 @@ def test_load_pot_returns_declared_instance(tmp_path: Path):
     assert loaded.name == "loaded"
 
 
+def test_load_pot_does_not_shadow_the_stdlib(tmp_path: Path, monkeypatch):
+    """The pot's directory must not precede the stdlib on sys.path."""
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    (tmp_path / "types.py").write_text("SHADOWED = True\n")
+    source = tmp_path / "app.py"
+    source.write_text("from summonpot import Pot\npot = Pot('served')\n")
+
+    _load_pot(str(source))
+
+    entry = str(tmp_path.resolve())
+    assert entry in sys.path, "the pot's directory must stay importable while serving"
+    assert sys.path.index(entry) == len(sys.path) - 1
+    assert sys.path[0] != entry
+
+
+def test_load_pot_does_not_duplicate_sys_path_entries(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    source = tmp_path / "app.py"
+    source.write_text("from summonpot import Pot\npot = Pot('served')\n")
+
+    _load_pot(str(source))
+    _load_pot(str(source))
+
+    assert sys.path.count(str(tmp_path.resolve())) == 1
+
+
 def test_load_pot_reports_unloadable_file_once(tmp_path: Path, capsys):
     """typer.Exit subclasses RuntimeError and must not be caught as a load error."""
     source = tmp_path / "app.txt"

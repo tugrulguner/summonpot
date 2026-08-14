@@ -63,7 +63,14 @@ def _load_pot(source: str) -> Pot:
         typer.echo(f"Error: file not found: {filepath}", err=True)
         raise typer.Exit(1)
 
-    sys.path.insert(0, str(filepath.parent))
+    # Appended, not prepended: the directory has to stay importable for the life of
+    # the process, because capabilities may import siblings lazily while serving.
+    # Prepending it would let a neighbouring types.py or json.py shadow the stdlib
+    # for every later import, including uvicorn's.
+    project_dir = str(filepath.parent)
+    if project_dir not in sys.path:
+        sys.path.append(project_dir)
+
     # Raised outside the try below: typer.Exit subclasses RuntimeError, so an
     # `except Exception` around this would catch it and report the exit code
     # as though it were a load error.
