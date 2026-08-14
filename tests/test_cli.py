@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -65,6 +66,37 @@ def test_load_pot_returns_declared_instance(tmp_path: Path):
 
     assert isinstance(loaded, Pot)
     assert loaded.name == "loaded"
+
+
+def test_load_pot_supports_dataclasses_in_the_pot_file(tmp_path: Path):
+    """dataclasses resolve annotations through sys.modules[cls.__module__]."""
+    source = tmp_path / "app.py"
+    source.write_text(
+        "from __future__ import annotations\n"
+        "from dataclasses import dataclass\n"
+        "from summonpot import Pot\n"
+        "\n"
+        "@dataclass\n"
+        "class Settings:\n"
+        "    retries: int = 3\n"
+        "\n"
+        "pot = Pot('dataclass-app')\n"
+    )
+
+    loaded = _load_pot(str(source))
+
+    assert loaded.name == "dataclass-app"
+
+
+def test_load_pot_does_not_leave_a_failed_module_in_sys_modules(tmp_path: Path):
+    source = tmp_path / "broken.py"
+    source.write_text("raise RuntimeError('broken app')\n")
+    before = set(sys.modules)
+
+    with pytest.raises(typer.Exit):
+        _load_pot(str(source))
+
+    assert set(sys.modules) - before == set()
 
 
 def test_serve_command_loads_and_serves_pot(tmp_path: Path):

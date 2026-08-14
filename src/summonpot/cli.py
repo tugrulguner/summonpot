@@ -70,7 +70,14 @@ def _load_pot(source: str) -> Pot:
             typer.echo(f"Error: could not load module from {filepath}", err=True)
             raise typer.Exit(1)
         mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
+        # Register before execution: dataclasses, typing.get_type_hints, enum
+        # resolution, and pickling all look the defining module up in sys.modules.
+        sys.modules[spec.name] = mod
+        try:
+            spec.loader.exec_module(mod)
+        except BaseException:
+            sys.modules.pop(spec.name, None)
+            raise
     except Exception as e:
         typer.echo(f"Error loading {filepath}: {e}", err=True)
         raise typer.Exit(1) from None
