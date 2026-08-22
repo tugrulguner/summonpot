@@ -14,13 +14,230 @@ with the graph that can.
 from __future__ import annotations
 
 import inspect
-from typing import Any
+from collections.abc import Mapping, Sequence
+from types import UnionType
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+)
 
 from pydantic import BaseModel
 
 from summonpot.contracts import AgentChoice, FromRequest, FromResult, Operation
 
 _VARIADIC = (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
+
+
+# ---------------------------------------------------------------------------
+# Conservative type comparison
+#
+# Only the relations binding validation needs, deliberately narrow. Every
+# function answers "is this provably wrong?" - anything it cannot decide is
+# accepted, because a guard that refuses a valid declaration is worse than one
+# that misses an invalid one.
+# ---------------------------------------------------------------------------
+
+_SELECTABLE = (list, set, frozenset, Sequence)
+# Iterable, but not a collection of selectable values: a string yields characters
+# and a mapping yields keys.
+_NOT_SELECTABLE = (str, bytes, bytearray, dict, Mapping)
+
+
+def _unwrap(annotation: Any) -> Any:
+    """Strip `Annotated` down to the type it decorates."""
+    while get_origin(annotation) is Annotated:
+        annotation = get_args(annotation)[0]
+    return annotation
+
+
+def _is_unknown(annotation: Any) -> bool:
+    """Report whether nothing can be proven about this annotation."""
+    if annotation is None or annotation is Any or annotation is object:
+        return True
+    return isinstance(annotation, str | TypeVar)
+
+
+def _safe_issubclass(source: Any, target: Any) -> bool | None:
+    """Return the subclass relation, or None when it cannot be established.
+
+    `issubclass` raises for a Protocol that is not `runtime_checkable`, among
+    others. An unanswerable question is unknown, never a registration failure.
+    """
+    if not (isinstance(source, type) and isinstance(target, type)):
+        return None
+    try:
+        return issubclass(source, target)
+    except TypeError:
+        return None
+
+
+def _union_members(annotation: Any) -> tuple[Any, ...] | None:
+    """Return a union's members, or None if this is not a union."""
+    if get_origin(annotation) in (Union, UnionType):
+        return get_args(annotation)
+    return None
+
+
+def _widens_numerically(source: Any, target: Any) -> bool:
+    """Report whether the numeric tower permits this widening.
+
+    Based on the subclass relation rather than identity, so `bool` widens like the
+    `int` it is.
+    """
+    if _safe_issubclass(source, int) and target in (float, complex):
+        return True
+    return bool(_safe_issubclass(source, float) and target is complex)
+
+
+def _is_compatible(source: Any, target: Any) -> bool:
+    """Report whether a value of type `source` may satisfy `target`.
+
+    True also means "cannot be disproven".
+    """
+    source, target = _unwrap(source), _unwrap(target)
+
+    if _is_unknown(source) or _is_unknown(target) or source is target:
+        return True
+
+    # Any member of a union source may arrive, so all of them must fit; a union
+    # target is satisfied by fitting any one member.
+    members = _union_members(source)
+    if members is not None:
+        return all(_is_compatible(member, target) for member in members)
+    members = _union_members(target)
+    if members is not None:
+        return any(_is_compatible(source, member) for member in members)
+
+    source_values = get_args(source) if get_origin(source) is Literal else None
+    target_values = get_args(target) if get_origin(target) is Literal else None
+    if source_values is not None and target_values is not None:
+        # Both value sets are finite and known, so disjointness is provable.
+        return all(value in target_values for value in source_values)
+    if source_values is not None:
+        return all(_is_compatible(type(value), target) for value in source_values)
+    if target_values is not None:
+        # The value cannot be proven, but the type of every permitted value can.
+        return any(_is_compatible(source, type(value)) for value in target_values)
+
+    if get_origin(source) is not None or get_origin(target) is not None:
+        return _generics_compatible(source, target)
+
+    if _widens_numerically(source, target):
+        return True
+    related = _safe_issubclass(source, target)
+    return True if related is None else related
+
+
+def _generics_compatible(source: Any, target: Any) -> bool:
+    """Compare two annotations where at least one is parameterised."""
+    source_origin, target_origin = get_origin(source), get_origin(target)
+    if source_origin is None or target_origin is None:
+        return True
+
+    if source_origin is not target_origin:
+        related = _safe_issubclass(source_origin, target_origin)
+        if related is None:
+            return True
+        if not related:
+            return False
+        # The origins are related, but that says nothing about the parameters -
+        # list[int] is not a Sequence[str]. Fall through and compare them.
+
+    raw_source, raw_target = get_args(source), get_args(target)
+    source_args = [a for a in raw_source if a is not Ellipsis]
+    target_args = [a for a in raw_target if a is not Ellipsis]
+
+    source_is_fixed = get_origin(source) is tuple and not _is_homogeneous_tuple(
+        raw_source
+    )
+    target_is_fixed = get_origin(target) is tuple and not _is_homogeneous_tuple(
+        raw_target
+    )
+
+    # A fixed tuple is a sequence of its declared members, so a target admitting any
+    # number of one element type - tuple[T, ...] or Sequence[T] - is satisfied only
+    # if every member fits T. The differing count is not what makes it unknown.
+    if source_is_fixed and not target_is_fixed and len(target_args) == 1:
+        return all(_is_compatible(member, target_args[0]) for member in source_args)
+
+    # Two fixed tuples describe positions, so different lengths cannot match.
+    if (
+        source_is_fixed
+        and target_is_fixed
+        and raw_source
+        and raw_target
+        and len(source_args) != len(target_args)
+    ):
+        return False
+
+    if not source_args or not target_args or len(source_args) != len(target_args):
+        return True
+    return all(
+        _is_compatible(s, t) for s, t in zip(source_args, target_args, strict=True)
+    )
+
+
+def _is_homogeneous_tuple(args: tuple[Any, ...]) -> bool:
+    """Report whether these arguments spell `tuple[T, ...]`."""
+    return len(args) == 2 and args[1] is Ellipsis
+
+
+def _selectable_item_type(output: Any) -> tuple[bool, Any]:
+    """Describe what a model could select from a result of type `output`."""
+    output = _unwrap(output)
+    if _is_unknown(output):
+        return True, None
+
+    # Any member of a union may arrive, so the result is selectable only if every
+    # member is. Element types are combined only when they agree; disagreement is
+    # left unknown rather than modelled.
+    members = _union_members(output)
+    if members is not None:
+        element_types = set()
+        for member in members:
+            if _is_unknown(member):
+                return True, None
+            selectable, element = _selectable_item_type(member)
+            if not selectable:
+                return False, None
+            element_types.add(element)
+        return True, element_types.pop() if len(element_types) == 1 else None
+
+    origin = get_origin(output) or output
+    args = get_args(output)
+
+    if origin is tuple:
+        # Only the homogeneous form is a collection of like items. A fixed tuple has
+        # a different type at each position, so "select an item" has no single item
+        # type to constrain. Bare `tuple` is unparameterised and therefore unknown,
+        # which is not the same as `tuple[()]` - that one provably has no items.
+        if get_origin(output) is None:
+            return True, None
+        if _is_homogeneous_tuple(args):
+            return True, args[0]
+        return False, None
+
+    # Checked one type at a time: _safe_issubclass answers "unknown" for a union
+    # target, which would let these fall through to the Sequence test below - and a
+    # str *is* a Sequence, of characters.
+    if any(_safe_issubclass(origin, excluded) for excluded in _NOT_SELECTABLE):
+        return False, None
+    if any(_safe_issubclass(origin, candidate) for candidate in _SELECTABLE):
+        return True, args[0] if args else None
+    return False, None
+
+
+def _describe(annotation: Any) -> str:
+    """Render an annotation for an error message."""
+    annotation = _unwrap(annotation)
+    if annotation is None:
+        return "unannotated"
+    return getattr(annotation, "__name__", None) or str(annotation)
 
 
 def _bindable_request_fields(
@@ -32,11 +249,32 @@ def _bindable_request_fields(
     return {parameter.name for parameter in parameters}
 
 
+def _request_annotations(
+    input_model: type[BaseModel] | None, parameters: list[Any]
+) -> dict[str, Any]:
+    """Return the endpoint's request field types, keyed by the name bindings use."""
+    if input_model is not None:
+        return {
+            name: field.annotation for name, field in input_model.model_fields.items()
+        }
+    return {parameter.name: parameter.annotation for parameter in parameters}
+
+
 def _readable_fields(output: Any) -> set[str] | None:
     """Return the fields a result exposes, or None if it exposes none statically."""
     if isinstance(output, type) and issubclass(output, BaseModel):
         return set(output.model_fields)
     return None
+
+
+def _argument_annotations(tool: Any) -> dict[str, Any]:
+    """Return an operation's resolved argument types, keyed by name.
+
+    Read from the normalized ParamDef list rather than by re-inspecting the callable,
+    so this agrees with the arguments the model is actually offered for a bound
+    method, a callable object or a partial.
+    """
+    return {p.name: p.annotation for p in tool.parameters}
 
 
 def validate_contracts(
@@ -79,6 +317,8 @@ def validate_contracts(
             contract=contract,
             declared=declared,
             request_fields=request_fields,
+            argument_types=_argument_annotations(tool),
+            request_types=_request_annotations(input_model, parameters),
         )
 
 
@@ -114,6 +354,8 @@ def _validate_bindings(
     contract: Operation,
     declared: set[Operation],
     request_fields: set[str],
+    argument_types: dict[str, Any],
+    request_types: dict[str, Any],
 ) -> None:
     """Check one operation's bindings against the endpoint that declares it."""
     bind = contract.bind or {}
@@ -178,6 +420,14 @@ def _validate_bindings(
                 source=source,
                 request_fields=request_fields,
             )
+            _require_compatible(
+                endpoint=endpoint,
+                operation=operation,
+                argument=name,
+                wanted=argument_types.get(name),
+                supplied=request_types.get(source.field),
+                origin=f"request field {source.field!r}",
+            )
         elif isinstance(source, FromResult):
             _require_declared(
                 endpoint=endpoint,
@@ -191,6 +441,16 @@ def _validate_bindings(
                 operation=operation,
                 argument=name,
                 source=source,
+            )
+            _require_compatible(
+                endpoint=endpoint,
+                operation=operation,
+                argument=name,
+                wanted=argument_types.get(name),
+                supplied=_result_field_type(source),
+                origin=(
+                    f"field {source.field!r} of {_operation_name(source.operation)!r}"
+                ),
             )
         elif isinstance(source, AgentChoice) and source.from_result is not None:
             _require_declared(
@@ -210,6 +470,103 @@ def _validate_bindings(
                 argument=name,
                 producer=source.from_result,
             )
+            _require_selectable(
+                endpoint=endpoint,
+                operation=operation,
+                argument=name,
+                source=source,
+            )
+        if isinstance(source, AgentChoice):
+            # Whatever the model picks still has to fit the argument receiving it.
+            # Checked for every choice, including one with no producer behind it.
+            _require_compatible(
+                endpoint=endpoint,
+                operation=operation,
+                argument=name,
+                wanted=argument_types.get(name),
+                supplied=_chosen_type(source),
+                origin="the model's choice",
+            )
+
+
+def _operation_name(contract: Operation) -> str:
+    """Render an operation for an error message."""
+    return getattr(contract.operation, "__name__", type(contract.operation).__name__)
+
+
+def _result_field_type(source: FromResult) -> Any:
+    """Return the declared type of the output field a binding reads."""
+    output = source.operation.output
+    if isinstance(output, type) and issubclass(output, BaseModel):
+        field = output.model_fields.get(source.field)
+        if field is not None:
+            return field.annotation
+    return None
+
+
+def _require_compatible(
+    *,
+    endpoint: str,
+    operation: str,
+    argument: str,
+    wanted: Any,
+    supplied: Any,
+    origin: str,
+) -> None:
+    """Reject a binding whose value provably cannot satisfy the argument.
+
+    Only a definite mismatch is rejected. An unresolved annotation, `Any`, or a shape
+    the comparison does not model is accepted, because refusing what cannot be proven
+    would block valid declarations.
+    """
+    if _is_compatible(supplied, wanted):
+        return
+    raise TypeError(
+        f"Endpoint {endpoint!r} binds {origin} ({_describe(supplied)}) to argument "
+        f"{argument!r} of operation {operation!r} ({_describe(wanted)}). Those types "
+        "are incompatible."
+    )
+
+
+def _chosen_type(source: AgentChoice) -> Any:
+    """Return the declared type of a value the model chooses, if it is known.
+
+    A producer's element type wins over `item_type`, because the model can only pick
+    values the producer actually returned. Declaring `item_type=Any` narrows nothing
+    and must not erase what the producer already proved.
+    """
+    if source.from_result is not None:
+        element = _selectable_item_type(source.from_result.output)[1]
+        if not _is_unknown(element):
+            return element
+    return source.item_type
+
+
+def _require_selectable(
+    *, endpoint: str, operation: str, argument: str, source: AgentChoice
+) -> None:
+    """Reject offering the model a choice from a result it cannot choose from."""
+    producer = source.from_result
+    if producer is None:  # pragma: no cover - guarded by the caller
+        return
+
+    selectable, item_type = _selectable_item_type(producer.output)
+    if not selectable:
+        raise TypeError(
+            f"Endpoint {endpoint!r} offers argument {argument!r} of operation "
+            f"{operation!r} as a choice from the result of "
+            f"{_operation_name(producer)!r}, typed "
+            f"{_describe(producer.output)}. A choice is made from a list, set, tuple "
+            "or sequence; that type is not a collection of selectable items."
+        )
+
+    if source.item_type is not None and not _is_compatible(item_type, source.item_type):
+        raise TypeError(
+            f"Endpoint {endpoint!r} offers argument {argument!r} of operation "
+            f"{operation!r} as a choice of {_describe(source.item_type)}, but "
+            f"{_operation_name(producer)!r} returns a collection of "
+            f"{_describe(item_type)}."
+        )
 
 
 def _validate_from_request(

@@ -529,6 +529,11 @@ def test_after_naming_a_declared_operation_is_accepted():
 # --- a result must be structured to be read from -----------------------------
 
 
+def list_tiers(customer_id: str) -> list[str]:
+    """List the tiers available to a customer."""
+    return ["standard", "gold"]
+
+
 def scalar_lookup(customer_id: str) -> str:
     """Return a customer tier."""
     return "standard"
@@ -649,9 +654,9 @@ def test_agent_choice_may_not_offer_a_result_with_no_declared_output():
 
 def test_agent_choice_may_offer_a_result_with_a_declared_output():
     producer = Operation(
-        lookup_customer,
+        list_tiers,
         bind={"customer_id": FromRequest("customer_id")},
-        output=Customer,
+        output=list[str],
     )
     pot = Pot("svc")
 
@@ -677,37 +682,38 @@ def test_agent_choice_may_offer_a_result_with_a_declared_output():
     assert len(pot.endpoints[0].tools) == 2
 
 
-def test_agent_choice_may_offer_a_scalar_result():
-    """`output=str` is a validatable contract; only the absence of one is a gap.
+def test_agent_choice_may_not_offer_a_scalar_result():
+    """`str` is validatable, but it is not a collection of selectable items.
 
-    Reading a *field* from it is still refused — that check belongs to FromResult,
-    and AgentChoice names no field.
+    Its items are characters, so offering one as a choice is not a bounded semantic
+    selection. This is stricter than the earlier rule, which only required the
+    producer to declare some output type.
     """
     producer = Operation(
         scalar_lookup, bind={"customer_id": FromRequest("customer_id")}, output=str
     )
     pot = Pot("svc")
 
-    @pot.summon("/orders")
-    def create_order(
-        request: OrderRequest,
-        tier=Required(producer),
-        order=Required(
-            Operation(
-                place_order,
-                bind={
-                    "customer_id": FromRequest("customer_id"),
-                    "tier": AgentChoice(from_result=producer, item_type=str),
-                    "sku": FromRequest("sku"),
-                },
-                output=OrderResponse,
-            )
-        ),
-    ) -> OrderResponse:
-        """Place an order."""
-        raise NotImplementedError
+    with pytest.raises(TypeError, match="not a collection of selectable items"):
 
-    assert len(pot.endpoints[0].tools) == 2
+        @pot.summon("/orders")
+        def create_order(
+            request: OrderRequest,
+            tier=Required(producer),
+            order=Required(
+                Operation(
+                    place_order,
+                    bind={
+                        "customer_id": FromRequest("customer_id"),
+                        "tier": AgentChoice(from_result=producer, item_type=str),
+                        "sku": FromRequest("sku"),
+                    },
+                    output=OrderResponse,
+                )
+            ),
+        ) -> OrderResponse:
+            """Place an order."""
+            raise NotImplementedError
 
 
 def test_the_unstructured_output_error_recommends_something_accepted():
