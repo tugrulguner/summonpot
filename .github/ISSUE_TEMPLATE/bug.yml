@@ -1,0 +1,99 @@
+name: "Bug report"
+description: "Report a reproducible Summonpot failure"
+title: "[Bug]: "
+labels:
+  - "bug"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a Summonpot bug. Search existing issues and pull requests first. Remove API keys, tokens, credentials, connection strings, private request data, and provider output from everything you post.
+
+  - type: input
+    id: summonpot-version
+    attributes:
+      label: "Summonpot version or source revision"
+      description: "Run `summonpot --version`, or provide the exact Git commit when testing current source."
+      placeholder: "0.6.0 or 4819a8bc..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: python-version
+    attributes:
+      label: "Python version"
+      options:
+        - "3.11"
+        - "3.12"
+        - "3.13"
+        - "Other installable version"
+    validations:
+      required: true
+
+  - type: input
+    id: operating-system
+    attributes:
+      label: "Operating system"
+      placeholder: "macOS 26, Ubuntu 24.04, Windows 11, or similar"
+    validations:
+      required: true
+
+  - type: input
+    id: model-provider
+    attributes:
+      label: "Model and provider"
+      description: "Name the model string and provider, or state that `SUMMONPOT_MODEL=test` reproduces the failure. Do not include credentials."
+      placeholder: "test, openai:gpt-4o-mini, or similar"
+    validations:
+      required: true
+
+  - type: textarea
+    id: minimal-application
+    attributes:
+      label: "Minimal runnable application"
+      description: "Provide the smallest complete endpoint declaration and capability set that reproduces the failure."
+      render: "python"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: "Exact reproduction steps and request"
+      description: "Include the install command, server or test command, and exact HTTP request or CLI invocation."
+      render: "shell"
+    validations:
+      required: true
+
+  - type: textarea
+    id: observed
+    attributes:
+      label: "Observed behavior"
+      description: "Include the exact status, response, traceback, schema, or CLI output after redaction."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Expected behavior"
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: "Additional context"
+      description: "State whether this reproduces with the keyless test model and whether it affects registration, OpenAPI, runtime execution, or the packaged CLI."
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: "Confirmations"
+      options:
+        - label: "I searched existing issues and pull requests for this failure."
+          required: true
+        - label: "I reproduced this with the smallest practical application and exact request or command."
+          required: true
+        - label: "I removed API keys, tokens, credentials, connection strings, private request data, and provider output from this report."
+          required: true

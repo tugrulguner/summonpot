@@ -1,0 +1,106 @@
+name: "Feature request"
+description: "Propose a scoped Summonpot addition or contract change"
+title: "[Feature]: "
+labels:
+  - "enhancement"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Start with the user problem, not a new configuration surface. Substantial public API, capability-authority, runtime, provider, or execution-model changes must align on the contract before implementation. Summonpot keeps `@summon(...)` minimal and does not expose public graph or engine-selection APIs.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem"
+      description: "What can a Summonpot user not do today, or what current behavior creates the problem?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: "What happens now"
+      description: "Point to the current behavior, relevant source, test, example, or roadmap boundary."
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: "Why I want it"
+      description: "Explain the concrete user or contributor impact."
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: "Concrete use case"
+      description: "Show the smallest realistic endpoint declaration or workflow that needs this capability."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: "Area"
+      options:
+        - "Endpoint declaration or routing"
+        - "Capability contract or authority boundary"
+        - "Runtime, provider, limits, or errors"
+        - "OpenAPI or generated HTTP contract"
+        - "CLI and developer tooling"
+        - "Documentation or runnable examples"
+        - "Packaging, compatibility, or CI"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: "Proposed solution"
+      description: "Describe the smallest public behavior that solves the problem. Code is optional."
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: "Acceptance criteria"
+      description: "Use checkboxes and describe how a real user can verify the result."
+    validations:
+      required: true
+
+  - type: textarea
+    id: implementation-notes
+    attributes:
+      label: "Implementation notes"
+      description: "List likely files, dependencies, sequencing, or security boundaries when known."
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives considered"
+      description: "Describe workarounds or smaller approaches and why they are insufficient."
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: "Scope and non-goals"
+      description: "State what this request deliberately does not add."
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: "Confirmations"
+      options:
+        - label: "I searched existing issues, pull requests, and the roadmap for this request."
+          required: true
+        - label: "I separated shipped behavior from planned architecture."
+          required: true
+        - label: "I will wait for contract alignment before implementing a substantial public API, runtime-authority, or execution-model change."
+          required: true
