@@ -38,7 +38,9 @@ Use `make format` before committing.
 - Current requests remain model-backed. Automatic model-free endpoint execution stays
   planned until source, tests, and real execution prove it has shipped.
 - Registration rejects invalid declarations before traffic when the failure is knowable.
-- Request-owned and framework-owned bound values do not become model-controlled arguments.
+- In the shipped single-required-operation `Exactly(1)` slice, supported `FromRequest`, direct
+  `AgentChoice`, and callable-default bindings are framework-owned rather than model-controlled.
+- Unsupported binding shapes, including `FromContext`, remain model-supplied.
 - Provider text, model output, capability details, credentials, and private request data do
   not enter public error bodies, fixtures, issue reports, or pull requests.
 - Public contract changes update README, roadmap, examples, and packaged coding-agent
@@ -71,23 +73,32 @@ exact-head review procedure used by maintainers.
 3. Keep one concern per pull request and stay inside the agreed scope.
 4. Add or update tests and executable examples when behavior changes.
 5. Synchronize affected public documentation and packaged guidance.
-6. Add the exact pull-request-numbered changelog fragment for user-facing changes.
+6. Add an issue-numbered changelog fragment for tracked user-facing work, or generate a
+   unique orphan fragment for a small direct change.
 7. Run `make check`, `make build`, and the relevant checks in `docs/reviewing.md`.
 8. Open the pull request with current behavior, focused change, non-goals, and exact
    verification results. Leave it open for review.
 
 ## Changelog fragments
 
-User-facing changes require one Towncrier fragment named after the pull request:
+User-facing changes require one Towncrier fragment. When the change has a tracking issue,
+use its number:
 
 ```text
-changelog.d/<pull-request-number>.<type>.md
+changelog.d/<issue-number>.<type>.md
+```
+
+For a small direct change without an issue, let Towncrier create a unique orphan fragment:
+
+```bash
+uv run towncrier create +.changed.md
 ```
 
 Types are `added`, `changed`, `deprecated`, `removed`, and `fixed`. Write one sentence about
-what changed for a user, not how the patch was implemented. Run `make changelog-draft` to
-preview it. Do not edit `CHANGELOG.md` directly. For maintenance with no user-visible effect,
-a maintainer may apply the `skip-changelog` label.
+what changed for a user, not how the patch was implemented. Numeric fragments link to their
+GitHub issue; generated orphan fragments remain unlinked. Run `make changelog-draft` to
+preview the result. Do not edit `CHANGELOG.md` directly. For maintenance with no user-visible
+effect, a maintainer may apply the `skip-changelog` label.
 
 ## Reporting issues
 

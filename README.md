@@ -611,7 +611,7 @@ uv sync --all-extras
 make check
 ```
 
-Every user-facing change needs a numbered Towncrier fragment. Read
+Every user-facing change needs an issue-backed or generated orphan Towncrier fragment. Read
 [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
 
 ## Roadmap

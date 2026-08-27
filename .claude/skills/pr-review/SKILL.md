@@ -7,18 +7,23 @@ description: "Handle the mechanics of a summonpot pull request: changelog fragme
 
 ## Opening one
 
-Every user-facing change needs a towncrier fragment named for its PR number, which only
-exists after the PR is created:
+Every user-facing change needs a Towncrier fragment. When the change has a tracking issue,
+use its number:
 
-```bash
-gh pr create --base main --head <branch> --title "..." --body-file body.md
-# then, using the number it returned:
-printf '%s\n' "One line describing the change." > changelog.d/<N>.<type>.md
-git add -A && git commit -m "docs: add changelog fragment for #<N>" && git push
+```text
+changelog.d/<issue-number>.<type>.md
 ```
 
-Types: `added`, `changed`, `deprecated`, `removed`, `fixed`. Non-user-facing changes
-carry the `skip-changelog` label instead. Dependabot is exempt by label already.
+For a small direct change without an issue, generate a unique orphan fragment before opening
+the pull request:
+
+```bash
+uv run towncrier create +.changed.md
+```
+
+Replace `changed` with `added`, `deprecated`, `removed`, or `fixed` when appropriate. Numeric
+fragments must name an issue, not a pull request. Non-user-facing changes carry the
+`skip-changelog` label instead. Dependabot is exempt by label already.
 
 Do not add Claude co-author trailers or "Generated with" lines to commits or PR bodies.
 

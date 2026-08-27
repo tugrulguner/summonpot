@@ -49,9 +49,10 @@ Prioritize:
 - public graph, engine-selection, scheduler-control, or configuration surfaces that make the
   endpoint declaration more complex without a proven user need.
 
-Automatic model-free endpoint execution, broader operation graphs, ordering, context
-injection, receipts, and built-in authentication remain planned unless current source and
-real execution prove otherwise.
+Automatic model-free endpoint execution, broader operation graphs, context injection,
+receipts, and built-in authentication remain planned unless current source and real execution
+prove otherwise. Ordering declarations and their registration-time validation have shipped;
+runtime ordering enforcement remains planned.
 
 ## 4. Run the checks that matter
 

@@ -43,6 +43,7 @@ dev = [
     "ruff>=0.16.3",
     "pyright>=1.1.390",
     "pre-commit>=4.6.2",
+    "pyyaml>=6.0",
     "httpx>=0.27.0",
     "summonpot[all]",
     "towncrier>=25.8.0",
@@ -85,7 +86,7 @@ directory = "changelog.d"
 filename = "CHANGELOG.md"
 start_string = "<!-- towncrier release notes start -->\n"
 title_format = "## [{version}] - {project_date}"
-issue_format = "[#{issue}](https://github.com/tugrulguner/summonpot/pull/{issue})"
+issue_format = "[#{issue}](https://github.com/tugrulguner/summonpot/issues/{issue})"
 
 [[tool.towncrier.type]]
 directory = "added"

@@ -56,10 +56,17 @@ make check                    # lint, format, typecheck, tests
 make format                   # before committing
 ```
 
-Every user-facing change needs a towncrier fragment named for its PR:
+Every user-facing change needs a Towncrier fragment. Use the tracking issue number when one
+exists:
 
 ```text
-changelog.d/<pr-number>.<added|changed|deprecated|removed|fixed>.md
+changelog.d/<issue-number>.<type>.md
+```
+
+For a small direct change without an issue, generate a unique orphan fragment:
+
+```bash
+uv run towncrier create +.changed.md
 ```
 
 Dependabot is exempt, by label. Anything else without a fragment fails a required check

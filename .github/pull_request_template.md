@@ -34,12 +34,14 @@ List the exact commands run and their results:
 
 - [ ] Updated README, roadmap, examples, or packaged coding-agent guidance when their public contract changed.
 - [ ] Kept current shipped behavior separate from planned architecture.
-- [ ] Preserved registration-time validation, redacted public errors, and framework-owned bound arguments where applicable.
+- [ ] Preserved registration-time validation and redacted public errors where applicable.
+- [ ] Kept supported framework-owned bound arguments out of model-controlled inputs.
 - [ ] Avoided adding public graph, engine-selection, scheduler-control, or fat decorator configuration APIs.
 
 ## Changelog
 
-- [ ] Added `changelog.d/<pull-request-number>.<type>.md` for a user-facing change; or
+- [ ] Added `changelog.d/<issue-number>.<type>.md` for tracked user-facing work; or
+- [ ] Added a unique `changelog.d/+<identifier>.<type>.md` orphan fragment for a small direct change; or
 - [ ] This has no user-visible effect and should receive the `skip-changelog` label.
 
 ## Safety

@@ -86,6 +86,18 @@ body:
       label: "Additional context"
       description: "State whether this reproduces with the keyless test model and whether it affects registration, OpenAPI, runtime execution, or the packaged CLI."
 
+  - type: dropdown
+    id: contribution-intent
+    attributes:
+      label: "Contribution intent"
+      description: "Tell maintainers whether you want to work on the fix after triage."
+      options:
+        - "I would like to implement this after maintainer confirmation"
+        - "I am reporting the problem only"
+        - "I need guidance before deciding"
+    validations:
+      required: true
+
   - type: checkboxes
     id: confirmations
     attributes:
