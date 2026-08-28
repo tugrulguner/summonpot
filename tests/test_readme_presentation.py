@@ -49,26 +49,56 @@ def test_readme_states_the_current_runtime_boundary_before_positioning():
 
 def test_readme_explains_both_flows_under_one_endpoint_contract():
     readme = README.read_text(encoding="utf-8")
+    why = readme.split("## Why summonpot?", 1)[1].split("That declaration answers", 1)[
+        0
+    ]
+    declaration = why.split("```python", 1)[1].split("```", 1)[0]
     section = readme.split("### One endpoint, both flows", 1)[1].split(
         "## What ships today", 1
     )[0]
     normalized_section = _normalize(section)
 
-    assert "one @summon declaration" in section
+    assert "def build_report(" in declaration
+    assert "# Deterministic:" in declaration
+    assert '"topic": FromRequest("topic")' in declaration
+    assert "# Agentic:" in declaration
+    assert '"format": AgentChoice()' in declaration
+    assert '@summon("/research")' in declaration
+    assert "calls=Exactly(1)" in declaration
+    assert "the example above combines both kinds of work" in normalized_section
     assert (
-        "deterministic: trusted request bindings + exact application operations"
-        in section
+        "request, response, route, and openapi contract remain one declaration"
+        in normalized_section
     )
-    assert "agentic: explicitly declared semantic choices" in section
-    assert "one typed response + one HTTP route + one OpenAPI contract" in section
-    assert "FromRequest" in section
-    assert "AgentChoice" in section
-    assert "Exactly(1)" in section
     assert "the configured model participates in every request" in normalized_section
     assert (
         "automatic no-model execution for a fully resolved declaration remains planned"
         in normalized_section
     )
+
+
+def test_readme_replaces_the_text_formula_with_a_visual_flow_diagram():
+    readme = README.read_text(encoding="utf-8")
+    introduction = readme.split("## Why summonpot?", 1)[0]
+    diagram = ROOT / "docs" / "assets" / "authority-boundary.svg"
+
+    assert 'src="docs/assets/authority-boundary.svg"' in introduction
+    assert "typed request model\n+ fixed goal" not in introduction
+    assert diagram.is_file()
+
+    content = diagram.read_text(encoding="utf-8")
+    assert (
+        "One Summonpot declaration combines deterministic work and agentic choice"
+        in content
+    )
+    assert "TYPED REQUEST" in content
+    assert "DETERMINISTIC" in content
+    assert "FromRequest(&quot;topic&quot;)" not in content
+    assert 'FromRequest("topic")' in content
+    assert "AGENTIC" in content
+    assert "AgentChoice()" in content
+    assert "Required(..., calls=Exactly(1))" in content
+    assert "TYPED RESPONSE" in content
 
 
 def test_readme_keeps_the_established_structure_without_version_history():
@@ -80,7 +110,6 @@ def test_readme_keeps_the_established_structure_without_version_history():
     assert "Summonpot 0.5.0" not in readme
     assert 'pip install "summonpot[serve,cli]"' in readme
     assert "git+https://github.com/tugrulguner/summonpot.git@" not in readme
-    assert "docs/assets/authority-boundary.svg" not in readme
 
 
 def test_readme_distinguishes_tool_schema_hiding_from_prompt_secrecy():

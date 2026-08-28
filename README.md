@@ -31,19 +31,9 @@
   <a href="#contributing">Contributing</a>
 </p>
 
-Summonpot turns one declaration into a live HTTP endpoint:
-
-```text
-typed request model
-+ fixed goal in the docstring
-+ exact application operations
-+ explicit model-owned choices
-+ typed response model
-= executable endpoint
-
-declaration body
-= ...
-```
+<p align="center">
+  <img src="docs/assets/authority-boundary.svg" alt="One Summonpot endpoint declaration combines trusted request bindings and exact application operations with explicit model-owned choices, producing one validated HTTP and OpenAPI response" width="960">
+</p>
 
 The ellipsis is declaration syntax, not an unfinished implementation. The signature,
 docstring, operations, argument bindings, and return type are the executable contract.
@@ -68,19 +58,32 @@ a model workflow and then wraps it in HTTP. Summonpot declares both through one 
 contract, so applications keep one public API as the balance changes between exact
 operations and semantic decisions:
 
-The following conceptual declaration omits the application-specific request models and
-operation implementations; the [quick start](#quick-start) is the standalone example.
+The following conceptual declaration omits the application-specific models and service
+implementation; the [quick start](#quick-start) is the standalone example.
 
 ```python
+from typing import Literal
+
 from summonpot import AgentChoice, Exactly, FromRequest, Operation, Required, Summon
 
 
 summon = Summon("research-api")
 
+
+def build_report(
+    topic: str,
+    format: Literal["summary", "detailed"],
+) -> ResearchReport:
+    """Run the application's exact research operation."""
+    return research_service.build(topic=topic, format=format)
+
+
 research_operation = Operation(
-    research_topic,
+    build_report,
     bind={
+        # Deterministic: validated request data owns this argument.
         "topic": FromRequest("topic"),
+        # Agentic: the model owns only this declared semantic choice.
         "format": AgentChoice(),
     },
     output=ResearchReport,
@@ -124,25 +127,12 @@ operation has completed successfully.
 
 ### One endpoint, both flows
 
-A Summonpot endpoint can combine deterministic execution and agentic choice without
-changing its public shape:
-
-```text
-one @summon declaration
-    |
-    +-- deterministic: trusted request bindings + exact application operations
-    |
-    +-- agentic: explicitly declared semantic choices
-    |
-    +-- one typed response + one HTTP route + one OpenAPI contract
-```
-
-In the supported bound-operation shape, `FromRequest(...)` injects trusted values,
-callable defaults remain application-owned, and `AgentChoice()` exposes only the arguments
-the model may supply. `Exactly(1)` and `output=` enforce operation use and local output
-validation. The endpoint may therefore perform exact work and make a model-driven decision
-under one declaration. Today the configured model participates in every request; automatic
-no-model execution for a fully resolved declaration remains planned.
+The example above combines both kinds of work. `FromRequest(...)` injects trusted values
+into exact application code, while `AgentChoice()` marks the only argument the model may
+supply. `Exactly(1)` and `output=` enforce operation use and local output validation. The
+request, response, route, and OpenAPI contract remain one declaration. Today the configured
+model participates in every request; automatic no-model execution for a fully resolved
+declaration remains planned.
 
 ## What ships today
 
