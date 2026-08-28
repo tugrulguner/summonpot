@@ -7,12 +7,11 @@ signature, so the answers live here once rather than in two copies that can drif
 from __future__ import annotations
 
 import inspect
+import types
 import typing
 from collections.abc import Callable
 from typing import Any
 
-
-import types
 
 def type_name(tp: Any) -> str:
     """Render an annotation as a short display string."""
