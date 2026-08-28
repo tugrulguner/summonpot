@@ -12,8 +12,14 @@ from collections.abc import Callable
 from typing import Any
 
 
+import types
+
 def type_name(tp: Any) -> str:
     """Render an annotation as a short display string."""
+    origin = typing.get_origin(tp)
+    if origin is typing.Union or origin is types.UnionType:
+        return " | ".join(type_name(a) for a in typing.get_args(tp))
+
     if hasattr(tp, "__origin__"):
         origin = tp.__origin__
         args = tp.__args__
