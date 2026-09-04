@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any
@@ -81,14 +81,19 @@ class _CompiledEndpoint:
     output_model: Any
     model: str | None
     tools: tuple[_CompiledTool, ...]
+    direct_tool: int | None
 
 
 _REGISTERED_PLANS: dict[int, tuple[ReferenceType[EndpointDef], _CompiledEndpoint]] = {}
 
 
-def _register_endpoint(endpoint: EndpointDef) -> _CompiledEndpoint:
+def _register_endpoint(
+    endpoint: EndpointDef,
+    *,
+    allow_direct: bool = True,
+) -> _CompiledEndpoint:
     """Compile and privately retain one endpoint's immutable execution plan."""
-    plan = _compile_endpoint(endpoint)
+    plan = _compile_endpoint(endpoint, allow_direct=allow_direct)
     identity = id(endpoint)
 
     def discard(reference: ReferenceType[EndpointDef]) -> None:
@@ -125,12 +130,22 @@ class _EndpointRun:
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
-def _compile_endpoint(endpoint: EndpointDef) -> _CompiledEndpoint:
+def _compile_endpoint(
+    endpoint: EndpointDef,
+    *,
+    allow_direct: bool = True,
+) -> _CompiledEndpoint:
     """Snapshot validated endpoint metadata into an immutable runtime plan."""
-    enforce_index = _bound_exact_tool_index(endpoint.tools)
+    source_tools = tuple(endpoint.tools)
+    enforce_index = _bound_exact_tool_index(source_tools)
+    direct_index = (
+        _direct_tool_index(endpoint, source_tools, enforce_index)
+        if allow_direct
+        else None
+    )
     tools = tuple(
         _compile_tool(tool, index, enforce=index == enforce_index)
-        for index, tool in enumerate(tuple(endpoint.tools))
+        for index, tool in enumerate(source_tools)
     )
     return _CompiledEndpoint(
         path=endpoint.path,
@@ -145,10 +160,11 @@ def _compile_endpoint(endpoint: EndpointDef) -> _CompiledEndpoint:
         output_model=endpoint.output_model,
         model=endpoint.model,
         tools=tools,
+        direct_tool=direct_index,
     )
 
 
-def _bound_exact_tool_index(tools: list[ToolDef]) -> int | None:
+def _bound_exact_tool_index(tools: Sequence[ToolDef]) -> int | None:
     """Return the one PR-1 operation eligible for bound enforcement."""
     if len(tools) != 1:
         return None
@@ -173,6 +189,24 @@ def _bound_exact_tool_index(tools: list[ToolDef]) -> int | None:
     ):
         return None
     return 0
+
+
+def _direct_tool_index(
+    endpoint: EndpointDef,
+    tools: Sequence[ToolDef],
+    enforce_index: int | None,
+) -> int | None:
+    """Return the narrow operation that can execute without a model."""
+    if enforce_index is None or endpoint.input_model is None:
+        return None
+    contract = tools[enforce_index].contract
+    if contract is None or contract.output is not endpoint.output_model:
+        return None
+    if contract.bind is None or any(
+        not isinstance(source, FromRequest) for source in contract.bind.values()
+    ):
+        return None
+    return enforce_index
 
 
 def _compile_tool(tool: ToolDef, identity: int, *, enforce: bool) -> _CompiledTool:

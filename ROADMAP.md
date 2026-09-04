@@ -12,12 +12,12 @@ Pydantic request model
 ```
 
 The endpoint body is declarative and is never the handler. Request JSON carries business
-data, not an action selector. The same simple contract is designed to support deterministic
-execution when one complete path exists. Today, the agent runtime handles every request.
-For the enforced single required `Exactly(1)` slice, it hides and injects application-owned
-arguments and leaves only declared `AgentChoice` values to the agent. Unsupported shapes
-retain legacy model-supplied argument behavior until their full semantics ship. The typed
-HTTP endpoint stays stable as that balance changes.
+data, not an action selector. The same simple contract supports direct deterministic
+execution for the narrow complete path shipped below; all other requests use the agent
+runtime. For the enforced single required `Exactly(1)` slice, Summonpot hides and injects
+application-owned arguments and leaves only declared `AgentChoice` values to the agent.
+Unsupported shapes retain legacy model-supplied argument behavior until their full semantics
+ship. The typed HTTP endpoint stays stable as that balance changes.
 
 ## Shipped foundation
 
@@ -39,6 +39,10 @@ The current release line provides:
 - Ellipsis declaration bodies that avoid abstract-method semantics, with direct Python calls rejected at the decorator boundary.
 - Immutable `Operation` declarations with `FromRequest`, `FromResult`, `FromContext`, and `AgentChoice` argument sources.
 - Runtime enforcement for one required `Exactly(1)` operation using `FromRequest`, direct `AgentChoice`, or callable defaults: trusted arguments are hidden and injected, the one start is reserved before invocation, and declared output is locally validated before success.
+- Single-operation deterministic execution when that slice has no `AgentChoice`, every
+  required input comes from `FromRequest` or a callable default, and the operation output is
+  exactly the endpoint response model: Summonpot executes directly without resolving or
+  constructing a model.
 - Declarative call bounds and ordering references without adding decorator configuration.
 - Registration-time validation for complete bindings, request and result references, operation ordering, selectable collections, and provable type incompatibility.
 - Python 3.11–3.13 CI, package builds, and expanded runtime/CLI coverage.
@@ -60,15 +64,26 @@ and stored, but the current runtime does not inject or enforce them yet.
 
 ### Current development boundary
 
-The first bound runtime slice enforces one required `Exactly(1)` operation whose inputs
-come from `FromRequest`, direct `AgentChoice`, or callable defaults. It snapshots the
-validated declaration at registration, hides trusted/defaulted arguments from the model,
-reserves the only permitted start before application code, and validates the operation
-output before recording success. The endpoint remains agentic when `AgentChoice` or final
-response composition requires the model.
+The bound runtime enforces one required `Exactly(1)` operation whose inputs come from
+`FromRequest`, direct `AgentChoice`, or callable defaults. It snapshots the validated
+declaration at registration, hides trusted/defaulted arguments from the model, reserves the
+only permitted start before application code, and validates the operation output before
+recording success.
+
+When that endpoint uses a Pydantic request model, has no `AgentChoice` or other unresolved
+source, and the operation output is exactly the endpoint response model, the same invocation
+kernel executes it directly without resolving or constructing a model. There is no model
+fallback after direct execution begins. The endpoint remains agentic when `AgentChoice`,
+final response composition, or any unsupported shape requires the model.
+
+The completed single-operation deterministic execution milestone therefore applies to
+exactly one required `Exactly(1)` operation where every required input comes from
+`FromRequest` or a callable default and the operation output is exactly the endpoint
+response model. It runs without resolving, constructing, or calling a model. The broader
+multi-operation deterministic compiler remains planned.
 
 Multi-operation graphs, `FromResult`, `FromContext`, `after`, broader call bounds, and
-automatic no-model execution remain planned. Those unsupported shapes retain the 0.6.0
+broader no-model execution remain planned. Those unsupported shapes retain the 0.6.0
 model-supplied argument behavior until their full semantics ship.
 
 ## Next milestones
@@ -77,29 +92,7 @@ The ordering below reflects the researched technical dependencies, not promised 
 dates. Each slice keeps the public `@summon` declaration unchanged and adds no executor
 selection flag, public graph, or handler body.
 
-### 1. Single-operation deterministic execution
-
-Ship the smallest complete no-model path first. Summonpot will execute directly when an
-endpoint has exactly one required `Exactly(1)` operation, every required input comes from
-`FromRequest` or a callable default, no `AgentChoice`, `FromResult`, `FromContext`, or
-`after` remains, and the operation output is exactly the endpoint response model.
-
-For that deliberately narrow shape, the runtime will:
-
-- Reuse the immutable compiled operation, trusted argument injection, atomic start
-  reservation, and cached output validation already used by the enforced agent path.
-- Execute once without resolving, constructing, or calling a model.
-- Preserve native validated request values and return the locally validated operation
-  output through the existing HTTP response contract.
-- Fail directly on an exception, timeout, or invalid operation output. There is no model
-  fallback after direct execution begins because an external side effect may already have
-  occurred.
-- Leave every ineligible or unsupported declaration on the current agent path.
-
-This is a walking skeleton, not completion of the general execution planner. The broader
-multi-operation deterministic compiler remains planned.
-
-### 2. Validated result chains
+### 1. Validated result chains
 
 Add the first private multi-operation execution semantics through a sequential required
 `Exactly(1)` chain:
@@ -116,7 +109,7 @@ Add the first private multi-operation execution semantics through a sequential r
 Execution remains sequential initially. Parallel ready operations are deferred until
 idempotency, transaction, or read-only semantics make concurrency safe.
 
-### 3. Producer-constrained agent choices
+### 2. Producer-constrained agent choices
 
 Constrain `AgentChoice(from_result=...)` to the exact validated collection produced during
 the same request:
@@ -128,7 +121,7 @@ the same request:
 - Reject empty or unavailable choice sets deterministically instead of spending model
   retries on an impossible path.
 
-### 4. Authenticated application context
+### 3. Authenticated application context
 
 Activate `FromContext` only after the framework has an authenticated, application-owned
 context contract:
@@ -138,7 +131,7 @@ context contract:
 - Context types and missing-value behavior are validated before operation invocation.
 - Secrets remain hidden from model-visible signatures, schemas, descriptions, and errors.
 
-### 5. Broader bounds and private path classification
+### 4. Broader bounds and private path classification
 
 Extend the identity-keyed invocation ledger and private plan after the exact-once slices are
 stable:
@@ -152,7 +145,7 @@ stable:
 - Keep unknown type relationships conservative without letting unknown branches erase
   known contradictions.
 
-### 6. Exact database operations
+### 5. Exact database operations
 
 Add optional adapters for prepared operations without exposing database authority:
 
@@ -191,7 +184,7 @@ receipt = Required(
 - Typed projections and affected-row constraints.
 - No raw `Session`, `Engine`, `Connection`, cursor, editable SQL, or natural-language-to-SQL capability.
 
-### 7. Broader deterministic execution compiler
+### 6. Broader deterministic execution compiler
 
 Select the least-powerful sufficient execution path for validated requests whose private
 plans contain more than the narrow walking skeleton:
@@ -217,7 +210,7 @@ for the same goal:
 - The same order endpoint can use the direct agent runtime when several declared substitutions are valid and a semantic choice remains.
 - No executor may add capabilities, weaken validation, or change the response contract.
 
-### 8. Receipts and broader stable failures
+### 7. Receipts and broader stable failures
 
 Extend the current redacted HTTP handling so authoritative success claims and operation
 failures depend on deterministic evidence:
@@ -228,7 +221,7 @@ failures depend on deterministic evidence:
 - Typed mappings for authorization, missing records, conflicts, database failures, and exhausted recovery paths, building on the shipped 429/502/504 mappings for usage limits, provider failures, and timeouts.
 - Declared recovery paths that cannot expand endpoint authority.
 
-### 9. Optional execution harnesses
+### 8. Optional execution harnesses
 
 Keep the public endpoint contract stable while adding larger internal executors when the request genuinely needs them:
 

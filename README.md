@@ -32,7 +32,7 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/tugrulguner/summonpot/9d1bfd0dd0203a07f856521d5ec5d22ff510b294/docs/assets/one-declaration-two-flows.png" alt="One Summonpot application declares a deterministic endpoint with application-owned operation arguments and an agentic endpoint with an explicit agent-owned choice through the same typed HTTP and OpenAPI framework" width="960">
+  <img src="https://raw.githubusercontent.com/tugrulguner/summonpot/3739ae6684f163b01892b8f2b6e7973bed12028d/docs/assets/one-declaration-two-flows.png" alt="One Summonpot application declares a deterministic endpoint with application-owned operation arguments and an agentic endpoint with an explicit agent-owned choice through the same typed HTTP and OpenAPI framework" width="960">
 </p>
 
 Summonpot modernizes APIs for AI without replacing the endpoint with a separate agent
@@ -49,12 +49,11 @@ enforcement, and structured output. Calling a registered declaration directly ra
 clear error; serve the application or invoke its generated HTTP route instead.
 
 > [!IMPORTANT]
-> Every current production `@summon` request runs through Summonpot's agent runtime,
-> backed by the configured provider model.
-> Deterministic operations still execute as exact application code inside that runtime;
-> the agent controls only the choices exposed by the declaration.
-> Automatic no-model execution for contracts with one fully resolved operation path is
-> on the [roadmap](ROADMAP.md), not shipped behavior.
+> One fully resolved `Exactly(1)` operation path now executes directly without resolving
+> or constructing a model. All other declarations still use Summonpot's provider-neutral
+> agent runtime; the agent controls only the choices exposed by the declaration.
+> Broader multi-operation deterministic execution remains on the
+> [roadmap](ROADMAP.md), not shipped behavior.
 
 ## Why summonpot?
 
@@ -75,15 +74,15 @@ from summonpot import AgentChoice, Exactly, FromRequest, Operation, Required, Su
 summon = Summon("research-api")
 
 
-def build_deterministic_report(topic: str) -> ResearchReport:
+def build_deterministic_report(topic: str) -> ResearchResponse:
     """Run the application's fully resolved research operation."""
-    return research_service.build(topic=topic, format="detailed")
+    return research_service.build_response(topic=topic, format="detailed")
 
 
 deterministic_report_operation = Operation(
     build_deterministic_report,
     bind={"topic": FromRequest("topic")},
-    output=ResearchReport,
+    output=ResearchResponse,
 )
 
 
@@ -151,12 +150,12 @@ operation has completed successfully.
 
 ### One declaration style, both endpoint flows
 
-`/reports/deterministic` binds every operation argument to validated application data; it
-contains no agent-owned operation choice. `/reports/agentic` uses the same declaration
-style but adds one explicit `AgentChoice()`. Both keep typed request/response contracts,
-operation enforcement, routing, and OpenAPI under Summonpot. Today the agent runtime handles
-every request, including the fully resolved endpoint; direct execution without the agent
-runtime remains planned for that declaration.
+`/reports/deterministic` binds every operation argument to validated application data; its
+operation output is exactly the endpoint response model, so the fully resolved endpoint
+executes once without constructing a model. `/reports/agentic` uses the same declaration
+style but adds one explicit `AgentChoice()`. The endpoint with `AgentChoice()` still uses
+the agent runtime. Both keep typed request/response contracts, operation enforcement,
+routing, and OpenAPI under Summonpot.
 
 ## What ships today
 
@@ -170,6 +169,9 @@ runtime remains planned for that declaration.
   `FromRequest` values and callable defaults are removed from the operation tool schema,
   direct `AgentChoice` arguments remain visible, one start is permitted, and `output=` is
   locally validated before success.
+- **Single-operation deterministic execution** when one required `Exactly(1)` operation
+  gets every required input from `FromRequest` or callable defaults and returns exactly the
+  endpoint response model. This path does not resolve, construct, or call a model.
 - **Typed `Operation` contracts** that declare request, prior-result, context, or
   agent-chosen argument sources without expanding the endpoint API.
 - **Registration-time contract validation** that rejects missing sources, invalid result
@@ -311,11 +313,13 @@ and annotations define the tool schema visible to the agent, while their impleme
 define the real application behavior.
 
 The capability set is closed. For one required typed operation with `Exactly(1)`, the
-runtime injects `FromRequest` values, removes them and callable defaults from the operation
-tool schema, offers only direct `AgentChoice` arguments, validates the declared operation
-output, and rejects a second start. Request values still appear in the agent's user message;
-tool-schema hiding is not prompt secrecy. Other operation shapes remain on the legacy
-agent-supplied path until their execution semantics ship. Every operation must still
+runtime injects `FromRequest` values, removes them and callable defaults from any
+model-visible tool schema, validates the declared operation output, and rejects a second
+start. If no `AgentChoice` remains and that output is exactly the endpoint response model,
+Summonpot executes the operation directly. Otherwise direct `AgentChoice` arguments remain
+visible to the agent. Request values on agentic paths still appear in the agent's user
+message; tool-schema hiding is not prompt secrecy. Other operation shapes remain on the
+legacy agent-supplied path until their execution semantics ship. Every operation must still
 enforce authorization.
 Pass exact operations, never raw database sessions, engines, connections, cursors,
 arbitrary SQL, shell access, or ambient filesystem authority.
@@ -375,11 +379,12 @@ module is imported. A `Customer` value may feed a `Person` argument when `Custom
 subclass, and Python's numeric widening permits `int` or `bool` to feed `float`.
 
 > [!IMPORTANT]
-> Registration validates and stores every binding source. Runtime enforcement currently
-> covers one required `Exactly(1)` operation using `FromRequest`, direct `AgentChoice`,
-> and callable defaults. `FromResult`, `FromContext`, `after`, broader call bounds, and
-> automatic no-model paths remain planned; unsupported shapes keep their existing
-> agent-supplied argument behavior.
+> Registration validates and stores every binding source. Runtime enforcement covers one
+> required `Exactly(1)` operation using `FromRequest`, direct `AgentChoice`, and callable
+> defaults. When every required value is application-owned and the operation output exactly
+> matches the endpoint response model, that operation executes without a model. `FromResult`,
+> `FromContext`, `after`, broader call bounds, and multi-operation direct paths remain
+> planned; unsupported shapes keep their existing agent-supplied argument behavior.
 
 ## How it works today
 
@@ -392,15 +397,15 @@ Pydantic request validation + OpenAPI contract
     v
 Runtime.call(...)
     |
-    v
-Configured provider-neutral model
-    |
-    +---- may call only declared capabilities
+    +---- one fully resolved Exactly(1) operation
     |          |
-    |          +---- successful Required(...) calls recorded per request
+    |          +---- execute directly; validate declared output
     |
-    v
-Required-operation gate
+    +---- otherwise: configured provider-neutral model
+               |
+               +---- may call only declared capabilities
+               |
+               +---- Required-operation gate
     |
     v
 Local Pydantic response validation
@@ -417,19 +422,19 @@ Pydantic AI is an internal runtime dependency. Applications use `Summon`, `@summ
 Pydantic models, and declarative capabilities; they do not construct provider clients or
 Pydantic AI agents.
 
-### The contract stays stable as execution evolves
+### The contract stays stable across execution paths
 
-The roadmap adds a no-model executor without adding a second endpoint API:
+Summonpot chooses its current execution path without adding a second endpoint API:
 
-| Contract state | Target execution |
+| Contract state | Current execution |
 |---|---|
-| One complete operation path with every binding resolved | Execute directly without a model |
+| One required `Exactly(1)` operation, all required inputs from `FromRequest` or defaults, exact response-model output | Execute directly without a model |
 | A bounded semantic choice remains | Use the agent runtime with declared capabilities |
-| No legal path exists | Return a typed deterministic error |
+| Unsupported or broader operation graph | Keep the existing agent path until its full semantics ship |
 
-Broader graph compilation and ordering, automatic no-model execution, SQLAlchemy/SQLite
-operation adapters, write receipts, streaming, and built-in authentication are **planned,
-not shipped**. See
+Broader graph execution and ordering, multi-operation deterministic execution,
+SQLAlchemy/SQLite operation adapters, write receipts, streaming, and built-in
+authentication are **planned, not shipped**. See
 [ROADMAP.md](ROADMAP.md) for the design boundaries and implementation order.
 
 ## HTTP methods and OpenAPI
@@ -585,6 +590,7 @@ The [`examples/`](examples/) directory grows from one endpoint to a multi-file s
 | 5 | [`05_bounded_runtime.py`](examples/05_bounded_runtime.py) | Limits, timeout, and model override |
 | 6 | [`06_support_service/`](examples/06_support_service/) | Multi-file typed operation chain and persisted ticket |
 | 7 | [`07_bound_operation.py`](examples/07_bound_operation.py) | Enforced `FromRequest` + `AgentChoice` with `Exactly(1)` |
+| 8 | [`08_direct_execution.py`](examples/08_direct_execution.py) | Credential-free single-operation deterministic execution |
 
 The [examples guide](examples/README.md) includes a real HTTP call for every level and
 explains what runs today and what remains planned.
@@ -638,7 +644,7 @@ Useful places to contribute include:
 - clearer errors, safer defaults, and API ergonomics;
 - `FromResult`/`FromContext` binding, broader capability-graph execution, and ordering;
 - exact database-operation adapters;
-- the deterministic execution compiler described in the roadmap;
+- broader deterministic execution compilation described in the roadmap;
 - documentation, diagrams, and reproducible bug reports.
 
 For substantial behavior or architecture changes, open an

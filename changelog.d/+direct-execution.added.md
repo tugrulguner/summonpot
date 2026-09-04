@@ -1,0 +1,1 @@
+Execute one fully resolved required `Exactly(1)` operation directly when its inputs come from the validated request or callable defaults and its output exactly matches the endpoint response model, without resolving or constructing a provider model.

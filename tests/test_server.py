@@ -16,7 +16,15 @@ from pydantic_ai.exceptions import (
     UsageLimitExceeded,
 )
 
-from summonpot import Depends, Summon, __version__
+from summonpot import (
+    Depends,
+    Exactly,
+    FromRequest,
+    Operation,
+    Required,
+    Summon,
+    __version__,
+)
 from summonpot.server import build_app
 
 
@@ -33,6 +41,48 @@ class AnalysisResponse(BaseModel):
 class TypedRequest(BaseModel):
     customer_id: UUID = Field(alias="customerId")
     created_at: datetime = Field(alias="createdAt")
+
+
+class DirectRequest(BaseModel):
+    value: int
+
+
+class DirectResponse(BaseModel):
+    doubled: int
+
+
+def test_direct_endpoint_runs_through_http_without_provider_credentials():
+    calls: list[int] = []
+
+    def double(value: int) -> DirectResponse:
+        """Double one validated request value."""
+        calls.append(value)
+        return DirectResponse(doubled=value * 2)
+
+    operation = Operation(
+        double,
+        bind={"value": FromRequest("value")},
+        output=DirectResponse,
+    )
+    summon = Summon("direct-service", model="invalid-provider:no-model")
+
+    @summon("/double")
+    def double_endpoint(
+        request: DirectRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectResponse:
+        """Double the request through the one complete operation path."""
+        ...
+
+    client = TestClient(build_app(summon))
+    schema = client.get("/openapi.json").json()["paths"]["/double"]["post"]
+    response = client.post("/double", json={"value": 21})
+
+    assert schema.get("parameters", []) == []
+    assert response.status_code == 200
+    assert response.json() == {"doubled": 42}
+    assert calls == [21]
+    assert summon._runtime._agents == {}
 
 
 def test_build_app_creates_route(mock_runtime):

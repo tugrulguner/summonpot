@@ -141,7 +141,7 @@ async def _run_endpoint(summon: Any, endpoint: Any, params: dict[str, Any]) -> A
         logger.warning("Endpoint %s timed out", endpoint.path, exc_info=exc)
         raise HTTPException(
             status_code=504,
-            detail="Endpoint timed out before the model produced a valid response.",
+            detail="Endpoint timed out before producing a valid response.",
         ) from exc
     except ModelHTTPError as exc:
         logger.warning(
