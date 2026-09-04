@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="560" viewBox="0 0 1440 560" role="img" aria-labelledby="title desc">
   <title id="title">One Summonpot framework supports deterministic and agentic endpoints</title>
-  <desc id="desc">One Summon application branches into a deterministic endpoint with fully application-owned operation arguments and an agentic endpoint with an explicit agent-owned choice. Both use typed request and response contracts, HTTP, OpenAPI, and local validation. Both use the agent runtime today; direct execution for the fully bound endpoint remains planned.</desc>
+  <desc id="desc">One Summon application branches into a deterministic endpoint with fully application-owned operation arguments and an agentic endpoint with an explicit agent-owned choice. Both use typed request and response contracts, HTTP, OpenAPI, and local validation. The complete operation path runs directly, while AgentChoice keeps the agent runtime.</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#070a13"/>
@@ -68,5 +68,5 @@
   </g>
 
   <rect x="275" y="510" width="890" height="30" rx="9" fill="#0f172a" stroke="#475569" stroke-width="1"/>
-  <text x="720" y="531" text-anchor="middle" fill="#94a3b8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">Current runtime: both use the agent runtime  ·  direct execution for the fully bound endpoint remains planned</text>
+  <text x="720" y="531" text-anchor="middle" fill="#94a3b8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">Current runtime: one complete path runs directly  ·  AgentChoice() keeps the agent runtime</text>
 </svg>
