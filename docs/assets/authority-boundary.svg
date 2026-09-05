@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="560" viewBox="0 0 1440 560" role="img" aria-labelledby="title desc">
   <title id="title">One Summonpot framework supports deterministic and agentic endpoints</title>
-  <desc id="desc">One Summon application branches into a deterministic endpoint with fully application-owned operation arguments and an agentic endpoint with an explicit agent-owned choice. Both use typed request and response contracts, HTTP, OpenAPI, and local validation. The complete operation path runs directly, while AgentChoice keeps the agent runtime.</desc>
+  <desc id="desc">One Summon application branches into the shipped single-operation direct slice and an agentic endpoint with an explicit agent-owned choice. Direct execution requires a Pydantic request, one Required Exactly 1 operation, only FromRequest bindings or callable defaults, no unsupported ordering or sources, and exact operation-to-endpoint output identity. Both paths use typed contracts, HTTP, OpenAPI, and local validation.</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#070a13"/>
@@ -43,10 +43,11 @@
   <g>
     <rect x="390" y="95" width="650" height="180" rx="16" fill="#092019" stroke="#34d399" stroke-width="2"/>
     <circle cx="422" cy="128" r="7" fill="#34d399" filter="url(#glow)"/>
-    <text x="442" y="135" fill="#6ee7b7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" font-weight="700">DETERMINISTIC ENDPOINT</text>
-    <text x="422" y="178" fill="#f8fafc" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="19" font-weight="700">@summon("/reports/deterministic")</text>
-    <text x="422" y="216" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="16">FromRequest(...)  →  exact application operation</text>
-    <text x="422" y="248" fill="#94a3b8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">every operation argument is application-owned</text>
+    <text x="442" y="135" fill="#6ee7b7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" font-weight="700">SHIPPED SINGLE-OP DIRECT SLICE</text>
+    <text x="422" y="170" fill="#f8fafc" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="700">Pydantic request • exactly one operation</text>
+    <text x="422" y="200" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">Required(..., calls=Exactly(1))</text>
+    <text x="422" y="226" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">FromRequest/defaults only • no ordering/other sources</text>
+    <text x="422" y="252" fill="#94a3b8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">operation output = endpoint output (exact identity)</text>
   </g>
 
   <g>
@@ -68,5 +69,5 @@
   </g>
 
   <rect x="275" y="510" width="890" height="30" rx="9" fill="#0f172a" stroke="#475569" stroke-width="1"/>
-  <text x="720" y="531" text-anchor="middle" fill="#94a3b8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">Current runtime: one complete path runs directly  ·  AgentChoice() keeps the agent runtime</text>
+  <text x="720" y="531" text-anchor="middle" fill="#94a3b8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">Current runtime: eligible single-op slice runs directly  ·  every other declaration uses the agent runtime</text>
 </svg>
