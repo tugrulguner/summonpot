@@ -7,9 +7,10 @@ import inspect
 import json
 import os
 from collections.abc import Mapping
+from copy import deepcopy
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent, ModelRetry, RunContext, Tool
 from pydantic_ai.models import Model
 from pydantic_ai.usage import UsageLimits
@@ -82,6 +83,8 @@ async def _invoke_bound_operation(
 ) -> Any:
     """Invoke one enforced operation through the shared trusted-value kernel."""
     values = dict(supplied)
+    for default in tool.defaults:
+        values.setdefault(default.argument, deepcopy(default.value))
     for binding in tool.bindings:
         if isinstance(binding.source, FromRequest):
             try:
@@ -107,7 +110,12 @@ async def _invoke_bound_operation(
         result = await _call_with_values(tool, values)
         assert tool.output_adapter is not None
         try:
-            validated = tool.output_adapter.validate_python(result)
+            candidate = (
+                result.model_dump(mode="python", round_trip=True, warnings=False)
+                if isinstance(result, BaseModel)
+                else result
+            )
+            validated = tool.output_adapter.validate_python(candidate)
         except ValidationError as exc:
             raise _OperationOutputError(
                 f"Capability {tool.name!r} returned an invalid declared output."

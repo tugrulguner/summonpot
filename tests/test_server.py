@@ -85,6 +85,49 @@ def test_direct_endpoint_runs_through_http_without_provider_credentials():
     assert summon._runtime._agents == {}
 
 
+def test_direct_http_route_uses_registration_time_metadata():
+    class MutatedRequest(BaseModel):
+        value: str
+
+    class MutatedResponse(BaseModel):
+        text: str
+
+    def double(value: int) -> DirectResponse:
+        return DirectResponse(doubled=value * 2)
+
+    operation = Operation(
+        double,
+        bind={"value": FromRequest("value")},
+        output=DirectResponse,
+    )
+    summon = Summon("direct-service", model="invalid-provider:no-model")
+
+    @summon("/double")
+    def double_endpoint(
+        request: DirectRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectResponse:
+        """Keep registered transport and execution metadata authoritative."""
+        ...
+
+    endpoint = summon.endpoints[0]
+    endpoint.path = "/mutated"
+    endpoint.method = "PUT"
+    endpoint.input_model = MutatedRequest
+    endpoint.output_model = MutatedResponse
+    endpoint.parameters.clear()
+
+    client = TestClient(build_app(summon))
+    schema = client.get("/openapi.json").json()
+
+    assert "/double" in schema["paths"]
+    assert "/mutated" not in schema["paths"]
+    assert client.post("/double", json={"value": "not-an-int"}).status_code == 422
+    response = client.post("/double", json={"value": 21})
+    assert response.status_code == 200
+    assert response.json() == {"doubled": 42}
+
+
 def test_build_app_creates_route(mock_runtime):
     summon = mock_runtime(mock_response="Hello, world!")
 

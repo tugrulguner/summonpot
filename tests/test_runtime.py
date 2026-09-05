@@ -25,6 +25,7 @@ from summonpot import (
     Summon,
     UsageLimits,
 )
+from summonpot._execution import _RequestValues
 from summonpot.runtime import Runtime, _OperationOutputError
 
 
@@ -54,6 +55,14 @@ class NativeCustomerRecord(BaseModel):
 class DirectCustomerResponse(BaseModel):
     customer_id: UUID
     include_history: bool
+
+
+class TagRequest(BaseModel):
+    tags: list[str]
+
+
+class TagResponse(BaseModel):
+    tags: list[str]
 
 
 def _register_endpoint(summon: Summon, *, model: str | None = None) -> None:
@@ -179,6 +188,180 @@ def test_direct_operation_invalid_output_is_not_replayed_or_sent_to_a_model():
 
     assert starts == 1
     assert runtime._agents == {}
+
+
+@pytest.mark.parametrize("use_subclass", [False, True])
+def test_direct_operation_revalidates_constructed_model_output(use_subclass: bool):
+    class UnsafeResponse(DirectCustomerResponse):
+        pass
+
+    def malformed(customer_id: UUID) -> DirectCustomerResponse:
+        response_type = UnsafeResponse if use_subclass else DirectCustomerResponse
+        return response_type.model_construct(
+            customer_id="not-a-uuid", include_history=False
+        )
+
+    operation = Operation(
+        malformed,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/constructed")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Reject an unvalidated model instance from application code."""
+        ...
+
+    with pytest.raises(_OperationOutputError, match="invalid declared output"):
+        asyncio.run(
+            Runtime(model="invalid-provider:no-model").call(
+                summon.endpoints[0],
+                {"customerId": "12345678-1234-5678-1234-567812345678"},
+            )
+        )
+
+
+def test_direct_request_ignores_untrusted_prevalidated_typed_values():
+    requested = UUID("12345678-1234-5678-1234-567812345678")
+    forged = UUID("87654321-4321-8765-4321-876543218765")
+
+    def load_customer(customer_id: UUID) -> DirectCustomerResponse:
+        return DirectCustomerResponse(
+            customer_id=customer_id,
+            include_history=False,
+        )
+
+    operation = Operation(
+        load_customer,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/prevalidated")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Use only the registered request adapter as the trust boundary."""
+        ...
+
+    params = _RequestValues(
+        {"customerId": str(requested)}, typed={"customer_id": forged}
+    )
+    result = asyncio.run(
+        Runtime(model="invalid-provider:no-model").call(summon.endpoints[0], params)
+    )
+
+    assert result.customer_id == requested
+
+
+def test_direct_request_detaches_nested_values_from_the_caller():
+    def extend(tags: list[str]) -> TagResponse:
+        tags.append("runtime")
+        return TagResponse(tags=tags)
+
+    operation = Operation(
+        extend,
+        bind={"tags": FromRequest("tags")},
+        output=TagResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/tags")
+    def tags(
+        request: TagRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> TagResponse:
+        """Keep direct request state isolated from caller-owned containers."""
+        ...
+
+    payload = {"tags": ["caller"]}
+    result = asyncio.run(
+        Runtime(model="invalid-provider:no-model").call(summon.endpoints[0], payload)
+    )
+
+    assert result.tags == ["caller", "runtime"]
+    assert payload == {"tags": ["caller"]}
+
+
+def test_direct_operation_uses_registration_time_callable_defaults():
+    defaults = ["registered"]
+
+    def extend(tags: list[str], suffixes: list[str] = defaults) -> TagResponse:
+        return TagResponse(tags=[*tags, *suffixes])
+
+    operation = Operation(
+        extend,
+        bind={"tags": FromRequest("tags")},
+        output=TagResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/tags/default")
+    def tags(
+        request: TagRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> TagResponse:
+        """Use the callable default captured when the endpoint was registered."""
+        ...
+
+    defaults.append("mutated")
+    result = asyncio.run(
+        Runtime(model="invalid-provider:no-model").call(
+            summon.endpoints[0], {"tags": ["caller"]}
+        )
+    )
+
+    assert result.tags == ["caller", "registered"]
+
+
+def test_default_only_operation_stays_on_the_agent_path():
+    def status(include_history: bool = False) -> DirectCustomerResponse:
+        return DirectCustomerResponse(
+            customer_id=UUID("12345678-1234-5678-1234-567812345678"),
+            include_history=include_history,
+        )
+
+    operation = Operation(status, bind={}, output=DirectCustomerResponse)
+    summon = Summon("svc")
+
+    @summon("/customers/status")
+    def customer(
+        request: ResearchRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Keep empty-binding operations agent-backed."""
+        ...
+
+    turns = 0
+
+    def model_function(messages, info: AgentInfo):
+        nonlocal turns
+        turns += 1
+        if turns == 1:
+            return ModelResponse(parts=[ToolCallPart("status", {})])
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    info.output_tools[0].name,
+                    {
+                        "customer_id": "12345678-1234-5678-1234-567812345678",
+                        "include_history": False,
+                    },
+                )
+            ]
+        )
+
+    runtime = Runtime(model=FunctionModel(model_function))
+    asyncio.run(runtime.call(summon.endpoints[0], {"query": "status"}))
+
+    assert turns == 2
+    assert len(runtime._agents) == 1
 
 
 def test_direct_timeout_does_not_retry_or_switch_to_a_model():

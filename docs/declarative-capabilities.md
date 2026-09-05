@@ -78,9 +78,10 @@ model schema, the single start is reserved before application code, and `output=
 validated before the operation satisfies `Required`.
 
 Multi-operation chains, `FromResult`, `FromContext`, `after`, and broader call bounds remain
-registration-only. See [`07_bound_operation.py`](../examples/07_bound_operation.py) for the
-enforced slice and [`06_support_service`](../examples/06_support_service/app.py) for the
-broader declared chain and its explicit current-runtime boundary.
+registration-only. See [`08_direct_execution.py`](../examples/08_direct_execution.py) for the
+credential-free direct slice, [`07_bound_operation.py`](../examples/07_bound_operation.py)
+for the agent-backed enforced slice, and
+[`06_support_service`](../examples/06_support_service/app.py) for the broader declared chain.
 
 ## Deterministic and agentic execution
 
@@ -92,7 +93,13 @@ bounded choice remains → agentic execution
 no legal path → typed deterministic error
 ```
 
-The public endpoint declaration stays the same. The fixed docstring goal and validated request determine the work; callers do not send an `action` field or select an agent framework. Automatic deterministic endpoint execution is planned—the current runtime still executes `@summon` requests through the provider-neutral agent loop.
+The public endpoint declaration stays the same. The fixed docstring goal and validated
+request determine the work; callers do not send an `action` field or select an agent
+framework. When registration proves there is exactly one required `Exactly(1)` operation,
+every required argument comes from `FromRequest` or a callable default, and its declared
+output is the endpoint output model by exact identity, the runtime executes that operation
+directly before model resolution. There is no model fallback after direct execution starts.
+Any unresolved choice or unsupported declaration remains on the provider-neutral agent loop.
 
 Dependency parameters are declaration-only. They do not appear in the HTTP request body
 or OpenAPI request schema. The ellipsis is the complete declaration body, and direct calls

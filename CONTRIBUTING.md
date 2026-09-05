@@ -35,8 +35,9 @@ Use `make format` before committing.
 
 - `Summon` and `@summon(...)` remain a minimal endpoint declaration, not a graph builder or
   execution-engine configuration surface.
-- Current requests remain model-backed. Automatic model-free endpoint execution stays
-  planned until source, tests, and real execution prove it has shipped.
+- One fully resolved required `Exactly(1)` operation with complete `FromRequest` or
+  callable-default bindings and exact output identity executes directly without a model.
+  Every declaration outside that narrow shipped slice remains model-backed.
 - Registration rejects invalid declarations before traffic when the failure is knowable.
 - In the shipped single-required-operation `Exactly(1)` slice, supported `FromRequest`, direct
   `AgentChoice`, and callable-default bindings are framework-owned rather than model-controlled.

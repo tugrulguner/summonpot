@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any
@@ -13,7 +14,7 @@ from weakref import ReferenceType, ref
 from pydantic import TypeAdapter
 
 from summonpot.contracts import AgentChoice, FromRequest
-from summonpot.models import EndpointDef, ToolDef
+from summonpot.models import EndpointDef, ParamDef, ToolDef
 
 
 class _RequestValues(dict[str, Any]):
@@ -38,6 +39,22 @@ class _CompiledBinding:
 
 
 @dataclass(frozen=True, slots=True)
+class _CompiledDefault:
+    argument: str
+    value: Any
+
+
+@dataclass(frozen=True, slots=True)
+class _CompiledParameter:
+    name: str
+    type_annotation: str
+    description: str
+    required: bool
+    default: Any
+    annotation: Any
+
+
+@dataclass(frozen=True, slots=True)
 class _CompiledTool:
     identity: int
     name: str
@@ -49,6 +66,7 @@ class _CompiledTool:
     minimum: int
     maximum: int | None
     bindings: tuple[_CompiledBinding, ...]
+    defaults: tuple[_CompiledDefault, ...]
     output_adapter: TypeAdapter[Any] | None
     enforce_bound_exactly_once: bool
 
@@ -77,9 +95,13 @@ class _CompiledEndpoint:
     name: str
     description: str
     return_type: str
+    parameters: tuple[_CompiledParameter, ...]
+    input_model: Any
     input_adapter: TypeAdapter[Any] | None
     output_model: Any
     model: str | None
+    method: str
+    path_parameter_names: tuple[str, ...]
     tools: tuple[_CompiledTool, ...]
     direct_tool: int | None
 
@@ -152,6 +174,8 @@ def _compile_endpoint(
         name=endpoint.name,
         description=endpoint.description,
         return_type=endpoint.return_type,
+        parameters=tuple(_compile_parameter(param) for param in endpoint.parameters),
+        input_model=endpoint.input_model,
         input_adapter=(
             TypeAdapter(endpoint.input_model)
             if endpoint.input_model is not None
@@ -159,6 +183,8 @@ def _compile_endpoint(
         ),
         output_model=endpoint.output_model,
         model=endpoint.model,
+        method=endpoint.method,
+        path_parameter_names=tuple(endpoint.path_parameter_names),
         tools=tools,
         direct_tool=direct_index,
     )
@@ -202,7 +228,7 @@ def _direct_tool_index(
     contract = tools[enforce_index].contract
     if contract is None or contract.output is not endpoint.output_model:
         return None
-    if contract.bind is None or any(
+    if not contract.bind or any(
         not isinstance(source, FromRequest) for source in contract.bind.values()
     ):
         return None
@@ -233,10 +259,27 @@ def _compile_tool(tool: ToolDef, identity: int, *, enforce: bool) -> _CompiledTo
         ),
         maximum=bounds.maximum if enforce and bounds is not None else None,
         bindings=bindings,
+        defaults=tuple(
+            _CompiledDefault(name, deepcopy(parameter.default))
+            for name, parameter in signature.parameters.items()
+            if parameter.default is not inspect.Parameter.empty
+        ),
         output_adapter=(
             TypeAdapter(contract.output) if enforce and contract is not None else None
         ),
         enforce_bound_exactly_once=enforce,
+    )
+
+
+def _compile_parameter(param: ParamDef) -> _CompiledParameter:
+    """Snapshot one mutable public parameter definition for HTTP construction."""
+    return _CompiledParameter(
+        name=param.name,
+        type_annotation=param.type_annotation,
+        description=param.description,
+        required=param.required,
+        default=deepcopy(param.default),
+        annotation=param.annotation,
     )
 
 
@@ -261,11 +304,8 @@ def _prepare_request(
     params: Mapping[str, Any],
 ) -> _RequestValues:
     """Validate and snapshot raw input or copy an adapter-validated request view."""
-    if isinstance(params, _RequestValues):
-        return _RequestValues(params, typed=params.typed)
-
     if plan.input_adapter is not None:
-        validated = plan.input_adapter.validate_python(dict(params))
+        validated = plan.input_adapter.validate_python(deepcopy(dict(params)))
         prompt = validated.model_dump(mode="json", by_alias=True)
         typed = {
             name: getattr(validated, name) for name in type(validated).model_fields
