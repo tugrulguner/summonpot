@@ -169,6 +169,42 @@ async def _call_capability(fn: Any, *args: Any, **kwargs: Any) -> Any:
     return result
 
 
+def _validated_retries(retries: object) -> int:
+    """Require a non-negative built-in ``int``.
+
+    Checked here rather than at first use because it is knowable here. Stored
+    unvalidated, a float or a string survived construction, survived endpoint
+    registration, and surfaced on the first HTTP request as
+    ``AttributeError: 'float' object has no attribute 'copy'`` from inside
+    agent construction -- which the server turns into a 500 that names neither
+    ``retries`` nor the configuration that set it. Negative and boolean values
+    were worse: they reached *successful* requests while meaning nothing.
+
+    ``type(retries) is int`` rather than ``isinstance``: ``bool`` is an ``int``
+    subclass, so ``retries=True`` would otherwise be stored as ``1``.
+    """
+    if type(retries) is not int:
+        # Nothing about the rejected object is rendered -- not the value, and
+        # not its type. ``retries`` is configuration, so both are caller
+        # controlled: a value may hold a credential that would be copied
+        # verbatim into startup and CI logs, its ``__repr__`` may raise, and a
+        # class is free to set ``__name__`` to secret-bearing text or to make
+        # even reading it raise from a metaclass. Any of those would either
+        # leak into logs or replace this actionable TypeError with an
+        # arbitrary exception from the caller's own code. Naming the setting
+        # and the rule is what tells you which configuration to correct.
+        raise TypeError(
+            "retries must be a built-in int. It counts how many times a "
+            "failed model call is retried, so it must be 0 or more."
+        )
+    if retries < 0:
+        raise ValueError(
+            f"retries must be 0 or more, not {retries}. A negative count has no "
+            "meaning; use 0 to disable retrying."
+        )
+    return retries
+
+
 class Runtime:
     """Execute summonpot endpoints through the least-powerful shipped path."""
 
@@ -181,7 +217,7 @@ class Runtime:
         timeout: float | None = None,
     ) -> None:
         self._model = model
-        self.retries = retries
+        self.retries = _validated_retries(retries)
         self.usage_limits = usage_limits
         self.timeout = timeout
         self._agents: dict[
