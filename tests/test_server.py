@@ -15,6 +15,8 @@ from pydantic_ai.exceptions import (
     UnexpectedModelBehavior,
     UsageLimitExceeded,
 )
+from pydantic_ai.messages import ModelResponse, ToolCallPart
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from summonpot import (
     Depends,
@@ -25,6 +27,7 @@ from summonpot import (
     Summon,
     __version__,
 )
+from summonpot.runtime import Runtime
 from summonpot.server import build_app
 
 
@@ -126,6 +129,50 @@ def test_direct_http_route_uses_registration_time_metadata():
     response = client.post("/double", json={"value": 21})
     assert response.status_code == 200
     assert response.json() == {"doubled": 42}
+
+
+def test_scalar_http_parameter_keeps_its_typed_value_for_from_request():
+    customer_id = UUID("12345678-1234-5678-1234-567812345678")
+    received: list[UUID] = []
+
+    def inspect_customer(value: UUID) -> DirectResponse:
+        received.append(value)
+        return DirectResponse(doubled=2)
+
+    operation = Operation(
+        inspect_customer,
+        bind={"value": FromRequest("value")},
+        output=DirectResponse,
+    )
+    turns = 0
+
+    def model_function(messages, info: AgentInfo):
+        nonlocal turns
+        turns += 1
+        if turns == 1:
+            return ModelResponse(parts=[ToolCallPart("inspect_customer", {})])
+        return ModelResponse(
+            parts=[ToolCallPart(info.output_tools[0].name, {"doubled": 2})]
+        )
+
+    summon = Summon("typed-service")
+    summon._runtime = Runtime(model=FunctionModel(model_function))
+
+    @summon("/inspect")
+    def inspect_endpoint(
+        value: UUID,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectResponse:
+        """Preserve FastAPI's validated scalar type through trusted injection."""
+        ...
+
+    response = TestClient(build_app(summon)).post(
+        "/inspect", json={"value": str(customer_id)}
+    )
+
+    assert response.status_code == 200
+    assert received == [customer_id]
+    assert isinstance(received[0], UUID)
 
 
 def test_build_app_creates_route(mock_runtime):

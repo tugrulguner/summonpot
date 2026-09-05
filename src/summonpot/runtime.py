@@ -111,7 +111,9 @@ async def _invoke_bound_operation(
         assert tool.output_adapter is not None
         try:
             candidate = (
-                result.model_dump(mode="python", round_trip=True, warnings=False)
+                BaseModel.model_dump(
+                    result, mode="python", round_trip=True, warnings=False
+                )
                 if isinstance(result, BaseModel)
                 else result
             )

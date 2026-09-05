@@ -52,6 +52,7 @@ class _CompiledParameter:
     required: bool
     default: Any
     annotation: Any
+    adapter: TypeAdapter[Any] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,7 +167,12 @@ def _compile_endpoint(
         else None
     )
     tools = tuple(
-        _compile_tool(tool, index, enforce=index == enforce_index)
+        _compile_tool(
+            tool,
+            index,
+            enforce=index == enforce_index,
+            snapshot_defaults=index == direct_index,
+        )
         for index, tool in enumerate(source_tools)
     )
     return _CompiledEndpoint(
@@ -232,10 +238,32 @@ def _direct_tool_index(
         not isinstance(source, FromRequest) for source in contract.bind.values()
     ):
         return None
+    if not _direct_defaults_are_stable(tools[enforce_index], contract.bind):
+        return None
     return enforce_index
 
 
-def _compile_tool(tool: ToolDef, identity: int, *, enforce: bool) -> _CompiledTool:
+def _direct_defaults_are_stable(tool: ToolDef, bindings: Mapping[str, Any]) -> bool:
+    """Return whether every direct-path default is immutable and identity-stable."""
+    signature, _ = _resolved_signature(tool.fn)
+    for name, parameter in signature.parameters.items():
+        if name in bindings or parameter.default is inspect.Parameter.empty:
+            continue
+        try:
+            if deepcopy(parameter.default) is not parameter.default:
+                return False
+        except Exception:
+            return False
+    return True
+
+
+def _compile_tool(
+    tool: ToolDef,
+    identity: int,
+    *,
+    enforce: bool,
+    snapshot_defaults: bool,
+) -> _CompiledTool:
     signature, annotations = _resolved_signature(tool.fn)
     contract = tool.contract
     bindings = (
@@ -260,9 +288,11 @@ def _compile_tool(tool: ToolDef, identity: int, *, enforce: bool) -> _CompiledTo
         maximum=bounds.maximum if enforce and bounds is not None else None,
         bindings=bindings,
         defaults=tuple(
-            _CompiledDefault(name, deepcopy(parameter.default))
+            _CompiledDefault(name, parameter.default)
             for name, parameter in signature.parameters.items()
-            if parameter.default is not inspect.Parameter.empty
+            if snapshot_defaults
+            and parameter.default is not inspect.Parameter.empty
+            and (contract is None or contract.bind is None or name not in contract.bind)
         ),
         output_adapter=(
             TypeAdapter(contract.output) if enforce and contract is not None else None
@@ -280,6 +310,11 @@ def _compile_parameter(param: ParamDef) -> _CompiledParameter:
         required=param.required,
         default=deepcopy(param.default),
         annotation=param.annotation,
+        adapter=(
+            TypeAdapter(param.annotation)
+            if param.annotation is not None and not isinstance(param.annotation, str)
+            else None
+        ),
     )
 
 
@@ -312,7 +347,20 @@ def _prepare_request(
         }
         return _RequestValues(prompt, typed=typed)
 
-    return _RequestValues(params)
+    prompt = deepcopy(dict(params))
+    typed_source = params.typed if isinstance(params, _RequestValues) else params
+    typed: dict[str, Any] = {}
+    for parameter in plan.parameters:
+        if parameter.name not in typed_source and parameter.name not in prompt:
+            continue
+        value = typed_source.get(parameter.name, prompt.get(parameter.name))
+        detached = deepcopy(value)
+        typed[parameter.name] = (
+            parameter.adapter.validate_python(detached)
+            if parameter.adapter is not None
+            else detached
+        )
+    return _RequestValues(prompt, typed=typed)
 
 
 def _new_run(plan: _CompiledEndpoint, params: Mapping[str, Any]) -> _EndpointRun:

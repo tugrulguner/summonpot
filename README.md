@@ -32,7 +32,7 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/tugrulguner/summonpot/3739ae6684f163b01892b8f2b6e7973bed12028d/docs/assets/one-declaration-two-flows.png" alt="One Summonpot application declares a deterministic endpoint with application-owned operation arguments and an agentic endpoint with an explicit agent-owned choice through the same typed HTTP and OpenAPI framework" width="960">
+  <img src="https://raw.githubusercontent.com/tugrulguner/summonpot/a3238041b53f6f07d4575ecfae5a77f60a551500/docs/assets/one-declaration-two-flows.png" alt="One Summonpot application branches into the exact shipped single-operation direct slice or an agent-backed endpoint through the same typed HTTP and OpenAPI framework" width="960">
 </p>
 
 Summonpot modernizes APIs for AI without replacing the endpoint with a separate agent
@@ -51,7 +51,8 @@ clear error; serve the application or invoke its generated HTTP route instead.
 > [!IMPORTANT]
 > One fully resolved `Exactly(1)` operation path now executes directly without resolving
 > or constructing a model. All other declarations still use Summonpot's provider-neutral
-> agent runtime; the agent controls only the choices exposed by the declaration.
+> agent runtime. Within the runtime-enforced binding slice, the agent controls only explicit
+> `AgentChoice()` arguments; unsupported legacy binding shapes may remain model-supplied.
 > Broader multi-operation deterministic execution remains on the
 > [roadmap](ROADMAP.md), not shipped behavior.
 
@@ -170,8 +171,9 @@ routing, and OpenAPI under Summonpot.
   direct `AgentChoice` arguments remain visible, one start is permitted, and `output=` is
   locally validated before success.
 - **Single-operation deterministic execution** when one required `Exactly(1)` operation
-  gets every required input from `FromRequest` or callable defaults and returns exactly the
-  endpoint response model. This path does not resolve, construct, or call a model.
+  has at least one `FromRequest` binding, every remaining argument comes from `FromRequest`
+  or an immutable identity-stable callable default, and its output is exactly the endpoint
+  response model. This path does not resolve, construct, or call a model.
 - **Typed `Operation` contracts** that declare request, prior-result, context, or
   agent-chosen argument sources without expanding the endpoint API.
 - **Registration-time contract validation** that rejects missing sources, invalid result
@@ -428,7 +430,7 @@ Summonpot chooses its current execution path without adding a second endpoint AP
 
 | Contract state | Current execution |
 |---|---|
-| One required `Exactly(1)` operation, all required inputs from `FromRequest` or defaults, exact response-model output | Execute directly without a model |
+| One required `Exactly(1)` operation, at least one `FromRequest` binding, only `FromRequest` or immutable identity-stable defaults, exact response-model output | Execute directly without a model |
 | A bounded semantic choice remains | Use the agent runtime with declared capabilities |
 | Unsupported or broader operation graph | Keep the existing agent path until its full semantics ship |
 

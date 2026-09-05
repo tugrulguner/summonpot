@@ -5,9 +5,9 @@ layer. The endpoint remains the stable public abstraction while its contract com
 exact application behavior with explicitly bounded agentic decisions. You declare the
 request model, the goal, the exact capabilities, and the response model.
 
-One fully resolved `Exactly(1)` operation path executes without a model when every required
-input comes from `FromRequest` or a callable default and the operation output is exactly the
-endpoint response model. All other declarations still use the provider-neutral agent
+One fully resolved `Exactly(1)` operation path executes without a model when it has at least
+one `FromRequest` binding, uses only `FromRequest` or immutable identity-stable callable
+defaults, and the operation output is exactly the endpoint response model. All other declarations still use the provider-neutral agent
 runtime. Broader multi-operation deterministic execution remains planned. The framework
 owns execution, including any agent loop. **The ellipsis is a complete declaration body**,
 not an implementation waiting to be written. Calling the decorated declaration directly is

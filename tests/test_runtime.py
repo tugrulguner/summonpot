@@ -25,7 +25,7 @@ from summonpot import (
     Summon,
     UsageLimits,
 )
-from summonpot._execution import _RequestValues
+from summonpot._execution import _prepare_request, _registered_plan, _RequestValues
 from summonpot.runtime import Runtime, _OperationOutputError
 
 
@@ -225,6 +225,44 @@ def test_direct_operation_revalidates_constructed_model_output(use_subclass: boo
         )
 
 
+def test_operation_output_validation_bypasses_overridden_model_dump():
+    requested = UUID("12345678-1234-5678-1234-567812345678")
+
+    class DeceptiveResponse(DirectCustomerResponse):
+        def model_dump(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            return {
+                "customer_id": requested,
+                "include_history": False,
+            }
+
+    def malformed(customer_id: UUID) -> DirectCustomerResponse:
+        return DeceptiveResponse.model_construct(
+            customer_id="not-a-uuid", include_history=False
+        )
+
+    operation = Operation(
+        malformed,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/deceptive")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Validate structure rather than trusting an instance override."""
+        ...
+
+    with pytest.raises(_OperationOutputError, match="invalid declared output"):
+        asyncio.run(
+            Runtime(model="invalid-provider:no-model").call(
+                summon.endpoints[0], {"customerId": str(requested)}
+            )
+        )
+
+
 def test_direct_request_ignores_untrusted_prevalidated_typed_values():
     requested = UUID("12345678-1234-5678-1234-567812345678")
     forged = UUID("87654321-4321-8765-4321-876543218765")
@@ -289,35 +327,108 @@ def test_direct_request_detaches_nested_values_from_the_caller():
     assert payload == {"tags": ["caller"]}
 
 
-def test_direct_operation_uses_registration_time_callable_defaults():
-    defaults = ["registered"]
+def test_scalar_request_snapshot_detaches_nested_values_from_the_caller():
+    summon = Summon("svc")
 
-    def extend(tags: list[str], suffixes: list[str] = defaults) -> TagResponse:
-        return TagResponse(tags=[*tags, *suffixes])
+    @summon("/tags/scalar")
+    def tags(values: list[str]) -> str:
+        """Snapshot an ordinary scalar-style endpoint request."""
+        ...
+
+    plan = _registered_plan(summon.endpoints[0])
+    assert plan is not None
+    payload = {"values": ["caller"]}
+    prepared = _prepare_request(plan, payload)
+
+    payload["values"].append("mutated")
+
+    assert prepared == {"values": ["caller"]}
+    assert prepared.typed == {"values": ["caller"]}
+
+
+def test_direct_operation_uses_registration_time_callable_defaults():
+    def load_customer(
+        customer_id: UUID, privileged: bool = False
+    ) -> DirectCustomerResponse:
+        return DirectCustomerResponse(
+            customer_id=customer_id,
+            include_history=privileged,
+        )
 
     operation = Operation(
-        extend,
-        bind={"tags": FromRequest("tags")},
-        output=TagResponse,
+        load_customer,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
     )
     summon = Summon("svc")
 
-    @summon("/tags/default")
-    def tags(
-        request: TagRequest,
+    @summon("/customers/default")
+    def customer(
+        request: NativeCustomerRequest,
         result=Required(operation, calls=Exactly(1)),
-    ) -> TagResponse:
+    ) -> DirectCustomerResponse:
         """Use the callable default captured when the endpoint was registered."""
         ...
 
-    defaults.append("mutated")
+    load_customer.__defaults__ = (True,)
     result = asyncio.run(
         Runtime(model="invalid-provider:no-model").call(
-            summon.endpoints[0], {"tags": ["caller"]}
+            summon.endpoints[0],
+            {"customerId": "12345678-1234-5678-1234-567812345678"},
         )
     )
 
-    assert result.tags == ["caller", "registered"]
+    assert result.include_history is False
+
+
+def test_identity_sensitive_default_keeps_operation_agent_backed():
+    sentinel = object()
+
+    def load_customer(
+        customer_id: UUID, marker: object = sentinel
+    ) -> DirectCustomerResponse:
+        return DirectCustomerResponse(
+            customer_id=customer_id,
+            include_history=marker is sentinel,
+        )
+
+    operation = Operation(
+        load_customer,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/sentinel")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Do not change identity-sensitive callable-default semantics."""
+        ...
+
+    plan = _registered_plan(summon.endpoints[0])
+    assert plan is not None
+    assert plan.direct_tool is None
+
+
+def test_unenforced_tool_with_noncopyable_default_still_registers():
+    lock = threading.Lock()
+
+    def inspect_lock(value: object = lock) -> str:
+        return "locked" if value.locked() else "open"  # type: ignore[attr-defined]
+
+    summon = Summon("svc")
+
+    @summon("/research")
+    def research(
+        request: ResearchRequest,
+        inspection=Depends(inspect_lock),
+    ) -> ResearchResponse:
+        """Keep legacy capability defaults compatible."""
+        ...
+
+    assert len(summon.endpoints) == 1
 
 
 def test_default_only_operation_stays_on_the_agent_path():

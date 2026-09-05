@@ -96,10 +96,11 @@ def test_roadmap_advances_after_the_narrow_no_model_slice():
 
     assert shipped_direct < result_chain < database
     assert "exactly one required `Exactly(1)` operation" in roadmap
+    assert "at least one `FromRequest` binding" in roadmap
     assert (
-        "every required input comes from `FromRequest` or a callable default" in roadmap
+        "only `FromRequest` or immutable identity-stable callable defaults" in roadmap
     )
-    assert "operation output is exactly the endpoint response model" in roadmap
+    assert "operation output exactly matching the endpoint response model" in roadmap
     assert "without resolving, constructing, or calling a model" in roadmap
     assert "There is no model fallback after direct execution begins" in roadmap
     assert (

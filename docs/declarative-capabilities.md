@@ -96,9 +96,10 @@ no legal path → typed deterministic error
 The public endpoint declaration stays the same. The fixed docstring goal and validated
 request determine the work; callers do not send an `action` field or select an agent
 framework. When registration proves there is exactly one required `Exactly(1)` operation,
-every required argument comes from `FromRequest` or a callable default, and its declared
-output is the endpoint output model by exact identity, the runtime executes that operation
-directly before model resolution. There is no model fallback after direct execution starts.
+at least one argument is bound from `FromRequest`, every remaining argument comes from
+`FromRequest` or an immutable identity-stable callable default, and its declared output is
+the endpoint output model by exact identity, the runtime executes that operation directly
+before model resolution. There is no model fallback after direct execution starts.
 Any unresolved choice or unsupported declaration remains on the provider-neutral agent loop.
 
 Dependency parameters are declaration-only. They do not appear in the HTTP request body

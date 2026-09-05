@@ -52,9 +52,8 @@ def test_readme_states_the_current_runtime_boundary_before_positioning():
         "all other declarations still use summonpot's provider-neutral agent runtime"
         in introduction
     )
-    assert (
-        "the agent controls only the choices exposed by the declaration" in introduction
-    )
+    assert "within the runtime-enforced binding slice" in introduction
+    assert "unsupported legacy binding shapes may remain model-supplied" in introduction
     assert (
         "broader multi-operation deterministic execution remains on the "
         "[roadmap](roadmap.md)" in introduction
@@ -109,7 +108,7 @@ def test_readme_replaces_the_text_formula_with_a_png_flow_diagram():
     source = ROOT / "docs" / "assets" / "authority-boundary.svg"
     packaged_image = (
         "https://raw.githubusercontent.com/tugrulguner/summonpot/"
-        "3739ae6684f163b01892b8f2b6e7973bed12028d/"
+        "a3238041b53f6f07d4575ecfae5a77f60a551500/"
         "docs/assets/one-declaration-two-flows.png"
     )
 
@@ -128,16 +127,19 @@ def test_readme_replaces_the_text_formula_with_a_png_flow_diagram():
     )
     assert "SUMMON APP" in content
     assert "same declaration style" in content
-    assert "DETERMINISTIC ENDPOINT" in content
-    assert '@summon("/reports/deterministic")' in content
-    assert "every operation argument is application-owned" in content
+    assert "SHIPPED SINGLE-OP DIRECT SLICE" in content
+    assert "Pydantic request • exactly one operation" in content
+    assert "Required(..., calls=Exactly(1))" in content
+    assert "≥1 FromRequest • immutable stable defaults only" in content
+    assert "no ordering or unsupported sources" in content
+    assert "operation output = endpoint output (exact identity)" in content
     assert "AGENTIC ENDPOINT" in content
     assert '@summon("/reports/agentic")' in content
     assert "AgentChoice()" in content
     assert "the agent owns only the declared semantic choice" in content
     assert "model-owned" not in content
-    assert "Current runtime: one complete path runs directly" in content
-    assert "AgentChoice() keeps the agent runtime" in content
+    assert "Current runtime: eligible single-op slice runs directly" in content
+    assert "every other declaration uses the agent runtime" in content
 
 
 def test_readme_keeps_the_established_structure_without_version_history():
