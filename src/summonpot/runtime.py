@@ -1,4 +1,4 @@
-"""Provider-agnostic agent runtime for summonpot."""
+"""Provider-neutral endpoint runtime for direct and agent-backed execution."""
 
 from __future__ import annotations
 
@@ -48,44 +48,7 @@ def _tracked_operation(tool: _CompiledTool) -> Any:
             return result
 
         supplied = visible_signature.bind(*capability_args, **kwargs).arguments
-        values = dict(supplied)
-        for binding in tool.bindings:
-            if isinstance(binding.source, FromRequest):
-                try:
-                    values[binding.argument] = ctx.deps.request[binding.source.field]
-                except KeyError:
-                    raise RuntimeError(
-                        f"Required request field {binding.source.field!r} is unavailable."
-                    ) from None
-            elif isinstance(binding.source, AgentChoice):
-                # Already validated against the model-visible signature above.
-                continue
-
-        state = ctx.deps.states[tool.identity]
-        async with ctx.deps.lock:
-            if tool.maximum is not None and state.started >= tool.maximum:
-                raise ModelRetry(
-                    f"Capability {tool.name!r} may run exactly once and has already started."
-                )
-            state.started += 1
-            state.running += 1
-
-        try:
-            result = await _call_with_values(tool, values)
-            assert tool.output_adapter is not None
-            try:
-                validated = tool.output_adapter.validate_python(result)
-            except ValidationError as exc:
-                raise _OperationOutputError(
-                    f"Capability {tool.name!r} returned an invalid declared output."
-                ) from exc
-        finally:
-            async with ctx.deps.lock:
-                state.running -= 1
-
-        async with ctx.deps.lock:
-            state.succeeded += 1
-        return validated
+        return await _invoke_bound_operation(tool, ctx.deps, supplied)
 
     annotations = {
         name: annotation
@@ -110,6 +73,54 @@ def _tracked_operation(tool: _CompiledTool) -> Any:
         **annotations,
     }
     return execute
+
+
+async def _invoke_bound_operation(
+    tool: _CompiledTool,
+    run: _EndpointRun,
+    supplied: Mapping[str, Any],
+) -> Any:
+    """Invoke one enforced operation through the shared trusted-value kernel."""
+    values = dict(supplied)
+    for default in tool.defaults:
+        values.setdefault(default.argument, default.value)
+    for binding in tool.bindings:
+        if isinstance(binding.source, FromRequest):
+            try:
+                values[binding.argument] = run.request[binding.source.field]
+            except KeyError:
+                raise RuntimeError(
+                    f"Required request field {binding.source.field!r} is unavailable."
+                ) from None
+        elif isinstance(binding.source, AgentChoice):
+            # Already validated against the model-visible signature when agent-owned.
+            continue
+
+    state = run.states[tool.identity]
+    async with run.lock:
+        if tool.maximum is not None and state.started >= tool.maximum:
+            raise ModelRetry(
+                f"Capability {tool.name!r} may run exactly once and has already started."
+            )
+        state.started += 1
+        state.running += 1
+
+    try:
+        result = await _call_with_values(tool, values)
+        assert tool.output_validator is not None
+        try:
+            validated = tool.output_validator.validate_python(result)
+        except ValidationError as exc:
+            raise _OperationOutputError(
+                f"Capability {tool.name!r} returned an invalid declared output."
+            ) from exc
+    finally:
+        async with run.lock:
+            state.running -= 1
+
+    async with run.lock:
+        state.succeeded += 1
+    return validated
 
 
 async def _call_with_values(tool: _CompiledTool, values: dict[str, Any]) -> Any:
@@ -187,7 +198,7 @@ def _validated_retries(retries: object) -> int:
 
 
 class Runtime:
-    """Execute summonpot endpoints through a provider-agnostic agent engine."""
+    """Execute summonpot endpoints through the least-powerful shipped path."""
 
     def __init__(
         self,
@@ -208,8 +219,10 @@ class Runtime:
     def _plan_for(self, endpoint: EndpointDef) -> _CompiledEndpoint:
         plan = _registered_plan(endpoint)
         if plan is None:
-            # Compatibility for EndpointDef instances constructed outside Summon.
-            plan = _register_endpoint(endpoint)
+            # Compatibility for EndpointDef instances constructed outside Summon. They
+            # have not passed authoritative registration validation, so they must not
+            # activate the direct path from mutable inspection metadata alone.
+            plan = _register_endpoint(endpoint, allow_direct=False)
         return plan
 
     @property
@@ -235,8 +248,14 @@ class Runtime:
         """Run an endpoint with provider-neutral tools and typed output."""
         plan = self._plan_for(endpoint)
         request = _prepare_request(plan, params)
-        agent = self._agent_for(endpoint)
         run = _new_run(plan, request)
+        if plan.direct_tool is not None:
+            async with asyncio.timeout(self.timeout):
+                return await _invoke_bound_operation(
+                    plan.tools[plan.direct_tool], run, {}
+                )
+
+        agent = self._agent_for(endpoint)
         message = self._build_user_message(plan, request)
         async with asyncio.timeout(self.timeout):
             result = await agent.run(message, deps=run, usage_limits=self.usage_limits)

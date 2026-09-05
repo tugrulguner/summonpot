@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Start with the user problem, not a new configuration surface. Current requests remain model-backed. Substantial public API, capability-authority, runtime, provider, or execution-model changes must align on the contract before implementation. Summonpot keeps `@summon(...)` minimal and does not expose public graph or engine-selection APIs.
+        Start with the user problem, not a new configuration surface. One fully resolved required `Exactly(1)` operation can execute directly; declarations outside that narrow shipped slice remain model-backed. Substantial public API, capability-authority, runtime, provider, or execution-model changes must align on the contract before implementation. Summonpot keeps `@summon(...)` minimal and does not expose public graph or engine-selection APIs.
 
   - type: textarea
     id: problem

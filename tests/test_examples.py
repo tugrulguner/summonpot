@@ -24,6 +24,7 @@ EXAMPLES = [
     ("05_bounded_runtime.py", "/summaries", "post"),
     ("06_support_service/app.py", "/support", "post"),
     ("07_bound_operation.py", "/customers/view", "post"),
+    ("08_direct_execution.py", "/quotes/direct", "post"),
 ]
 
 
@@ -94,6 +95,28 @@ def test_bound_operation_example_runs_through_real_http(monkeypatch):
     }
 
 
+def test_direct_example_runs_without_resolving_a_model(monkeypatch):
+    monkeypatch.setenv("SUMMONPOT_MODEL", "invalid-provider:no-model")
+    summon = _load_example("08_direct_execution.py", monkeypatch)
+
+    response = TestClient(build_app(summon)).post(
+        "/quotes/direct",
+        json={
+            "unit_price_cents": 1299,
+            "quantity": 3,
+            "tax_rate_percent": "8.25",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "subtotal_cents": 3897,
+        "tax_cents": 322,
+        "total_cents": 4219,
+    }
+    assert summon._runtime._agents == {}
+
+
 def test_support_example_declares_the_typed_operation_chain(monkeypatch):
     summon = _load_example("06_support_service/app.py", monkeypatch)
     tools = {tool.name: tool for tool in summon.endpoints[0].tools}
@@ -125,6 +148,15 @@ def test_support_example_guide_states_the_current_binding_boundary():
     assert "does not inject bound values" in guide
     assert "filtered model schema" in guide
     assert "one permitted start" in guide
+    assert "08_direct_execution.py" in guide
+    assert "requires no provider model or credentials" in guide
+    assert (
+        "current `@summon` requests still use the configured model runtime" not in guide
+    )
+    assert (
+        "Automatic no-model deterministic endpoint execution is planned, not shipped."
+        not in guide
+    )
 
 
 def test_readme_teaches_the_current_api_without_version_specific_migration():

@@ -1,0 +1,1 @@
+Execute one fully resolved required `Exactly(1)` operation directly when the endpoint uses a Pydantic request model, it has at least one validated-request binding, uses only validated request values or immutable identity-stable callable defaults, and its output exactly matches the endpoint response model, without resolving or constructing a provider model.

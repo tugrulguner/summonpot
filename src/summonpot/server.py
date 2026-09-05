@@ -8,7 +8,12 @@ from types import UnionType
 from typing import TYPE_CHECKING, Annotated, Any, Union, get_args, get_origin
 
 from summonpot import __version__
-from summonpot._execution import _RequestValues
+from summonpot._execution import (
+    _CompiledEndpoint,
+    _registered_plan,
+    _RequestValues,
+    _validated_transport_request,
+)
 from summonpot.summon import BODYLESS_METHODS, _unwrap_annotated
 
 if TYPE_CHECKING:
@@ -31,30 +36,33 @@ def build_app(summon: Summon) -> Any:
     )
 
     for endpoint in summon.endpoints:
-        route_path = endpoint.path
-        method = endpoint.method
+        # Registration-time metadata is authoritative for both transport and
+        # execution; later mutation of the public definition cannot change a route.
+        definition = _registered_plan(endpoint) or endpoint
+        route_path = definition.path
+        method = definition.method
 
-        if endpoint.parameters and method in BODYLESS_METHODS:
+        if definition.parameters and method in BODYLESS_METHODS:
             # GET/DELETE/HEAD carry no request body, so the declared parameters
             # become query parameters instead.
-            _handle_with_query = _make_query_handler(endpoint, summon)
+            _handle_with_query = _make_query_handler(endpoint, summon, definition)
             app.add_api_route(
                 route_path,
                 _handle_with_query,
                 methods=[method],
-                response_model=endpoint.output_model,
+                response_model=definition.output_model,
                 summary=(
-                    endpoint.description.split("\n")[0]
-                    if endpoint.description
-                    else endpoint.name
+                    definition.description.split("\n")[0]
+                    if definition.description
+                    else definition.name
                 ),
-                description=endpoint.description,
+                description=definition.description,
             )
-        elif endpoint.parameters:
+        elif definition.parameters:
             RequestModel: Any
-            if endpoint.input_model is not None:
-                RequestModel = endpoint.input_model
-            elif not _body_parameters(endpoint):
+            if definition.input_model is not None:
+                RequestModel = definition.input_model
+            elif not _body_parameters(definition):
                 # Every declared parameter is carried by the URL, so there is no
                 # body left to describe. Generating an empty model anyway would
                 # make the body *required*: FastAPI answers a bodyless
@@ -65,7 +73,7 @@ def build_app(summon: Summon) -> Any:
                 from pydantic import create_model
 
                 fields: dict[str, tuple[type, Any]] = {}
-                for p in _body_parameters(endpoint):
+                for p in _body_parameters(definition):
                     field_type = _field_type(p)
                     if p.required:
                         fields[p.name] = (field_type, ...)
@@ -73,23 +81,25 @@ def build_app(summon: Summon) -> Any:
                         fields[p.name] = (field_type, p.default)
 
                 RequestModel = create_model(
-                    f"{endpoint.name}Request",
+                    f"{definition.name}Request",
                     **fields,  # pyright: ignore[reportArgumentType, reportCallIssue]
                 )
 
-            _handle_with_body = _make_body_handler(endpoint, summon, RequestModel)
+            _handle_with_body = _make_body_handler(
+                endpoint, summon, RequestModel, definition
+            )
 
             app.add_api_route(
                 route_path,
                 _handle_with_body,
                 methods=[method],
-                response_model=endpoint.output_model,
+                response_model=definition.output_model,
                 summary=(
-                    endpoint.description.split("\n")[0]
-                    if endpoint.description
-                    else endpoint.name
+                    definition.description.split("\n")[0]
+                    if definition.description
+                    else definition.name
                 ),
-                description=endpoint.description,
+                description=definition.description,
             )
         else:
             _handle_without_body = _make_no_body_handler(endpoint, summon)
@@ -98,13 +108,13 @@ def build_app(summon: Summon) -> Any:
                 route_path,
                 _handle_without_body,
                 methods=[method],
-                response_model=endpoint.output_model,
+                response_model=definition.output_model,
                 summary=(
-                    endpoint.description.split("\n")[0]
-                    if endpoint.description
-                    else endpoint.name
+                    definition.description.split("\n")[0]
+                    if definition.description
+                    else definition.name
                 ),
-                description=endpoint.description,
+                description=definition.description,
             )
 
     return app
@@ -141,7 +151,7 @@ async def _run_endpoint(summon: Any, endpoint: Any, params: dict[str, Any]) -> A
         logger.warning("Endpoint %s timed out", endpoint.path, exc_info=exc)
         raise HTTPException(
             status_code=504,
-            detail="Endpoint timed out before the model produced a valid response.",
+            detail="Endpoint timed out before producing a valid response.",
         ) from exc
     except ModelHTTPError as exc:
         logger.warning(
@@ -202,7 +212,10 @@ def _path_parameters(endpoint: Any) -> list[Any]:
 
 
 def _make_body_handler(
-    endpoint: Any, summon: Any, request_model: type[Any] | None
+    endpoint: Any,
+    summon: Any,
+    request_model: type[Any] | None,
+    definition: Any | None = None,
 ) -> Any:
     """Create a route handler for a body method, retaining endpoint context in its closure.
 
@@ -211,7 +224,7 @@ def _make_body_handler(
     with nothing but its path segments.
     """
 
-    path_parameters = _path_parameters(endpoint)
+    path_parameters = _path_parameters(definition or endpoint)
 
     # The synthetic body parameter shares one namespace with the path
     # parameters, and the path parameter names come from the URL, so `body` is
@@ -251,9 +264,12 @@ def _make_body_handler(
                 value if isinstance(value, (str, int, float, bool)) else str(value)
             )
 
-        return await _run_endpoint(
-            summon, endpoint, _RequestValues(prompt, typed=typed)
+        params = (
+            _validated_transport_request(definition, prompt, typed=typed)
+            if isinstance(definition, _CompiledEndpoint)
+            else _RequestValues(prompt, typed=typed)
         )
+        return await _run_endpoint(summon, endpoint, params)
 
     # FastAPI reads __signature__, so naming the path parameters explicitly is
     # what turns them into bound, validated, documented path parameters instead
@@ -298,17 +314,24 @@ def _needs_query_marker(annotation: Any) -> bool:
     return origin in (list, set, frozenset, tuple)
 
 
-def _make_query_handler(endpoint: Any, summon: Any) -> Any:
+def _make_query_handler(
+    endpoint: Any, summon: Any, definition: Any | None = None
+) -> Any:
     """Create a handler whose parameters arrive as a query string."""
 
     from fastapi import Query
 
     async def handle(**kwargs: Any) -> Any:
-        return await _run_endpoint(summon, endpoint, kwargs)
+        params = (
+            _validated_transport_request(definition, kwargs, typed=kwargs)
+            if isinstance(definition, _CompiledEndpoint)
+            else kwargs
+        )
+        return await _run_endpoint(summon, endpoint, params)
 
     parameters = []
     annotations: dict[str, Any] = {}
-    for p in endpoint.parameters:
+    for p in (definition or endpoint).parameters:
         # Same resolved annotation the body path uses, so a union stays nullable and
         # a generic keeps its element type instead of collapsing to its first member.
         annotation = _field_type(p)

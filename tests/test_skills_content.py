@@ -77,18 +77,26 @@ def test_skill_states_the_current_binding_execution_boundary():
     assert "trusted and defaulted arguments are hidden from the model" in body
     assert "Multi-operation chains" in body
     assert "model-supplied argument behavior" in body
-    assert "automatic no-model execution" in body.lower()
+    assert "executes it directly without resolving or constructing a model" in body
+    assert "no model fallback after direct execution begins" in body.lower()
+    assert "uses a Pydantic request model" in body
+    assert "Scalar request declarations also remain agent-backed" in body
+    assert "copy hooks are not proof of immutability" in body
 
 
-def test_skill_uses_the_current_ai_api_positioning_without_claiming_planned_work():
+def test_skill_uses_the_current_ai_api_positioning_and_direct_runtime_boundary():
     body = " ".join(skill_body().split())
 
     assert "modernizes APIs for AI" in body
     assert "stable public abstraction" in body
     assert "exact application behavior" in body
     assert "explicitly bounded agentic decisions" in body
-    assert "Every current `@summon` request runs through" in body
-    assert "Automatic no-model execution remains planned" in body
+    assert "one fully resolved `exactly(1)` operation path" in body.lower()
+    assert (
+        "all other declarations still use the provider-neutral agent runtime"
+        in body.lower()
+    )
+    assert "Broader multi-operation deterministic execution remains planned" in body
 
 
 def test_skill_documents_supported_request_declaration_shapes():

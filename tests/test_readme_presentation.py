@@ -45,19 +45,18 @@ def test_readme_states_the_current_runtime_boundary_before_positioning():
     introduction = _normalize(readme.split("## Why summonpot?", 1)[0])
 
     assert (
-        "every current production `@summon` request runs through summonpot's agent runtime, "
-        "backed by the configured provider model" in introduction
+        "one fully resolved `exactly(1)` operation path now executes directly without "
+        "resolving or constructing a model" in introduction
     )
     assert (
-        "deterministic operations still execute as exact application code inside that runtime"
+        "all other declarations still use summonpot's provider-neutral agent runtime"
         in introduction
     )
+    assert "within the runtime-enforced binding slice" in introduction
+    assert "unsupported legacy binding shapes may remain model-supplied" in introduction
     assert (
-        "the agent controls only the choices exposed by the declaration" in introduction
-    )
-    assert (
-        "automatic no-model execution for contracts with one fully resolved operation path "
-        "is on the [roadmap](roadmap.md), not shipped behavior" in introduction
+        "broader multi-operation deterministic execution remains on the "
+        "[roadmap](roadmap.md)" in introduction
     )
 
 
@@ -92,11 +91,11 @@ def test_readme_shows_deterministic_and_agentic_endpoints_in_one_code_block():
         "`agentchoice()`" in normalized_section
     )
     assert (
-        "the agent runtime handles every request, including the fully resolved endpoint"
+        "the fully resolved endpoint executes once without constructing a model"
         in normalized_section
     )
     assert (
-        "direct execution without the agent runtime remains planned for that declaration"
+        "the endpoint with `agentchoice()` still uses the agent runtime"
         in normalized_section
     )
     assert "model-owned operation choice" not in normalized_section
@@ -109,7 +108,7 @@ def test_readme_replaces_the_text_formula_with_a_png_flow_diagram():
     source = ROOT / "docs" / "assets" / "authority-boundary.svg"
     packaged_image = (
         "https://raw.githubusercontent.com/tugrulguner/summonpot/"
-        "9d1bfd0dd0203a07f856521d5ec5d22ff510b294/"
+        "a3238041b53f6f07d4575ecfae5a77f60a551500/"
         "docs/assets/one-declaration-two-flows.png"
     )
 
@@ -128,16 +127,19 @@ def test_readme_replaces_the_text_formula_with_a_png_flow_diagram():
     )
     assert "SUMMON APP" in content
     assert "same declaration style" in content
-    assert "DETERMINISTIC ENDPOINT" in content
-    assert '@summon("/reports/deterministic")' in content
-    assert "every operation argument is application-owned" in content
+    assert "SHIPPED SINGLE-OP DIRECT SLICE" in content
+    assert "Pydantic request • exactly one operation" in content
+    assert "Required(..., calls=Exactly(1))" in content
+    assert "≥1 FromRequest • immutable stable defaults only" in content
+    assert "no ordering or unsupported sources" in content
+    assert "operation output = endpoint output (exact identity)" in content
     assert "AGENTIC ENDPOINT" in content
     assert '@summon("/reports/agentic")' in content
     assert "AgentChoice()" in content
     assert "the agent owns only the declared semantic choice" in content
     assert "model-owned" not in content
-    assert "Current runtime: both use the agent runtime" in content
-    assert "direct execution for the fully bound endpoint remains planned" in content
+    assert "Current runtime: eligible single-op slice runs directly" in content
+    assert "every other declaration uses the agent runtime" in content
 
 
 def test_readme_keeps_the_established_structure_without_version_history():

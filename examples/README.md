@@ -25,6 +25,9 @@ export OPENROUTER_API_KEY='<your key>'
 export SUMMONPOT_MODEL="openrouter:google/gemini-3.7-flash"
 ```
 
+Level 8's fully resolved operation requires no provider model or credentials. The other
+examples use the configured agent runtime.
+
 Keep secrets in your environment or secret manager—never in an example file. Start any example through the CLI:
 
 ```bash
@@ -38,7 +41,10 @@ arguments. The bound runtime is deliberately narrower: an endpoint with exactly 
 required typed operation, `Exactly(1)`, and only `FromRequest`, direct `AgentChoice`, or
 defaulted arguments receives trusted request injection, a filtered model schema, local
 operation-output validation, and one permitted start. Level 7 runs that shipped path.
-Level 6 retains the broader multi-operation declarations that remain registration-only.
+When the endpoint uses a Pydantic request model, the operation has at least one
+`FromRequest` binding, uses only `FromRequest` or supported immutable callable defaults,
+and its output exactly matches the endpoint response model, Summonpot executes it directly without a model; Level 8 runs that path. Level 6
+retains the broader multi-operation declarations that remain registration-only.
 
 ## Progression
 
@@ -66,7 +72,9 @@ curl -X POST http://127.0.0.1:8000/quotes \
   -d '{"unit_price_cents":1299,"quantity":3,"tax_rate_percent":"8.25"}'
 ```
 
-`calculate_quote` is deterministic application code, but current `@summon` requests still use the configured model runtime. Automatic no-model deterministic endpoint execution is planned, not shipped.
+This example wraps a bare callable in `Required(...)`, so it remains on the configured model
+runtime. Level 8 shows the narrower typed `Operation` contract that qualifies for shipped
+no-model execution.
 
 ### 3. Bounded agentic order fulfillment
 
@@ -166,13 +174,32 @@ curl -X POST http://127.0.0.1:8000/customers/view \
 ```
 
 This endpoint still uses the model to choose `format` and compose `CustomerView`.
-Credential-free deterministic execution is the next runtime slice, not part of this one.
+Its declaration does not qualify for direct execution.
+
+### 8. Single-operation deterministic execution
+
+File: `08_direct_execution.py`
+
+Shows the first no-model endpoint path. Every required operation argument comes from the
+validated `QuoteRequest`, the operation is required exactly once, and its declared output
+is exactly `QuoteResponse`. It therefore requires no provider model or credentials.
+
+```bash
+summonpot serve examples/08_direct_execution.py --host 127.0.0.1 --port 8000
+
+curl -X POST http://127.0.0.1:8000/quotes/direct \
+  -H 'Content-Type: application/json' \
+  -d '{"unit_price_cents":1299,"quantity":3,"tax_rate_percent":"8.25"}'
+```
+
+The response is computed by the exact application operation and validated as
+`QuoteResponse`; Summonpot does not resolve or construct a model for this endpoint.
 
 ## What is intentionally not shown as shipped
 
 The examples do not claim these planned features exist:
 
-- automatic no-model deterministic endpoint execution;
+- multi-operation deterministic endpoint execution;
 - SQLAlchemy or SQLite operation adapters;
 - streaming responses;
 - built-in authentication.

@@ -5,12 +5,14 @@ layer. The endpoint remains the stable public abstraction while its contract com
 exact application behavior with explicitly bounded agentic decisions. You declare the
 request model, the goal, the exact capabilities, and the response model.
 
-Every current `@summon` request runs through the provider-neutral agent runtime.
-Deterministic capabilities still execute as exact application code inside that runtime.
-Automatic no-model execution remains planned. The framework owns execution, including
-the agent loop. **The ellipsis is a complete declaration body**, not an implementation
-waiting to be written. Calling the decorated declaration directly is rejected; execution
-goes through the served endpoint.
+One fully resolved `Exactly(1)` operation path executes without a model when the endpoint
+uses a Pydantic request model and it has at least
+one `FromRequest` binding, uses only `FromRequest` or immutable identity-stable callable
+defaults, and the operation output is exactly the endpoint response model. All other declarations still use the provider-neutral agent
+runtime. Broader multi-operation deterministic execution remains planned. The framework
+owns execution, including any agent loop. **The ellipsis is a complete declaration body**,
+not an implementation waiting to be written. Calling the decorated declaration directly is
+rejected; execution goes through the served endpoint.
 
 ## The endpoint shape
 
@@ -192,10 +194,28 @@ write = Required(order, calls=Exactly(1))
 For one required typed operation with `calls=Exactly(1)`, the runtime enforces bindings
 when every non-default argument uses `FromRequest` or direct `AgentChoice`: trusted and
 defaulted arguments are hidden from the model, the only start is reserved before execution,
-and `output=` is locally validated before satisfying `Required`. Multi-operation chains,
-`FromResult`, `FromContext`, `after`, collection-backed choices, and broader call bounds
-remain registration-only. Unsupported shapes keep the existing model-supplied argument
-behavior. Automatic no-model execution remains planned.
+and `output=` is locally validated before satisfying `Required`. When the endpoint uses a
+Pydantic request model, has at least one `FromRequest` binding, uses only `FromRequest`
+or supported immutable callable defaults, and `output=` is exactly the endpoint response model, Summonpot executes it directly
+without resolving or constructing a model. There is no model fallback after direct
+execution begins. Multi-operation chains, `FromResult`, `FromContext`, `after`,
+collection-backed choices, and broader call bounds remain registration-only. Unsupported
+shapes keep the existing model-supplied argument behavior.
+
+Runtime-enforced output schemas must not define a custom model `__init__`, including
+nested models. Registration rejects that unsupported constructor path rather than
+allowing it to bypass nested output validation. Use Pydantic model validators instead.
+
+HTTP request validation runs once. The server transfers a detached, plan-bound validated
+snapshot to the runtime rather than revalidating its JSON prompt representation. Raw
+runtime inputs still undergo validation; ordinary request wrappers are not trusted.
+
+
+Supported immutable callable defaults are exact built-in `None`, `bool`, `int`,
+`float`, `complex`, `str`, and `bytes` values, plus tuples and frozensets containing
+only those values recursively. Custom types (including subclasses of those built-ins)
+and mutable defaults keep the endpoint agent-backed; copy hooks are not proof of
+immutability. Scalar request declarations also remain agent-backed.
 
 ## HTTP methods
 
@@ -300,6 +320,10 @@ capability wiring before any key exists:
 export SUMMONPOT_MODEL=test
 ```
 
+An eligible single-operation deterministic endpoint requires no provider model or
+credentials. The environment setting above is needed only when a declaration takes the
+agent path.
+
 Otherwise choose a provider-qualified model and set that provider's key:
 
 ```bash
@@ -364,5 +388,6 @@ Two things to know:
   resource such as a default SQLite connection; open one per call.
 - **Argument authority depends on the declaration shape.** The enforced single-operation
   form hides `FromRequest` and defaulted arguments and exposes only `AgentChoice`. Bare
-  capabilities and broader operation graphs still receive model-supplied arguments, so
-  validate inputs and enforce authorization inside every capability.
+  capabilities and broader operation graphs still receive model-supplied arguments. A
+  fully resolved exact-response operation runs directly; all other declarations use the
+  agent path. Validate inputs and enforce authorization inside every capability.

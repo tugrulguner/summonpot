@@ -79,7 +79,7 @@ def test_declaration_surfaces_use_ellipsis_instead_of_not_implemented():
 def test_roadmap_scopes_the_enforced_authority_boundary():
     roadmap = " ".join(ROADMAP.read_text(encoding="utf-8").split())
 
-    assert "Today, the agent runtime handles every request" in roadmap
+    assert "executes directly without resolving or constructing a model" in roadmap
     assert "For the enforced single required `Exactly(1)` slice" in roadmap
     assert "leaves only declared `AgentChoice` values to the agent" in roadmap
     assert (
@@ -87,19 +87,20 @@ def test_roadmap_scopes_the_enforced_authority_boundary():
     )
 
 
-def test_roadmap_prioritizes_the_narrow_no_model_slice():
+def test_roadmap_advances_after_the_narrow_no_model_slice():
     roadmap = " ".join(ROADMAP.read_text(encoding="utf-8").split())
 
-    direct = roadmap.index("### 1. Single-operation deterministic execution")
-    result_chain = roadmap.index("### 2. Validated result chains")
-    database = roadmap.index("### 6. Exact database operations")
+    shipped_direct = roadmap.index("single-operation deterministic execution")
+    result_chain = roadmap.index("### 1. Validated result chains")
+    database = roadmap.index("### 5. Exact database operations")
 
-    assert direct < result_chain < database
+    assert shipped_direct < result_chain < database
     assert "exactly one required `Exactly(1)` operation" in roadmap
+    assert "at least one `FromRequest` binding" in roadmap
     assert (
-        "every required input comes from `FromRequest` or a callable default" in roadmap
+        "only `FromRequest` or immutable identity-stable callable defaults" in roadmap
     )
-    assert "operation output is exactly the endpoint response model" in roadmap
+    assert "operation output exactly matching the endpoint response model" in roadmap
     assert "without resolving, constructing, or calling a model" in roadmap
     assert "There is no model fallback after direct execution begins" in roadmap
     assert (

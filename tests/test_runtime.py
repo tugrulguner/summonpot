@@ -6,6 +6,7 @@ import asyncio
 import functools
 import threading
 import time
+from dataclasses import replace
 from uuid import UUID
 
 import pytest
@@ -24,6 +25,7 @@ from summonpot import (
     Summon,
     UsageLimits,
 )
+from summonpot._execution import _prepare_request, _registered_plan, _RequestValues
 from summonpot.runtime import Runtime, _OperationOutputError
 
 
@@ -50,11 +52,685 @@ class NativeCustomerRecord(BaseModel):
     format: str
 
 
+class DirectCustomerResponse(BaseModel):
+    customer_id: UUID
+    include_history: bool
+
+
+class TagRequest(BaseModel):
+    tags: list[str]
+
+
+class TagResponse(BaseModel):
+    tags: list[str]
+
+
 def _register_endpoint(summon: Summon, *, model: str | None = None) -> None:
     @summon("/research", model=model)
     def research(request: ResearchRequest) -> ResearchResponse:
         """Research a topic."""
         ...
+
+
+def test_direct_exact_operation_skips_model_resolution():
+    customer_id = UUID("12345678-1234-5678-1234-567812345678")
+    received: list[tuple[UUID, bool]] = []
+
+    def load_customer(
+        requested_id: UUID,
+        include_history: bool = False,
+        /,
+    ) -> DirectCustomerResponse:
+        """Load one customer without an agent-owned decision."""
+        received.append((requested_id, include_history))
+        return DirectCustomerResponse(
+            customer_id=requested_id,
+            include_history=include_history,
+        )
+
+    lookup = Operation(
+        load_customer,
+        bind={"requested_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/direct")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(lookup, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Return the requested customer directly."""
+        ...
+
+    runtime = Runtime(model="invalid-provider:no-model")
+    result = asyncio.run(
+        runtime.call(summon.endpoints[0], {"customerId": str(customer_id)})
+    )
+
+    assert result == DirectCustomerResponse(
+        customer_id=customer_id,
+        include_history=False,
+    )
+    assert received == [(customer_id, False)]
+    assert runtime._agents == {}
+
+
+def test_direct_operation_failure_never_falls_back_to_a_model():
+    starts = 0
+
+    def fail(customer_id: UUID) -> DirectCustomerResponse:
+        """Fail after direct execution starts."""
+        nonlocal starts
+        starts += 1
+        raise ValueError("application failure")
+
+    operation = Operation(
+        fail,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/fail")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Fail without changing executors."""
+        ...
+
+    runtime = Runtime(model="invalid-provider:no-model")
+    with pytest.raises(ValueError, match="application failure"):
+        asyncio.run(
+            runtime.call(
+                summon.endpoints[0],
+                {"customerId": "12345678-1234-5678-1234-567812345678"},
+            )
+        )
+
+    assert starts == 1
+    assert runtime._agents == {}
+
+
+def test_direct_operation_invalid_output_is_not_replayed_or_sent_to_a_model():
+    starts = 0
+
+    def malformed(customer_id: UUID) -> DirectCustomerResponse:
+        """Return an invalid declared output."""
+        nonlocal starts
+        starts += 1
+        return {"customer_id": customer_id}  # type: ignore[return-value]
+
+    operation = Operation(
+        malformed,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/malformed")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Validate direct operation output locally."""
+        ...
+
+    runtime = Runtime(model="invalid-provider:no-model")
+    with pytest.raises(_OperationOutputError, match="invalid declared output"):
+        asyncio.run(
+            runtime.call(
+                summon.endpoints[0],
+                {"customerId": "12345678-1234-5678-1234-567812345678"},
+            )
+        )
+
+    assert starts == 1
+    assert runtime._agents == {}
+
+
+@pytest.mark.parametrize("use_subclass", [False, True])
+def test_direct_operation_revalidates_constructed_model_output(use_subclass: bool):
+    class UnsafeResponse(DirectCustomerResponse):
+        pass
+
+    def malformed(customer_id: UUID) -> DirectCustomerResponse:
+        response_type = UnsafeResponse if use_subclass else DirectCustomerResponse
+        return response_type.model_construct(
+            customer_id="not-a-uuid", include_history=False
+        )
+
+    operation = Operation(
+        malformed,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/constructed")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Reject an unvalidated model instance from application code."""
+        ...
+
+    with pytest.raises(_OperationOutputError, match="invalid declared output"):
+        asyncio.run(
+            Runtime(model="invalid-provider:no-model").call(
+                summon.endpoints[0],
+                {"customerId": "12345678-1234-5678-1234-567812345678"},
+            )
+        )
+
+
+def test_operation_output_validation_bypasses_overridden_model_dump():
+    requested = UUID("12345678-1234-5678-1234-567812345678")
+
+    class DeceptiveResponse(DirectCustomerResponse):
+        def model_dump(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            return {
+                "customer_id": requested,
+                "include_history": False,
+            }
+
+    def malformed(customer_id: UUID) -> DirectCustomerResponse:
+        return DeceptiveResponse.model_construct(
+            customer_id="not-a-uuid", include_history=False
+        )
+
+    operation = Operation(
+        malformed,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/deceptive")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Validate structure rather than trusting an instance override."""
+        ...
+
+    with pytest.raises(_OperationOutputError, match="invalid declared output"):
+        asyncio.run(
+            Runtime(model="invalid-provider:no-model").call(
+                summon.endpoints[0], {"customerId": str(requested)}
+            )
+        )
+
+
+def test_direct_request_ignores_untrusted_prevalidated_typed_values():
+    requested = UUID("12345678-1234-5678-1234-567812345678")
+    forged = UUID("87654321-4321-8765-4321-876543218765")
+
+    def load_customer(customer_id: UUID) -> DirectCustomerResponse:
+        return DirectCustomerResponse(
+            customer_id=customer_id,
+            include_history=False,
+        )
+
+    operation = Operation(
+        load_customer,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/prevalidated")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Use only the registered request adapter as the trust boundary."""
+        ...
+
+    params = _RequestValues(
+        {"customerId": str(requested)}, typed={"customer_id": forged}
+    )
+    result = asyncio.run(
+        Runtime(model="invalid-provider:no-model").call(summon.endpoints[0], params)
+    )
+
+    assert result.customer_id == requested
+
+
+def test_direct_request_detaches_nested_values_from_the_caller():
+    def extend(tags: list[str]) -> TagResponse:
+        tags.append("runtime")
+        return TagResponse(tags=tags)
+
+    operation = Operation(
+        extend,
+        bind={"tags": FromRequest("tags")},
+        output=TagResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/tags")
+    def tags(
+        request: TagRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> TagResponse:
+        """Keep direct request state isolated from caller-owned containers."""
+        ...
+
+    payload = {"tags": ["caller"]}
+    result = asyncio.run(
+        Runtime(model="invalid-provider:no-model").call(summon.endpoints[0], payload)
+    )
+
+    assert result.tags == ["caller", "runtime"]
+    assert payload == {"tags": ["caller"]}
+
+
+def test_scalar_request_snapshot_detaches_nested_values_from_the_caller():
+    summon = Summon("svc")
+
+    @summon("/tags/scalar")
+    def tags(values: list[str]) -> str:
+        """Snapshot an ordinary scalar-style endpoint request."""
+        ...
+
+    plan = _registered_plan(summon.endpoints[0])
+    assert plan is not None
+    payload = {"values": ["caller"]}
+    prepared = _prepare_request(plan, payload)
+
+    payload["values"].append("mutated")
+
+    assert prepared == {"values": ["caller"]}
+    assert prepared.typed == {"values": ["caller"]}
+
+
+def test_direct_operation_uses_registration_time_callable_defaults():
+    def load_customer(
+        customer_id: UUID, privileged: bool = False
+    ) -> DirectCustomerResponse:
+        return DirectCustomerResponse(
+            customer_id=customer_id,
+            include_history=privileged,
+        )
+
+    operation = Operation(
+        load_customer,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/default")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Use the callable default captured when the endpoint was registered."""
+        ...
+
+    load_customer.__defaults__ = (True,)
+    result = asyncio.run(
+        Runtime(model="invalid-provider:no-model").call(
+            summon.endpoints[0],
+            {"customerId": "12345678-1234-5678-1234-567812345678"},
+        )
+    )
+
+    assert result.include_history is False
+
+
+def test_identity_sensitive_default_keeps_operation_agent_backed():
+    sentinel = object()
+
+    def load_customer(
+        customer_id: UUID, marker: object = sentinel
+    ) -> DirectCustomerResponse:
+        return DirectCustomerResponse(
+            customer_id=customer_id,
+            include_history=marker is sentinel,
+        )
+
+    operation = Operation(
+        load_customer,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/sentinel")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Do not change identity-sensitive callable-default semantics."""
+        ...
+
+    plan = _registered_plan(summon.endpoints[0])
+    assert plan is not None
+    assert plan.direct_tool is None
+
+
+def test_unenforced_tool_with_noncopyable_default_still_registers():
+    lock = threading.Lock()
+
+    def inspect_lock(value: object = lock) -> str:
+        return "locked" if value.locked() else "open"  # type: ignore[attr-defined]
+
+    summon = Summon("svc")
+
+    @summon("/research")
+    def research(
+        request: ResearchRequest,
+        inspection=Depends(inspect_lock),
+    ) -> ResearchResponse:
+        """Keep legacy capability defaults compatible."""
+        ...
+
+    assert len(summon.endpoints) == 1
+
+
+def test_default_only_operation_stays_on_the_agent_path():
+    def status(include_history: bool = False) -> DirectCustomerResponse:
+        return DirectCustomerResponse(
+            customer_id=UUID("12345678-1234-5678-1234-567812345678"),
+            include_history=include_history,
+        )
+
+    operation = Operation(status, bind={}, output=DirectCustomerResponse)
+    summon = Summon("svc")
+
+    @summon("/customers/status")
+    def customer(
+        request: ResearchRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Keep empty-binding operations agent-backed."""
+        ...
+
+    turns = 0
+
+    def model_function(messages, info: AgentInfo):
+        nonlocal turns
+        turns += 1
+        if turns == 1:
+            return ModelResponse(parts=[ToolCallPart("status", {})])
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    info.output_tools[0].name,
+                    {
+                        "customer_id": "12345678-1234-5678-1234-567812345678",
+                        "include_history": False,
+                    },
+                )
+            ]
+        )
+
+    runtime = Runtime(model=FunctionModel(model_function))
+    asyncio.run(runtime.call(summon.endpoints[0], {"query": "status"}))
+
+    assert turns == 2
+    assert len(runtime._agents) == 1
+
+
+def test_direct_timeout_does_not_retry_or_switch_to_a_model():
+    starts = 0
+
+    def slow(customer_id: UUID) -> DirectCustomerResponse:
+        """Finish after the request deadline has expired."""
+        nonlocal starts
+        starts += 1
+        time.sleep(0.05)
+        return DirectCustomerResponse(
+            customer_id=customer_id,
+            include_history=False,
+        )
+
+    operation = Operation(
+        slow,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/slow")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Apply one deadline to direct execution."""
+        ...
+
+    runtime = Runtime(model="invalid-provider:no-model", timeout=0.01)
+    with pytest.raises(TimeoutError):
+        asyncio.run(
+            runtime.call(
+                summon.endpoints[0],
+                {"customerId": "12345678-1234-5678-1234-567812345678"},
+            )
+        )
+
+    assert starts == 1
+    assert runtime._agents == {}
+
+
+def test_output_composition_keeps_the_agent_path():
+    customer_id = UUID("12345678-1234-5678-1234-567812345678")
+
+    def load_customer(customer_id: UUID) -> NativeCustomerRecord:
+        """Load a record that does not itself satisfy the endpoint response."""
+        return NativeCustomerRecord(customer_id=customer_id, format="summary")
+
+    operation = Operation(
+        load_customer,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=NativeCustomerRecord,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/composed")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Compose a different endpoint response from the operation result."""
+        ...
+
+    turns = 0
+
+    def model_function(messages, info: AgentInfo):
+        nonlocal turns
+        turns += 1
+        if turns == 1:
+            assert info.function_tools[0].parameters_json_schema["properties"] == {}
+            return ModelResponse(parts=[ToolCallPart("load_customer", {})])
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    info.output_tools[0].name,
+                    {
+                        "customer_id": str(customer_id),
+                        "include_history": False,
+                    },
+                )
+            ]
+        )
+
+    runtime = Runtime(model=FunctionModel(model_function))
+    result = asyncio.run(
+        runtime.call(summon.endpoints[0], {"customerId": str(customer_id)})
+    )
+
+    assert result.customer_id == customer_id
+    assert turns == 2
+    assert len(runtime._agents) == 1
+
+
+def test_concurrent_direct_calls_keep_independent_exactly_once_state():
+    starts: list[str] = []
+
+    async def load_customer(customer_id: UUID) -> DirectCustomerResponse:
+        """Load one customer while another request may be running."""
+        starts.append(str(customer_id))
+        await asyncio.sleep(0)
+        return DirectCustomerResponse(
+            customer_id=customer_id,
+            include_history=False,
+        )
+
+    operation = Operation(
+        load_customer,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/concurrent")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Load one customer per request."""
+        ...
+
+    identifiers = [
+        UUID("12345678-1234-5678-1234-567812345678"),
+        UUID("87654321-4321-8765-4321-876543218765"),
+    ]
+    runtime = Runtime(model="invalid-provider:no-model")
+
+    async def run_both() -> list[DirectCustomerResponse]:
+        return await asyncio.gather(
+            *(
+                runtime.call(
+                    summon.endpoints[0],
+                    {"customerId": str(identifier)},
+                )
+                for identifier in identifiers
+            )
+        )
+
+    results = asyncio.run(run_both())
+
+    assert [result.customer_id for result in results] == identifiers
+    assert sorted(starts) == sorted(str(identifier) for identifier in identifiers)
+    assert runtime._agents == {}
+
+
+def test_direct_execution_uses_the_registered_immutable_plan():
+    original_calls = 0
+    attacker_calls = 0
+
+    def load_customer(customer_id: UUID) -> DirectCustomerResponse:
+        """Load the registered customer."""
+        nonlocal original_calls
+        original_calls += 1
+        return DirectCustomerResponse(
+            customer_id=customer_id,
+            include_history=False,
+        )
+
+    def attacker(customer_id: UUID) -> DirectCustomerResponse:
+        nonlocal attacker_calls
+        attacker_calls += 1
+        return DirectCustomerResponse(
+            customer_id=customer_id,
+            include_history=True,
+        )
+
+    operation = Operation(
+        load_customer,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/immutable")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Use only the registered direct operation."""
+        ...
+
+    endpoint = summon.endpoints[0]
+    endpoint.tools[0].fn = attacker
+    endpoint.tools.clear()
+    endpoint.output_model = NativeCustomerRecord
+
+    result = asyncio.run(
+        Runtime(model="invalid-provider:no-model").call(
+            endpoint,
+            {"customerId": "12345678-1234-5678-1234-567812345678"},
+        )
+    )
+
+    assert result.include_history is False
+    assert original_calls == 1
+    assert attacker_calls == 0
+
+
+def test_unregistered_endpoint_metadata_cannot_activate_direct_execution():
+    calls = 0
+
+    def load_customer(customer_id: UUID) -> DirectCustomerResponse:
+        """Load one customer through an otherwise direct-eligible operation."""
+        nonlocal calls
+        calls += 1
+        return DirectCustomerResponse(
+            customer_id=customer_id,
+            include_history=False,
+        )
+
+    operation = Operation(
+        load_customer,
+        bind={"customer_id": FromRequest("customer_id")},
+        output=DirectCustomerResponse,
+    )
+    summon = Summon("svc")
+
+    @summon("/customers/unregistered")
+    def customer(
+        request: NativeCustomerRequest,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> DirectCustomerResponse:
+        """Keep compatibility metadata on the validated agent path."""
+        ...
+
+    endpoint = replace(summon.endpoints[0])
+    turns = 0
+
+    def model_function(messages, info: AgentInfo):
+        nonlocal turns
+        turns += 1
+        if turns == 1:
+            return ModelResponse(parts=[ToolCallPart("load_customer", {})])
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    info.output_tools[0].name,
+                    {
+                        "customer_id": "12345678-1234-5678-1234-567812345678",
+                        "include_history": False,
+                    },
+                )
+            ]
+        )
+
+    runtime = Runtime(model=FunctionModel(model_function))
+    result = asyncio.run(
+        runtime.call(
+            endpoint,
+            {"customerId": "12345678-1234-5678-1234-567812345678"},
+        )
+    )
+
+    assert result.include_history is False
+    assert calls == 1
+    assert turns == 2
+    assert len(runtime._agents) == 1
 
 
 def test_bound_operation_hides_and_injects_request_arguments():
