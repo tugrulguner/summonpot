@@ -7,6 +7,7 @@ were untested in both copies.
 from __future__ import annotations
 
 import inspect
+import typing
 from typing import Annotated, get_args, get_origin
 
 import pytest
@@ -145,3 +146,32 @@ def test_annotated_metadata_survives_a_nested_forward_reference():
     assert model(values=[1, 2]).values == [1, 2]
     with pytest.raises(ValidationError):
         model(values=[0])
+
+
+@pytest.mark.parametrize(
+    ("annotation", "expected"),
+    [
+        (int | None, "int | None"),
+        (str | int, "str | int"),
+        (dict[str, bool] | None, "dict[str, bool] | None"),
+        (list[int] | dict[str, str] | None, "list[int] | dict[str, str] | None"),
+        (tuple[int, str] | None, "tuple[int, str] | None"),
+    ],
+)
+def test_type_name_renders_pep604_unions(annotation, expected):
+    """Unions must not collapse to '__origin__' on interpreters that expose it."""
+    assert type_name(annotation) == expected
+
+
+@pytest.mark.parametrize(
+    ("annotation", "expected"),
+    [
+        (typing.Optional[int], "int | None"),
+        (typing.Union[int, str], "int | str"),
+        (typing.Union[str, int, None], "str | int | None"),
+        (typing.Optional[dict[str, bool]], "dict[str, bool] | None"),
+    ],
+)
+def test_type_name_renders_typing_unions(annotation, expected):
+    """Legacy typing.Union and typing.Optional must render correctly."""
+    assert type_name(annotation) == expected
