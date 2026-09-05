@@ -12,7 +12,9 @@ from typing import Any
 from weakref import ReferenceType, ref
 
 from pydantic import TypeAdapter
+from pydantic_core import SchemaValidator
 
+from summonpot._output_validation import _compile_output_validator
 from summonpot.contracts import AgentChoice, FromRequest
 from summonpot.models import EndpointDef, ParamDef, ToolDef
 
@@ -69,6 +71,7 @@ class _CompiledTool:
     bindings: tuple[_CompiledBinding, ...]
     defaults: tuple[_CompiledDefault, ...]
     output_adapter: TypeAdapter[Any] | None
+    output_validator: SchemaValidator | None
     enforce_bound_exactly_once: bool
 
     @property
@@ -108,6 +111,49 @@ class _CompiledEndpoint:
 
 
 _REGISTERED_PLANS: dict[int, tuple[ReferenceType[EndpointDef], _CompiledEndpoint]] = {}
+
+
+class _TransportRequest(_RequestValues):
+    """Transport envelope; its mutable public views confer no validation authority."""
+
+    __slots__ = ("__weakref__",)
+
+
+@dataclass(frozen=True, slots=True)
+class _TransportSnapshot:
+    reference: ReferenceType[_TransportRequest]
+    plan: _CompiledEndpoint
+    prompt: dict[str, Any]
+    typed: dict[str, Any]
+
+
+_TRANSPORT_SNAPSHOTS: dict[int, _TransportSnapshot] = {}
+
+
+def _validated_transport_request(
+    plan: _CompiledEndpoint,
+    prompt: Mapping[str, Any],
+    *,
+    typed: Mapping[str, Any],
+) -> _RequestValues:
+    """Seal FastAPI-validated values for this exact compiled route plan.
+
+    Only the HTTP adapter calls this factory after validation. Neither an ordinary
+    _RequestValues nor the envelope's mutable views is proof of validation. Keep
+    detached data privately, and release it when the envelope leaves scope.
+    """
+    request = _TransportRequest(prompt, typed=typed)
+    identity = id(request)
+
+    def discard(reference: ReferenceType[_TransportRequest]) -> None:
+        current = _TRANSPORT_SNAPSHOTS.get(identity)
+        if current is not None and current.reference is reference:
+            _TRANSPORT_SNAPSHOTS.pop(identity, None)
+
+    _TRANSPORT_SNAPSHOTS[identity] = _TransportSnapshot(
+        ref(request, discard), plan, deepcopy(dict(prompt)), deepcopy(dict(typed))
+    )
+    return request
 
 
 def _register_endpoint(
@@ -249,12 +295,18 @@ def _direct_defaults_are_stable(tool: ToolDef, bindings: Mapping[str, Any]) -> b
     for name, parameter in signature.parameters.items():
         if name in bindings or parameter.default is inspect.Parameter.empty:
             continue
-        try:
-            if deepcopy(parameter.default) is not parameter.default:
-                return False
-        except Exception:
+        if not _is_immutable_default(parameter.default):
             return False
     return True
+
+
+def _is_immutable_default(value: Any) -> bool:
+    """Recognize only built-in immutable values, never user copy hooks."""
+    if type(value) in (type(None), bool, int, float, complex, str, bytes):
+        return True
+    if type(value) in (tuple, frozenset):
+        return all(_is_immutable_default(item) for item in value)
+    return False
 
 
 def _compile_tool(
@@ -272,6 +324,9 @@ def _compile_tool(
         else ()
     )
     bounds = tool.bounds
+    output_adapter = (
+        TypeAdapter(contract.output) if enforce and contract is not None else None
+    )
     return _CompiledTool(
         identity=identity,
         name=tool.name,
@@ -294,8 +349,11 @@ def _compile_tool(
             and parameter.default is not inspect.Parameter.empty
             and (contract is None or contract.bind is None or name not in contract.bind)
         ),
-        output_adapter=(
-            TypeAdapter(contract.output) if enforce and contract is not None else None
+        output_adapter=output_adapter,
+        output_validator=(
+            _compile_output_validator(output_adapter)
+            if output_adapter is not None
+            else None
         ),
         enforce_bound_exactly_once=enforce,
     )
@@ -308,7 +366,7 @@ def _compile_parameter(param: ParamDef) -> _CompiledParameter:
         type_annotation=param.type_annotation,
         description=param.description,
         required=param.required,
-        default=deepcopy(param.default),
+        default=param.default,
         annotation=param.annotation,
         adapter=(
             TypeAdapter(param.annotation)
@@ -338,7 +396,13 @@ def _prepare_request(
     plan: _CompiledEndpoint,
     params: Mapping[str, Any],
 ) -> _RequestValues:
-    """Validate and snapshot raw input or copy an adapter-validated request view."""
+    """Validate raw external input once, or consume a plan-bound transport snapshot."""
+    snapshot = _TRANSPORT_SNAPSHOTS.get(id(params))
+    if snapshot is not None and snapshot.reference() is params:
+        if snapshot.plan is not plan:
+            raise ValueError("Validated request belongs to a different endpoint plan")
+        return _RequestValues(deepcopy(snapshot.prompt), typed=deepcopy(snapshot.typed))
+
     if plan.input_adapter is not None:
         validated = plan.input_adapter.validate_python(deepcopy(dict(params)))
         prompt = validated.model_dump(mode="json", by_alias=True)
@@ -348,7 +412,7 @@ def _prepare_request(
         return _RequestValues(prompt, typed=typed)
 
     prompt = deepcopy(dict(params))
-    typed_source = params.typed if isinstance(params, _RequestValues) else params
+    typed_source = params
     typed: dict[str, Any] = {}
     for parameter in plan.parameters:
         if parameter.name not in typed_source and parameter.name not in prompt:

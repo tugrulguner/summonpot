@@ -41,8 +41,9 @@ arguments. The bound runtime is deliberately narrower: an endpoint with exactly 
 required typed operation, `Exactly(1)`, and only `FromRequest`, direct `AgentChoice`, or
 defaulted arguments receives trusted request injection, a filtered model schema, local
 operation-output validation, and one permitted start. Level 7 runs that shipped path.
-When the operation has no `AgentChoice` and its output exactly matches the endpoint response
-model, Summonpot executes it directly without a model; Level 8 runs that path. Level 6
+When the endpoint uses a Pydantic request model, the operation has at least one
+`FromRequest` binding, uses only `FromRequest` or supported immutable callable defaults,
+and its output exactly matches the endpoint response model, Summonpot executes it directly without a model; Level 8 runs that path. Level 6
 retains the broader multi-operation declarations that remain registration-only.
 
 ## Progression

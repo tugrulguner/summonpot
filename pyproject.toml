@@ -24,7 +24,8 @@ classifiers = [
 ]
 dependencies = [
     "httpx>=0.27.0",
-    "pydantic>=2.0.0",
+    "pydantic>=2.13.5,<2.14",
+    "pydantic-core>=2.46.5,<2.47",
     "pydantic-ai-slim>=2.27.1,<3",
 ]
 

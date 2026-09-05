@@ -35,7 +35,8 @@ Use `make format` before committing.
 
 - `Summon` and `@summon(...)` remain a minimal endpoint declaration, not a graph builder or
   execution-engine configuration surface.
-- One fully resolved required `Exactly(1)` operation with at least one `FromRequest` binding,
+- An endpoint with a Pydantic request model and one fully resolved required `Exactly(1)`
+  operation with at least one `FromRequest` binding,
   only `FromRequest` or immutable identity-stable callable defaults, and exact output
   identity executes directly without a model.
   Every declaration outside that narrow shipped slice remains model-backed.

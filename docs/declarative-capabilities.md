@@ -95,7 +95,8 @@ no legal path → typed deterministic error
 
 The public endpoint declaration stays the same. The fixed docstring goal and validated
 request determine the work; callers do not send an `action` field or select an agent
-framework. When registration proves there is exactly one required `Exactly(1)` operation,
+framework. When the endpoint uses a Pydantic request model and registration proves there
+is exactly one required `Exactly(1)` operation,
 at least one argument is bound from `FromRequest`, every remaining argument comes from
 `FromRequest` or an immutable identity-stable callable default, and its declared output is
 the endpoint output model by exact identity, the runtime executes that operation directly
@@ -106,7 +107,25 @@ Dependency parameters are declaration-only. They do not appear in the HTTP reque
 or OpenAPI request schema. The ellipsis is the complete declaration body, and direct calls
 to a registered declaration are rejected; execution goes through the generated endpoint.
 
+
+Supported immutable callable defaults are exact built-in `None`, `bool`, `int`,
+`float`, `complex`, `str`, and `bytes` values, plus tuples and frozensets containing
+only those values recursively. Custom types (including subclasses of those built-ins)
+and mutable defaults keep the endpoint agent-backed; copy hooks are not proof of
+immutability. Scalar request declarations also remain agent-backed.
+
 ## What the boundary does and does not cover
+
+Output from runtime-enforced operations is validated against its declared schema without
+invoking serializers. Custom model `__init__` methods in these output schemas (including
+nested models) are rejected at registration: core's custom-constructor path can leave the
+compiled validator and trust unchecked nested instances. Use Pydantic model validators
+rather than a custom initializer for supported output validation.
+When an existing model instance allows extras, a colliding extra cannot overwrite a
+canonical field. During this revalidation, model `before` validators receive canonical
+fields plus noncolliding extras; colliding extras are validated separately and restored
+before model `after` and outer `wrap` validators observe the result. Caller-owned model
+storage is not rewritten. Raw mapping outputs retain their declared alias policy.
 
 The endpoint agent receives its declared dependencies and no ambient application access. An operation can contain deterministic business logic or a safe database adapter. Raw database sessions, connections, cursors, ORM registries, shells, and arbitrary SQL execution should not be exposed.
 
