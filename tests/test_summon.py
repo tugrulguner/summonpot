@@ -63,7 +63,9 @@ def test_cli_loads_the_module_summon_variable(tmp_path: Path):
     from summonpot.cli import _load_summon
 
     source = tmp_path / "app.py"
-    source.write_text("from summonpot import Summon\nsummon = Summon('loaded')\n")
+    source.write_text(
+        "from summonpot import Summon\nsummon = Summon('loaded')\n", encoding="utf-8"
+    )
 
     loaded = _load_summon(str(source))
 
@@ -71,7 +73,7 @@ def test_cli_loads_the_module_summon_variable(tmp_path: Path):
 
 
 def test_public_surfaces_use_the_summon_application_vocabulary():
-    readme = (ROOT / "README.md").read_text()
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
     canonical_readme = re.sub(
         r"^## Migrating from the 0\.5 API\n.*?(?=^## )",
         "",
@@ -87,7 +89,7 @@ def test_public_surfaces_use_the_summon_application_vocabulary():
     ]
     contents = {
         ROOT / "README.md": canonical_readme,
-        **{path: path.read_text() for path in surfaces},
+        **{path: path.read_text(encoding="utf-8") for path in surfaces},
     }
     stale = {
         str(path.relative_to(ROOT)): sorted(

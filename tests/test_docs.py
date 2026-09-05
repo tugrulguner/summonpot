@@ -17,7 +17,7 @@ ROADMAP = ROOT / "ROADMAP.md"
 
 
 def _snippet_after(heading: str) -> str:
-    text = README.read_text()
+    text = README.read_text(encoding="utf-8")
     assert heading in text, f"README no longer contains {heading!r}"
     block = text.split(heading, 1)[1]
     match = re.search(r"```python\n(.*?)```", block, re.DOTALL)
@@ -67,7 +67,9 @@ def test_declaration_surfaces_use_ellipsis_instead_of_not_implemented():
         str(path.relative_to(ROOT))
         for path in surfaces
         if re.search(
-            r"^\s*raise NotImplementedError\s*$", path.read_text(), re.MULTILINE
+            r"^\s*raise NotImplementedError\s*$",
+            path.read_text(encoding="utf-8"),
+            re.MULTILINE,
         )
     ]
 
@@ -82,4 +84,24 @@ def test_roadmap_scopes_the_enforced_authority_boundary():
     assert "leaves only declared `AgentChoice` values to the agent" in roadmap
     assert (
         "Unsupported shapes retain legacy model-supplied argument behavior" in roadmap
+    )
+
+
+def test_roadmap_prioritizes_the_narrow_no_model_slice():
+    roadmap = " ".join(ROADMAP.read_text(encoding="utf-8").split())
+
+    direct = roadmap.index("### 1. Single-operation deterministic execution")
+    result_chain = roadmap.index("### 2. Validated result chains")
+    database = roadmap.index("### 6. Exact database operations")
+
+    assert direct < result_chain < database
+    assert "exactly one required `Exactly(1)` operation" in roadmap
+    assert (
+        "every required input comes from `FromRequest` or a callable default" in roadmap
+    )
+    assert "operation output is exactly the endpoint response model" in roadmap
+    assert "without resolving, constructing, or calling a model" in roadmap
+    assert "There is no model fallback after direct execution begins" in roadmap
+    assert (
+        "The broader multi-operation deterministic compiler remains planned" in roadmap
     )

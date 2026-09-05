@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 from typing import Annotated, Literal
+from uuid import UUID
 
 import pytest
 from pydantic import BaseModel, Field
@@ -647,3 +648,111 @@ def test_summon_accepts_a_local_model_passed_as_a_live_annotation():
     summon = namespace["build"]()
 
     assert summon.endpoints[0].input_model.__name__ == "LocalRequest"
+
+
+# --- #78: path parameters are declared, validated and owned by the URL -------
+
+
+def test_path_placeholders_become_path_parameters():
+    summon = Summon("app")
+
+    @summon.summon("/customers/{customer_id}", method="POST")
+    def update_customer(customer_id: str, name: str) -> str:
+        """Update one customer."""
+        ...
+
+    assert summon.endpoints[0].path_parameter_names == ("customer_id",)
+
+
+def test_a_route_without_placeholders_owns_no_path_parameters():
+    summon = Summon("app")
+
+    @summon.summon("/customers", method="POST")
+    def create_customer(name: str) -> str:
+        """Create one customer."""
+        ...
+
+    assert summon.endpoints[0].path_parameter_names == ()
+
+
+def test_several_placeholders_keep_route_order():
+    summon = Summon("app")
+
+    @summon.summon("/orgs/{org_id}/customers/{customer_id}", method="PUT")
+    def move_customer(org_id: str, customer_id: str, name: str) -> str:
+        """Move a customer."""
+        ...
+
+    assert summon.endpoints[0].path_parameter_names == ("org_id", "customer_id")
+
+
+def test_a_placeholder_with_no_matching_parameter_is_rejected():
+    summon = Summon("app")
+
+    with pytest.raises(ValueError, match="has no parameter named"):
+
+        @summon.summon("/customers/{customer_id}", method="POST")
+        def update_customer(name: str) -> str:
+            """No customer_id in the signature."""
+            ...
+
+
+def test_a_repeated_placeholder_is_rejected():
+    summon = Summon("app")
+
+    with pytest.raises(ValueError, match="more than once"):
+
+        @summon.summon("/customers/{customer_id}/{customer_id}", method="POST")
+        def update_customer(customer_id: str, name: str) -> str:
+            """Named twice."""
+            ...
+
+
+def test_an_optional_path_parameter_is_rejected():
+    """A URL segment is always present, so a default could never apply."""
+    summon = Summon("app")
+
+    with pytest.raises(ValueError, match="declared optional"):
+
+        @summon.summon("/customers/{customer_id}", method="POST")
+        def update_customer(customer_id: str = "x", name: str = "y") -> str:
+            """Optional path parameter."""
+            ...
+
+
+def test_a_non_scalar_path_parameter_is_rejected():
+    """A path segment is text; a list has no unambiguous reading from one."""
+    summon = Summon("app")
+
+    with pytest.raises(ValueError, match="must be scalars"):
+
+        @summon.summon("/customers/{customer_id}", method="POST")
+        def update_customer(customer_id: list[str], name: str) -> str:
+            """Structured path parameter."""
+            ...
+
+
+@pytest.mark.parametrize("annotation", [str, int, float, bool, UUID])
+def test_every_supported_scalar_is_accepted(annotation):
+    summon = Summon("app")
+
+    def update_customer(customer_id: annotation, name: str) -> str:  # type: ignore[valid-type]
+        """Update one customer."""
+        ...
+
+    update_customer.__annotations__["customer_id"] = annotation
+    summon.summon("/customers/{customer_id}", method="POST")(update_customer)
+
+    assert summon.endpoints[0].path_parameter_names == ("customer_id",)
+
+
+def test_bodyless_methods_are_unaffected():
+    """GET already bound placeholders through the query-handler signature."""
+    summon = Summon("app")
+
+    @summon.summon("/customers/{customer_id}", method="GET")
+    def get_customer(customer_id: str) -> str:
+        """Read one customer."""
+        ...
+
+    assert summon.endpoints[0].path_parameter_names == ("customer_id",)

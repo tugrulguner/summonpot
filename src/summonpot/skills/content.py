@@ -24,7 +24,7 @@ SKILL_DESCRIPTION = (
 
 def skill_body() -> str:
     """Return the endpoint-contract skill content."""
-    return (_SKILLS_DIR / "summonpot.md").read_text()
+    return (_SKILLS_DIR / "summonpot.md").read_text(encoding="utf-8")
 
 
 def claude_skill(body: str, *, name: str, description: str) -> str:

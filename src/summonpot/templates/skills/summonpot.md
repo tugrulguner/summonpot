@@ -218,6 +218,52 @@ def list_tickets(
 Query parameters must be scalars or sequences of scalars. A mapping such as
 `dict[str, int]` has no query encoding and is rejected — use `POST` for that.
 
+## Path parameters
+
+A `{name}` placeholder in a route binds from the URL, on **every** method including
+the body-carrying ones. Each placeholder must match exactly one declared parameter,
+and that parameter must be **required** and annotated with a scalar the URL can
+carry: `str`, `int`, `float`, `bool` or `UUID`.
+
+```python
+from uuid import UUID
+
+
+@summon("/customers/{customer_id}", method="POST")
+def update_customer(customer_id: UUID, name: str) -> Customer:
+    """Update one customer."""
+    ...
+```
+
+A path parameter is **excluded from the generated request body model**, so the value
+lives in exactly one place. The URL is its only authority: a body that also carries
+`customer_id` does not override the URL segment.
+
+When the URL owns *every* declared parameter, the route takes **no request body at
+all** — call it with nothing but the path:
+
+```python
+@summon("/items/{item_id}", method="POST")
+def touch_item(item_id: int) -> Item:
+    """Touch one item."""
+    ...
+```
+
+```bash
+curl -X POST http://localhost:8000/items/7    # no -d, no Content-Type
+```
+
+These are rejected at registration, not at request time:
+
+- a placeholder that no parameter is named after;
+- the same placeholder named twice in one route;
+- a path parameter with a default — the URL always supplies it, so it is never optional;
+- a path parameter annotated with a non-scalar such as `list[int]` or a model. A
+  structured value belongs in the body.
+
+Because a Pydantic request-model endpoint takes exactly one request parameter, it
+cannot also declare a path parameter; that signature is rejected already.
+
 ## Running it
 
 Install the server, command-line, and chosen provider integrations explicitly. For

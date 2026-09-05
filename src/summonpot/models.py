@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -59,6 +60,26 @@ class ToolDef:
         return result
 
 
+PATH_PLACEHOLDER = re.compile(r"\{([^{}]*)\}")
+
+
+def path_placeholders(path: str) -> list[str]:
+    """The `{name}` placeholders in a route template, in order, exactly as written.
+
+    Duplicates are kept: a template naming the same placeholder twice is a
+    declaration error, and collapsing them here would hide it.
+
+    Nothing is normalised either, for the same reason. Stripping the text
+    inside the braces made `/items/{ item_id }` *pass* registration as
+    `item_id`, while the route handed to Starlette still carried the
+    unstripped placeholder -- so the declaration and the served route
+    disagreed about the name, and the mismatch surfaced only at request time.
+    Returning the raw text lets the caller reject it as the malformed
+    declaration it is.
+    """
+    return [match.group(1) for match in PATH_PLACEHOLDER.finditer(path)]
+
+
 @dataclass
 class EndpointDef:
     """A registered endpoint summoned behind a route."""
@@ -74,3 +95,5 @@ class EndpointDef:
     stream: bool = False
     model: str | None = None
     method: str = "POST"
+    path_parameter_names: tuple[str, ...] = ()
+    """Declared parameters bound from the URL, not the body. Set at registration."""

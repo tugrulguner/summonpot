@@ -51,13 +51,21 @@ def build_app(summon: Summon) -> Any:
                 description=endpoint.description,
             )
         elif endpoint.parameters:
+            RequestModel: Any
             if endpoint.input_model is not None:
                 RequestModel = endpoint.input_model
+            elif not _body_parameters(endpoint):
+                # Every declared parameter is carried by the URL, so there is no
+                # body left to describe. Generating an empty model anyway would
+                # make the body *required*: FastAPI answers a bodyless
+                # `POST /items/{item_id}` with 422 and never reaches the runtime,
+                # even though the URL already supplied every value.
+                RequestModel = None
             else:
                 from pydantic import create_model
 
                 fields: dict[str, tuple[type, Any]] = {}
-                for p in endpoint.parameters:
+                for p in _body_parameters(endpoint):
                     field_type = _field_type(p)
                     if p.required:
                         fields[p.name] = (field_type, ...)
@@ -172,19 +180,108 @@ async def _run_endpoint(summon: Any, endpoint: Any, params: dict[str, Any]) -> A
         ) from exc
 
 
-def _make_body_handler(endpoint: Any, summon: Any, request_model: type[Any]) -> Any:
-    """Create a body-only route handler while retaining endpoint context in its closure."""
+def _body_parameters(endpoint: Any) -> list[Any]:
+    """The declared parameters the JSON body owns.
 
-    async def handle(body: Any) -> Any:
+    Path parameters are excluded: the URL is the single authority for them, and
+    leaving them in the generated model would put the same value in two places
+    with the body silently winning.
+    """
+    owned = set(getattr(endpoint, "path_parameter_names", ()) or ())
+    return [p for p in endpoint.parameters if p.name not in owned]
+
+
+def _path_parameters(endpoint: Any) -> list[Any]:
+    """The declared parameters bound from the URL, in route order."""
+    by_name = {p.name: p for p in endpoint.parameters}
+    return [
+        by_name[name]
+        for name in getattr(endpoint, "path_parameter_names", ()) or ()
+        if name in by_name
+    ]
+
+
+def _make_body_handler(
+    endpoint: Any, summon: Any, request_model: type[Any] | None
+) -> Any:
+    """Create a route handler for a body method, retaining endpoint context in its closure.
+
+    `request_model` is None when the URL owns every declared parameter. The
+    handler then takes no body argument at all, so the route stays callable
+    with nothing but its path segments.
+    """
+
+    path_parameters = _path_parameters(endpoint)
+
+    # The synthetic body parameter shares one namespace with the path
+    # parameters, and the path parameter names come from the URL, so `body` is
+    # not ours to reserve. A route as ordinary as `/items/{body}` put two
+    # parameters called `body` into the signature below and `build_app()` died
+    # with `ValueError: duplicate parameter name: 'body'` -- the whole
+    # application refusing to start over a legal declaration. Step aside until
+    # the name is free; the prefix cannot collide in turn, because each
+    # candidate is re-checked.
+    body_name = "body"
+    taken = {p.name for p in path_parameters}
+    while body_name in taken:
+        body_name = f"_{body_name}"
+
+    # Everything arrives by keyword so that the body can be looked up under
+    # whichever name was free. Binding it positionally would mean the name in
+    # `__signature__` and the name FastAPI calls with could drift apart.
+    async def handle(**values: Any) -> Any:
+        path_values = dict(values)
+        body = path_values.pop(body_name, None)
+
         if hasattr(body, "model_dump"):
             prompt = body.model_dump(mode="json", by_alias=True)
             typed = {name: getattr(body, name) for name in type(body).model_fields}
-            params = _RequestValues(prompt, typed=typed)
         else:
-            params = _RequestValues(body)
-        return await _run_endpoint(summon, endpoint, params)
+            prompt = dict(body or {})
+            typed = dict(prompt)
 
-    handle.__annotations__["body"] = request_model
+        # The URL wins, and nothing it owns was ever in the body model, so
+        # there is nothing here to overwrite -- this adds, it does not resolve a
+        # conflict. Both views are kept: `typed` carries the value FastAPI
+        # validated (an int stays an int, a UUID stays a UUID), while `prompt`
+        # carries a JSON-safe rendering for the model prompt.
+        for name, value in path_values.items():
+            typed[name] = value
+            prompt[name] = (
+                value if isinstance(value, (str, int, float, bool)) else str(value)
+            )
+
+        return await _run_endpoint(
+            summon, endpoint, _RequestValues(prompt, typed=typed)
+        )
+
+    # FastAPI reads __signature__, so naming the path parameters explicitly is
+    # what turns them into bound, validated, documented path parameters instead
+    # of an undocumented **kwargs. Same technique as _make_query_handler.
+    # It is set even when there are no path parameters: without it FastAPI
+    # inspects the real signature, sees `**values`, and tries to bind it.
+    parameters = []
+    annotations: dict[str, Any] = {}
+    if request_model is not None:
+        parameters.append(
+            inspect.Parameter(
+                body_name,
+                inspect.Parameter.KEYWORD_ONLY,
+                annotation=request_model,
+            )
+        )
+        annotations[body_name] = request_model
+    for p in path_parameters:
+        annotation = _field_type(p)
+        parameters.append(
+            inspect.Parameter(
+                p.name, inspect.Parameter.KEYWORD_ONLY, annotation=annotation
+            )
+        )
+        annotations[p.name] = annotation
+
+    handle.__signature__ = inspect.Signature(parameters)  # type: ignore[attr-defined]
+    handle.__annotations__ = annotations
     return handle
 
 

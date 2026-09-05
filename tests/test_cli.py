@@ -48,7 +48,7 @@ def test_load_summon_reports_missing_file(tmp_path: Path, capsys):
 
 def test_load_summon_reports_file_without_summon(tmp_path: Path, capsys):
     source = tmp_path / "app.py"
-    source.write_text("value = 1\n")
+    source.write_text("value = 1\n", encoding="utf-8")
 
     with pytest.raises(typer.Exit) as error:
         _load_summon(str(source))
@@ -62,7 +62,7 @@ def test_load_summon_reports_file_without_summon(tmp_path: Path, capsys):
 
 def test_load_summon_rejects_a_variable_of_the_wrong_type(tmp_path: Path, capsys):
     source = tmp_path / "app.py"
-    source.write_text("summon = 1\n")
+    source.write_text("summon = 1\n", encoding="utf-8")
 
     with pytest.raises(typer.Exit) as error:
         _load_summon(str(source))
@@ -76,7 +76,7 @@ def test_load_summon_rejects_a_variable_of_the_wrong_type(tmp_path: Path, capsys
 
 def test_load_summon_reports_import_error(tmp_path: Path, capsys):
     source = tmp_path / "broken.py"
-    source.write_text("raise RuntimeError('broken app')\n")
+    source.write_text("raise RuntimeError('broken app')\n", encoding="utf-8")
 
     with pytest.raises(typer.Exit) as error:
         _load_summon(str(source))
@@ -87,7 +87,9 @@ def test_load_summon_reports_import_error(tmp_path: Path, capsys):
 
 def test_load_summon_returns_declared_instance(tmp_path: Path):
     source = tmp_path / "app.py"
-    source.write_text("from summonpot import Summon\nsummon = Summon('loaded')\n")
+    source.write_text(
+        "from summonpot import Summon\nsummon = Summon('loaded')\n", encoding="utf-8"
+    )
 
     loaded = _load_summon(str(source))
 
@@ -98,9 +100,11 @@ def test_load_summon_returns_declared_instance(tmp_path: Path):
 def test_load_summon_does_not_shadow_the_stdlib(tmp_path: Path, monkeypatch):
     """The application's directory must not precede the stdlib on sys.path."""
     monkeypatch.setattr(sys, "path", list(sys.path))
-    (tmp_path / "types.py").write_text("SHADOWED = True\n")
+    (tmp_path / "types.py").write_text("SHADOWED = True\n", encoding="utf-8")
     source = tmp_path / "app.py"
-    source.write_text("from summonpot import Summon\nsummon = Summon('served')\n")
+    source.write_text(
+        "from summonpot import Summon\nsummon = Summon('served')\n", encoding="utf-8"
+    )
 
     _load_summon(str(source))
 
@@ -115,7 +119,9 @@ def test_load_summon_does_not_shadow_the_stdlib(tmp_path: Path, monkeypatch):
 def test_load_summon_does_not_duplicate_sys_path_entries(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(sys, "path", list(sys.path))
     source = tmp_path / "app.py"
-    source.write_text("from summonpot import Summon\nsummon = Summon('served')\n")
+    source.write_text(
+        "from summonpot import Summon\nsummon = Summon('served')\n", encoding="utf-8"
+    )
 
     _load_summon(str(source))
     _load_summon(str(source))
@@ -126,7 +132,7 @@ def test_load_summon_does_not_duplicate_sys_path_entries(tmp_path: Path, monkeyp
 def test_load_summon_reports_unloadable_file_once(tmp_path: Path, capsys):
     """typer.Exit subclasses RuntimeError and must not be caught as a load error."""
     source = tmp_path / "app.txt"
-    source.write_text("summon = 1\n")
+    source.write_text("summon = 1\n", encoding="utf-8")
 
     with pytest.raises(typer.Exit) as error:
         _load_summon(str(source))
@@ -149,7 +155,8 @@ def test_load_summon_supports_dataclasses_in_the_application_file(tmp_path: Path
         "class Settings:\n"
         "    retries: int = 3\n"
         "\n"
-        "summon = Summon('dataclass-app')\n"
+        "summon = Summon('dataclass-app')\n",
+        encoding="utf-8",
     )
 
     loaded = _load_summon(str(source))
@@ -159,7 +166,7 @@ def test_load_summon_supports_dataclasses_in_the_application_file(tmp_path: Path
 
 def test_load_summon_does_not_leave_a_failed_module_in_sys_modules(tmp_path: Path):
     source = tmp_path / "broken.py"
-    source.write_text("raise RuntimeError('broken app')\n")
+    source.write_text("raise RuntimeError('broken app')\n", encoding="utf-8")
     before = set(sys.modules)
 
     with pytest.raises(typer.Exit):
@@ -170,7 +177,9 @@ def test_load_summon_does_not_leave_a_failed_module_in_sys_modules(tmp_path: Pat
 
 def test_serve_command_loads_and_serves_summon(tmp_path: Path):
     source = tmp_path / "app.py"
-    source.write_text("from summonpot import Summon\nsummon = Summon('served')\n")
+    source.write_text(
+        "from summonpot import Summon\nsummon = Summon('served')\n", encoding="utf-8"
+    )
 
     with patch.object(Summon, "serve") as serve:
         result = runner.invoke(

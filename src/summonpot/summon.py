@@ -9,6 +9,7 @@ from enum import Enum
 from functools import wraps
 from types import UnionType
 from typing import Annotated, Any, Literal, Union, get_args, get_origin
+from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -21,9 +22,27 @@ from summonpot._annotations import (
 from summonpot._execution import _register_endpoint
 from summonpot._validation import validate_contracts
 from summonpot.dependencies import Dependency
-from summonpot.models import EndpointDef, ParamDef, ToolDef
+from summonpot.models import EndpointDef, ParamDef, ToolDef, path_placeholders
 from summonpot.runtime import Runtime
 from summonpot.tools import build_tool_from_func
+
+_PATH_SCALARS: tuple[type, ...] = (str, int, float, bool, UUID)
+
+
+def _is_path_scalar(parameter: ParamDef) -> bool:
+    """Whether a declared parameter can be carried in a URL segment.
+
+    A path segment is text. str/int/float/bool/UUID have an unambiguous reading
+    from one; a list or a model does not, and inventing an encoding here would
+    be a transport API this issue explicitly does not add.
+    """
+    annotation = getattr(parameter, "annotation", None)
+    if annotation is None:
+        # Fall back to the display string for parameters declared without a
+        # resolved annotation.
+        return parameter.type_annotation in {"str", "int", "float", "bool", "UUID"}
+    annotation = _unwrap_annotated(annotation)
+    return isinstance(annotation, type) and issubclass(annotation, _PATH_SCALARS)
 
 
 class Summon:
@@ -251,6 +270,61 @@ class Summon:
             if duplicate_names:
                 raise TypeError(f"Duplicate capability name: {duplicate_names[0]}")
 
+            # Path parameters (#78). The route template is part of the endpoint
+            # contract: a URL identifier and a body identifier of the same name
+            # are two sources of truth for one value, and today the body wins
+            # silently. Partition the declared scalars here, once, so the
+            # transport layer never has to re-derive which side owns what.
+            placeholders = path_placeholders(path)
+            declared = {p.name: p for p in parameters}
+            path_parameter_names: tuple[str, ...] = ()
+
+            if placeholders:
+                seen: set[str] = set()
+                for placeholder in placeholders:
+                    if not placeholder or not placeholder.isidentifier():
+                        raise ValueError(
+                            f"{path!r} has the placeholder {{{placeholder}}}, which is "
+                            "not a valid Python identifier, so no endpoint parameter "
+                            "can ever match it."
+                        )
+                    if placeholder in seen:
+                        raise ValueError(
+                            f"{path!r} names {{{placeholder}}} more than once. A "
+                            "placeholder must match exactly one endpoint parameter."
+                        )
+                    seen.add(placeholder)
+
+                    matched = declared.get(placeholder)
+                    if matched is None:
+                        raise ValueError(
+                            f"{path!r} declares {{{placeholder}}} but {endpoint_name!r} "
+                            f"has no parameter named {placeholder!r}. Add it to the "
+                            "signature, or remove it from the route."
+                        )
+                    if not matched.required:
+                        raise ValueError(
+                            f"{placeholder!r} is a path parameter of {path!r}, so it is "
+                            "always present in the URL, but it is declared optional. "
+                            "Remove its default."
+                        )
+                    if not _is_path_scalar(matched):
+                        raise ValueError(
+                            f"{placeholder!r} is a path parameter of {path!r} but is "
+                            f"annotated {matched.type_annotation!r}. Path parameters "
+                            "must be scalars (str, int, float, bool, UUID); a "
+                            "structured value belongs in the body."
+                        )
+
+                # The issue asks that a Pydantic request-model endpoint with path
+                # parameters fail clearly at registration. It already does, and
+                # earlier than here: "Pydantic endpoints must declare exactly one
+                # request parameter" rejects the mixed signature before this runs.
+                # Adding a second check would have been unreachable code asserting
+                # a guarantee something else already makes.
+
+                path_parameter_names = tuple(placeholders)
+
             # Keyed on the pair, not the path alone: GET /orders and POST /orders
             # are different routes, while a second GET /orders would be dispatched
             # to the first and silently become dead code.
@@ -275,6 +349,7 @@ class Summon:
                 stream=stream,
                 model=model,
                 method=normalized_method,
+                path_parameter_names=path_parameter_names,
             )
             _register_endpoint(endpoint)
             self._routes[route] = endpoint_name

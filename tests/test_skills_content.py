@@ -35,6 +35,9 @@ def test_description_says_when_to_load_it():
         "unbound method",  # capability must be bound
         "stream=True",  # not implemented, raises
         "query-string",  # bodyless methods
+        "{customer_id}",  # path parameters bind from the URL
+        "excluded from the generated request body model",  # one value, one place
+        "call it with nothing but the path",  # a path-only body route needs no body
         "SUMMONPOT_MODEL=test",  # keyless trial
         "worker thread",  # thread-affine resources
         "usage_limits",  # bounding a call
@@ -117,3 +120,25 @@ def test_skill_python_examples_compile():
     assert len(blocks) >= 4
     for index, block in enumerate(blocks, 1):
         compile(block, f"summonpot-skill:{index}", "exec")
+
+
+@pytest.mark.parametrize(
+    "rejection",
+    [
+        "a placeholder that no parameter is named after",
+        "the same placeholder named twice",
+        "a path parameter with a default",
+        "a path parameter annotated with a non-scalar",
+    ],
+)
+def test_skill_documents_the_path_parameter_rejections(rejection):
+    """Each is a registration-time error the framework raises; the skill must say so."""
+    assert rejection in skill_body()
+
+
+def test_skill_names_every_supported_path_scalar():
+    """The accepted set is closed, so an agent must be told all of it."""
+    body = skill_body()
+    section = body[body.index("## Path parameters") : body.index("## Running it")]
+    for scalar in ("`str`", "`int`", "`float`", "`bool`", "`UUID`"):
+        assert scalar in section
