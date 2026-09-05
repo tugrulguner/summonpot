@@ -249,12 +249,18 @@ def _direct_defaults_are_stable(tool: ToolDef, bindings: Mapping[str, Any]) -> b
     for name, parameter in signature.parameters.items():
         if name in bindings or parameter.default is inspect.Parameter.empty:
             continue
-        try:
-            if deepcopy(parameter.default) is not parameter.default:
-                return False
-        except Exception:
+        if not _is_immutable_default(parameter.default):
             return False
     return True
+
+
+def _is_immutable_default(value: Any) -> bool:
+    """Recognize only built-in immutable values, never user copy hooks."""
+    if type(value) in (type(None), bool, int, float, complex, str, bytes):
+        return True
+    if type(value) in (tuple, frozenset):
+        return all(_is_immutable_default(item) for item in value)
+    return False
 
 
 def _compile_tool(
@@ -308,7 +314,7 @@ def _compile_parameter(param: ParamDef) -> _CompiledParameter:
         type_annotation=param.type_annotation,
         description=param.description,
         required=param.required,
-        default=deepcopy(param.default),
+        default=param.default,
         annotation=param.annotation,
         adapter=(
             TypeAdapter(param.annotation)

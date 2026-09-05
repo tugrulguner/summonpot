@@ -79,6 +79,9 @@ def test_skill_states_the_current_binding_execution_boundary():
     assert "model-supplied argument behavior" in body
     assert "executes it directly without resolving or constructing a model" in body
     assert "no model fallback after direct execution begins" in body.lower()
+    assert "uses a Pydantic request model" in body
+    assert "Scalar request declarations also remain agent-backed" in body
+    assert "copy hooks are not proof of immutability" in body
 
 
 def test_skill_uses_the_current_ai_api_positioning_and_direct_runtime_boundary():

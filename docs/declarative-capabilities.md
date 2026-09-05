@@ -95,7 +95,8 @@ no legal path → typed deterministic error
 
 The public endpoint declaration stays the same. The fixed docstring goal and validated
 request determine the work; callers do not send an `action` field or select an agent
-framework. When registration proves there is exactly one required `Exactly(1)` operation,
+framework. When the endpoint uses a Pydantic request model and registration proves there
+is exactly one required `Exactly(1)` operation,
 at least one argument is bound from `FromRequest`, every remaining argument comes from
 `FromRequest` or an immutable identity-stable callable default, and its declared output is
 the endpoint output model by exact identity, the runtime executes that operation directly
@@ -105,6 +106,13 @@ Any unresolved choice or unsupported declaration remains on the provider-neutral
 Dependency parameters are declaration-only. They do not appear in the HTTP request body
 or OpenAPI request schema. The ellipsis is the complete declaration body, and direct calls
 to a registered declaration are rejected; execution goes through the generated endpoint.
+
+
+Supported immutable callable defaults are exact built-in `None`, `bool`, `int`,
+`float`, `complex`, `str`, and `bytes` values, plus tuples and frozensets containing
+only those values recursively. Custom types (including subclasses of those built-ins)
+and mutable defaults keep the endpoint agent-backed; copy hooks are not proof of
+immutability. Scalar request declarations also remain agent-backed.
 
 ## What the boundary does and does not cover
 

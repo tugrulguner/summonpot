@@ -171,7 +171,7 @@ routing, and OpenAPI under Summonpot.
   direct `AgentChoice` arguments remain visible, one start is permitted, and `output=` is
   locally validated before success.
 - **Single-operation deterministic execution** when one required `Exactly(1)` operation
-  has at least one `FromRequest` binding, every remaining argument comes from `FromRequest`
+  uses a Pydantic request model and has at least one `FromRequest` binding; every remaining argument comes from `FromRequest`
   or an immutable identity-stable callable default, and its output is exactly the endpoint
   response model. This path does not resolve, construct, or call a model.
 - **Typed `Operation` contracts** that declare request, prior-result, context, or
@@ -317,7 +317,9 @@ define the real application behavior.
 The capability set is closed. For one required typed operation with `Exactly(1)`, the
 runtime injects `FromRequest` values, removes them and callable defaults from any
 model-visible tool schema, validates the declared operation output, and rejects a second
-start. If no `AgentChoice` remains and that output is exactly the endpoint response model,
+start. If the endpoint uses a Pydantic request model, has at least one `FromRequest`
+binding, uses only `FromRequest` or supported immutable callable defaults, and that output
+is exactly the endpoint response model,
 Summonpot executes the operation directly. Otherwise direct `AgentChoice` arguments remain
 visible to the agent. Request values on agentic paths still appear in the agent's user
 message; tool-schema hiding is not prompt secrecy. Other operation shapes remain on the
@@ -430,7 +432,7 @@ Summonpot chooses its current execution path without adding a second endpoint AP
 
 | Contract state | Current execution |
 |---|---|
-| One required `Exactly(1)` operation, at least one `FromRequest` binding, only `FromRequest` or immutable identity-stable defaults, exact response-model output | Execute directly without a model |
+| Pydantic request model, one required `Exactly(1)` operation, at least one `FromRequest` binding, only `FromRequest` or immutable identity-stable defaults, exact response-model output | Execute directly without a model |
 | A bounded semantic choice remains | Use the agent runtime with declared capabilities |
 | Unsupported or broader operation graph | Keep the existing agent path until its full semantics ship |
 
@@ -438,6 +440,13 @@ Broader graph execution and ordering, multi-operation deterministic execution,
 SQLAlchemy/SQLite operation adapters, write receipts, streaming, and built-in
 authentication are **planned, not shipped**. See
 [ROADMAP.md](ROADMAP.md) for the design boundaries and implementation order.
+
+
+Supported immutable callable defaults are exact built-in `None`, `bool`, `int`,
+`float`, `complex`, `str`, and `bytes` values, plus tuples and frozensets containing
+only those values recursively. Custom types (including subclasses of those built-ins)
+and mutable defaults keep the endpoint agent-backed; copy hooks are not proof of
+immutability. Scalar request declarations also remain agent-backed.
 
 ## HTTP methods and OpenAPI
 

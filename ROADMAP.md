@@ -39,7 +39,8 @@ The current release line provides:
 - Ellipsis declaration bodies that avoid abstract-method semantics, with direct Python calls rejected at the decorator boundary.
 - Immutable `Operation` declarations with `FromRequest`, `FromResult`, `FromContext`, and `AgentChoice` argument sources.
 - Runtime enforcement for one required `Exactly(1)` operation using `FromRequest`, direct `AgentChoice`, or callable defaults: trusted arguments are hidden and injected, the one start is reserved before invocation, and declared output is locally validated before success.
-- Single-operation deterministic execution when that slice has no `AgentChoice`, contains at
+- Single-operation deterministic execution when the endpoint uses a Pydantic request model,
+  that slice has no `AgentChoice`, contains at
   least one `FromRequest` binding, uses only `FromRequest` or immutable identity-stable
   callable defaults, and the operation output is exactly the endpoint response model:
   Summonpot executes directly without resolving or constructing a model.
@@ -77,7 +78,7 @@ fallback after direct execution begins. The endpoint remains agentic when `Agent
 final response composition, or any unsupported shape requires the model.
 
 The completed single-operation deterministic execution milestone therefore applies to
-exactly one required `Exactly(1)` operation with at least one `FromRequest` binding, only
+a Pydantic request model and exactly one required `Exactly(1)` operation with at least one `FromRequest` binding, only
 `FromRequest` or immutable identity-stable callable defaults, and an operation output exactly
 matching the endpoint response model. It runs without resolving, constructing, or calling a model. The broader
 multi-operation deterministic compiler remains planned.
