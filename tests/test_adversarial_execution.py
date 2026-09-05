@@ -2,10 +2,18 @@
 
 import asyncio
 import threading
-from typing import Any
+from typing import Annotated, Any, Literal, cast
 
 import pytest
-from pydantic import AliasPath, BaseModel, Field, RootModel, model_serializer
+from pydantic import (
+    AliasChoices,
+    AliasPath,
+    BaseModel,
+    Field,
+    RootModel,
+    field_serializer,
+    model_serializer,
+)
 
 from summonpot import Exactly, FromRequest, Operation, Required, Summon
 from summonpot._execution import _registered_plan
@@ -305,3 +313,336 @@ def test_nested_serializer_and_alias_fields_are_structurally_validated(invalid: 
             asyncio.run(call)
     else:
         assert asyncio.run(call).items[0].value == 7
+
+
+class ChoiceResponse(BaseModel):
+    value: int = Field(validation_alias=AliasChoices("external", AliasPath("data", 0)))
+
+
+class MixedAliases(BaseModel):
+    path: PathResponse
+    choice: ChoiceResponse
+    collision: CollisionResponse
+
+
+class RecursiveResponse(BaseModel):
+    value: int = Field(alias="external")
+    children: list["RecursiveResponse"] = Field(default_factory=list)
+
+
+class CatResponse(BaseModel):
+    kind: Literal["cat"]
+    value: int = Field(alias="external")
+
+
+class DogResponse(BaseModel):
+    kind: Literal["dog"]
+    value: int
+
+
+class UnionResponse(BaseModel):
+    pet: Annotated[CatResponse | DogResponse, Field(discriminator="kind")]
+
+
+class SerializedResponse(BaseModel):
+    value: int
+    hidden: int = Field(exclude=True)
+
+    @field_serializer("value")
+    def serialize_value(self, value: int) -> str:
+        return f"serialized:{value}"
+
+
+class SerializedRoot(RootModel[int]):
+    @model_serializer
+    def serialize_root(self) -> str:
+        return "not-an-integer"
+
+
+def _output_endpoint(output: Any, result: Any):
+    def operation(value: int):
+        return result
+
+    summon = Summon("test")
+
+    @summon("/schema-output")
+    def endpoint(
+        request: Request,
+        response=Required(
+            Operation(operation, bind={"value": FromRequest("value")}, output=output),
+            calls=Exactly(1),
+        ),
+    ) -> output:  # type: ignore[valid-type]
+        """Validate application output without serialization."""
+        ...
+
+    return summon.endpoints[0]
+
+
+@pytest.mark.parametrize("outer_instance", [False, True])
+@pytest.mark.parametrize("inner_instance", [False, True])
+def test_each_nested_model_selects_its_own_alias_policy(
+    outer_instance: bool, inner_instance: bool
+):
+    fields = {
+        "path": PathResponse.model_construct(value=7)
+        if inner_instance
+        else {"payload": {"value": 7}},
+        "choice": ChoiceResponse.model_construct(value=8)
+        if inner_instance
+        else {"data": [8]},
+        "collision": CollisionResponse.model_validate(
+            {"x": 1, "y": 2}, by_alias=False, by_name=True
+        )
+        if inner_instance
+        else {"y": 2},
+    }
+    result = MixedAliases.model_construct(**fields) if outer_instance else fields
+    endpoint = _output_endpoint(MixedAliases, result)
+    validated = asyncio.run(
+        Runtime(model="invalid:no-model").call(endpoint, {"value": 7})
+    )
+    assert validated.path.value == 7
+    assert validated.choice.value == 8
+    assert (validated.collision.x, validated.collision.y) == (
+        1 if inner_instance else 2,
+        2,
+    )
+
+
+@pytest.mark.parametrize(
+    "output,result,valid",
+    [
+        (PathResponse, {"payload": {"value": 7}}, True),
+        (PathResponse, {"value": 7}, False),
+        (ChoiceResponse, {"external": 7}, True),
+        (ChoiceResponse, {"value": 7}, False),
+        (SerializedResponse, SerializedResponse(value=7, hidden=9), True),
+        (
+            SerializedResponse,
+            SerializedResponse.model_construct(value=7, hidden="bad"),
+            False,
+        ),
+        (SerializedRoot, SerializedRoot(7), True),
+        (SerializedRoot, SerializedRoot.model_construct(root=cast(Any, "bad")), False),
+        (
+            RootModel[list[Response]],
+            RootModel[list[Response]]([Response(externalValue=7)]),
+            True,
+        ),
+        (
+            RootModel[list[Response]],
+            RootModel[list[Response]].model_construct(
+                root=[Response.model_construct(value="bad")]
+            ),
+            False,
+        ),
+        (
+            UnionResponse,
+            UnionResponse.model_construct(
+                pet=CatResponse.model_construct(kind="cat", value=7)
+            ),
+            True,
+        ),
+        (UnionResponse, {"pet": {"kind": "cat", "external": 7}}, True),
+        (
+            UnionResponse,
+            UnionResponse.model_construct(
+                pet=CatResponse.model_construct(kind="cat", value="bad")
+            ),
+            False,
+        ),
+        (UnionResponse, {"pet": {"kind": "unknown", "value": 7}}, False),
+        (
+            RecursiveResponse,
+            RecursiveResponse.model_construct(
+                value=1, children=[RecursiveResponse.model_construct(value=2)]
+            ),
+            True,
+        ),
+        (
+            RecursiveResponse,
+            RecursiveResponse.model_construct(value=1, children=[{"external": 2}]),
+            True,
+        ),
+        (
+            RecursiveResponse,
+            RecursiveResponse.model_construct(
+                value=1, children=[RecursiveResponse.model_construct(value="bad")]
+            ),
+            False,
+        ),
+    ],
+)
+def test_schema_output_regression_matrix(output: Any, result: Any, valid: bool):
+    endpoint = _output_endpoint(output, result)
+    call = Runtime(model="invalid:no-model").call(endpoint, {"value": 7})
+    if not valid:
+        with pytest.raises(_OperationOutputError):
+            asyncio.run(call)
+    else:
+        validated = asyncio.run(call)
+        assert isinstance(validated, output)
+        if isinstance(result, BaseModel) and not (
+            isinstance(result, RecursiveResponse)
+            and isinstance(result.children[0], dict)
+        ):
+            assert validated == result
+
+
+def test_output_validator_is_cached_and_does_not_modify_model_schema(monkeypatch):
+    from copy import deepcopy
+
+    from pydantic_core import SchemaValidator
+
+    import summonpot._execution as execution
+
+    schema = deepcopy(Response.__pydantic_core_schema__)
+    result = Response.model_construct(value="invalid")
+    endpoint = _output_endpoint(Response, result)
+    plan = _registered_plan(endpoint)
+    assert plan is not None
+    validator = plan.tools[0].output_validator
+    assert isinstance(validator, SchemaValidator)
+    assert Response.__pydantic_core_schema__ == schema
+    assert Response.model_validate(result) is result
+
+    def forbid_compile(*args, **kwargs):
+        pytest.fail("Output validator was compiled during a request")
+
+    monkeypatch.setattr(execution, "_compile_output_validator", forbid_compile)
+    for _ in range(2):
+        with pytest.raises(_OperationOutputError):
+            asyncio.run(Runtime(model="invalid:no-model").call(endpoint, {"value": 7}))
+    assert plan.tools[0].output_validator is validator
+
+
+def test_invalid_output_consumes_reservation_without_success_or_fallback(monkeypatch):
+    from pydantic_ai import ModelRetry
+
+    import summonpot.runtime as runtime_module
+    from summonpot._execution import _new_run
+    from summonpot.runtime import _invoke_bound_operation
+
+    endpoint = _output_endpoint(
+        Response, Response.model_construct(value="secret-invalid")
+    )
+    plan = _registered_plan(endpoint)
+    assert plan is not None
+    captured = []
+    original_new_run = runtime_module._new_run
+
+    def capture_run(*args, **kwargs):
+        run = original_new_run(*args, **kwargs)
+        captured.append(run)
+        return run
+
+    monkeypatch.setattr(runtime_module, "_new_run", capture_run)
+    with pytest.raises(_OperationOutputError, match="invalid declared output") as error:
+        asyncio.run(Runtime(model="invalid:no-model").call(endpoint, {"value": 7}))
+    assert "secret-invalid" not in str(error.value)
+    state = captured[0].states[0]
+    assert (state.started, state.running, state.succeeded) == (1, 0, 0)
+
+    async def attempt_twice():
+        run = _new_run(plan, {"value": 7})
+        with pytest.raises(_OperationOutputError):
+            await _invoke_bound_operation(plan.tools[0], run, {})
+        with pytest.raises(ModelRetry, match="already started"):
+            await _invoke_bound_operation(plan.tools[0], run, {})
+        assert (run.states[0].started, run.states[0].succeeded) == (1, 0)
+
+    asyncio.run(attempt_twice())
+
+
+@pytest.mark.parametrize("pydantic_dataclass", [False, True])
+@pytest.mark.parametrize("invalid", [False, True])
+def test_nested_dataclass_instances_are_revalidated(
+    pydantic_dataclass: bool, invalid: bool
+):
+    from dataclasses import dataclass
+
+    from pydantic.dataclasses import dataclass as validated_dataclass
+
+    decorate = validated_dataclass if pydantic_dataclass else dataclass
+
+    @decorate
+    class Item:
+        value: int
+
+    class Envelope(BaseModel):
+        item: Item
+
+    item = cast(Any, Item)(7)
+    if invalid:
+        object.__setattr__(item, "value", "bad")
+    endpoint = _output_endpoint(Envelope, Envelope.model_construct(item=item))
+    call = Runtime(model="invalid:no-model").call(endpoint, {"value": 7})
+    if invalid:
+        with pytest.raises(_OperationOutputError):
+            asyncio.run(call)
+    else:
+        assert asyncio.run(call).item.value == 7
+
+
+@pytest.mark.parametrize("instance", [False, True])
+def test_dataclass_alias_policy_is_local(instance: bool):
+    from pydantic.dataclasses import dataclass
+
+    @dataclass
+    class Item:
+        value: int = Field(validation_alias=AliasPath("payload", "value"))
+
+    class Envelope(BaseModel):
+        item: Item
+
+    item = object.__new__(Item)
+    object.__setattr__(item, "value", 7)
+    result = Envelope.model_construct(
+        item=item if instance else {"payload": {"value": 7}}
+    )
+    endpoint = _output_endpoint(Envelope, result)
+    assert (
+        asyncio.run(
+            Runtime(model="invalid:no-model").call(endpoint, {"value": 7})
+        ).item.value
+        == 7
+    )
+
+
+def test_labeled_union_schemas_are_revalidated_and_default_data_is_untouched():
+    from pydantic import TypeAdapter, ValidationError
+    from pydantic_core import SchemaValidator, core_schema
+
+    from summonpot._output_validation import _revalidating_schema
+
+    schema = core_schema.union_schema(
+        [
+            (TypeAdapter(Response).core_schema, "response"),
+            (core_schema.int_schema(), "integer"),
+        ]
+    )
+    validator = SchemaValidator(_revalidating_schema(schema), _use_prebuilt=False)
+    with pytest.raises(ValidationError):
+        validator.validate_python(Response.model_construct(value="bad"))
+    assert validator.validate_python(Response.model_construct(value=7)).value == 7
+    default = {"type": "model", "cls": Response, "schema": {"type": "any"}}
+    copied = _revalidating_schema(
+        core_schema.with_default_schema(core_schema.any_schema(), default=default)
+    )
+    assert copied["default"] is default
+
+
+def test_schema_named_fields_do_not_bypass_nested_revalidation():
+    class Envelope(BaseModel):
+        default: Response
+        metadata: Response
+        type: Response
+
+    invalid = Response.model_construct(value="bad")
+    endpoint = _output_endpoint(
+        Envelope,
+        Envelope.model_construct(default=invalid, metadata=invalid, type=invalid),
+    )
+    with pytest.raises(_OperationOutputError):
+        asyncio.run(Runtime(model="invalid:no-model").call(endpoint, {"value": 7}))

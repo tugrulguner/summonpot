@@ -197,6 +197,13 @@ routing, and OpenAPI under Summonpot.
 pip install "summonpot[serve,cli]"
 ```
 
+This source revision requires Pydantic `>=2.13.5,<2.14` and pydantic-core
+`>=2.46.5,<2.47`. Earlier Pydantic versions are no longer supported. Output
+revalidation uses a version-sensitive core option to avoid reusing validators that
+trust existing model instances; the dependency bounds keep that integration on the
+tested minor versions. These requirements apply to newly built artifacts, not to
+already-published packages.
+
 Start without a provider account by selecting the built-in test model:
 
 ```bash

@@ -12,7 +12,9 @@ from typing import Any
 from weakref import ReferenceType, ref
 
 from pydantic import TypeAdapter
+from pydantic_core import SchemaValidator
 
+from summonpot._output_validation import _compile_output_validator
 from summonpot.contracts import AgentChoice, FromRequest
 from summonpot.models import EndpointDef, ParamDef, ToolDef
 
@@ -69,6 +71,7 @@ class _CompiledTool:
     bindings: tuple[_CompiledBinding, ...]
     defaults: tuple[_CompiledDefault, ...]
     output_adapter: TypeAdapter[Any] | None
+    output_validator: SchemaValidator | None
     enforce_bound_exactly_once: bool
 
     @property
@@ -278,6 +281,9 @@ def _compile_tool(
         else ()
     )
     bounds = tool.bounds
+    output_adapter = (
+        TypeAdapter(contract.output) if enforce and contract is not None else None
+    )
     return _CompiledTool(
         identity=identity,
         name=tool.name,
@@ -300,8 +306,11 @@ def _compile_tool(
             and parameter.default is not inspect.Parameter.empty
             and (contract is None or contract.bind is None or name not in contract.bind)
         ),
-        output_adapter=(
-            TypeAdapter(contract.output) if enforce and contract is not None else None
+        output_adapter=output_adapter,
+        output_validator=(
+            _compile_output_validator(output_adapter)
+            if output_adapter is not None
+            else None
         ),
         enforce_bound_exactly_once=enforce,
     )

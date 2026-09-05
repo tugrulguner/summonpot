@@ -9,7 +9,7 @@ import os
 from collections.abc import Mapping
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 from pydantic_ai import Agent, ModelRetry, RunContext, Tool
 from pydantic_ai.models import Model
 from pydantic_ai.usage import UsageLimits
@@ -31,39 +31,6 @@ ModelSpec = Model | str
 
 class _OperationOutputError(RuntimeError):
     """A capability returned a value outside its declared output contract."""
-
-
-def _raw_output_value(value: Any) -> Any:
-    """Expose model field storage, never application serialization hooks.
-
-    Recursion also removes nested model instances: Pydantic otherwise trusts
-    already-created instances by default. Validation accepts canonical field
-    names so aliases (including validation paths) cannot hide stored fields.
-    """
-    if isinstance(value, BaseModel):
-        stored = object.__getattribute__(value, "__dict__")
-        if type(value).__pydantic_root_model__:
-            return _raw_output_value(stored.get("root"))
-        fields = {
-            name: _raw_output_value(stored[name])
-            for name in type(value).model_fields
-            if name in stored
-        }
-        extras = object.__getattribute__(value, "__pydantic_extra__")
-        if extras:
-            fields.update(
-                {name: _raw_output_value(item) for name, item in extras.items()}
-            )
-        return fields
-    if isinstance(value, dict):
-        return {key: _raw_output_value(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_raw_output_value(item) for item in value]
-    if isinstance(value, tuple):
-        return tuple(_raw_output_value(item) for item in value)
-    if isinstance(value, (set, frozenset)):
-        return type(value)(_raw_output_value(item) for item in value)
-    return value
 
 
 def _tracked_operation(tool: _CompiledTool) -> Any:
@@ -140,12 +107,9 @@ async def _invoke_bound_operation(
 
     try:
         result = await _call_with_values(tool, values)
-        assert tool.output_adapter is not None
+        assert tool.output_validator is not None
         try:
-            candidate = _raw_output_value(result)
-            validated = tool.output_adapter.validate_python(
-                candidate, by_name=True, by_alias=True
-            )
+            validated = tool.output_validator.validate_python(result)
         except ValidationError as exc:
             raise _OperationOutputError(
                 f"Capability {tool.name!r} returned an invalid declared output."

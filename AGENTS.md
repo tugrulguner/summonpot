@@ -14,9 +14,12 @@ request model + docstring goal + declared capabilities + response model
 ```
 
 The ellipsis is a complete declaration body, not an unfinished implementation. The
-decorated declaration rejects direct calls. Today every request runs through the
-provider-neutral agent runtime; the target is a compiler that picks the least-powerful
-sufficient executor, skipping the model entirely when one legal path remains.
+decorated declaration rejects direct calls. A Pydantic request endpoint executes directly
+when its sole operation is `Required(..., calls=Exactly(1))`, has at least one `FromRequest`
+binding, uses only request values or supported immutable callable defaults, and declares
+exactly the endpoint response model as its output. No model is resolved on that path, and
+execution never falls back to a model after starting. All other declarations retain the
+provider-neutral agent runtime; broader deterministic compilation remains planned.
 
 Two invariants govern almost every design argument:
 

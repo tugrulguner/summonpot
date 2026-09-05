@@ -30,3 +30,17 @@ def test_review_guidance_points_to_the_current_registration_entrypoint():
     assert "`src/summonpot/tools.py`" in guidance
     assert "`src/summonpot/_validation.py`" in guidance
     assert "`pot.py`" not in guidance
+
+
+def test_root_guidance_documents_the_shipped_direct_path():
+    guidance = " ".join((ROOT / "AGENTS.md").read_text(encoding="utf-8").split())
+
+    assert "Today every request runs through" not in guidance
+    assert "Pydantic request endpoint executes directly" in guidance
+    assert "Required(..., calls=Exactly(1))" in guidance
+    assert "at least one `FromRequest`" in guidance
+    assert "supported immutable callable defaults" in guidance
+    assert "never falls back to a model" in guidance
+    assert (
+        "All other declarations retain the provider-neutral agent runtime" in guidance
+    )
