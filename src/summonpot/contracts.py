@@ -80,6 +80,33 @@ class AgentChoice(ArgumentSource):
 # ---------------------------------------------------------------------------
 
 
+def _reject_non_count(value: object, field: str) -> None:
+    """Require a built-in ``int``, so a bound is always a number of calls.
+
+    ``type(value) is int`` rather than ``isinstance``: ``bool`` is an ``int``
+    subclass, so ``Exactly(True)`` otherwise becomes ``Exactly(1)`` -- a
+    declaration that means something, from an expression that meant nothing.
+    The same exactness rejects an ``IntEnum`` or a NumPy integer, which is the
+    intended reading; a call bound is written by hand in a declaration, and a
+    caller with one of those can spell ``int(...)``.
+    """
+    if type(value) is not int:
+        # Nothing about the rejected object is rendered -- not the value, and
+        # not its type. Both reach us straight from a caller's declaration, so
+        # both are caller-controlled: a value may carry a credential, its
+        # ``__repr__`` may raise, and a class is free to set ``__name__`` to
+        # secret-bearing text or to make even reading it raise from a
+        # metaclass. Any of those would either leak into logs or replace this
+        # actionable TypeError with an arbitrary exception from somebody
+        # else's code. The declaration site in the traceback already says which
+        # expression was written, so naming the field and the rule is enough to
+        # fix it.
+        raise TypeError(
+            f"Call bound {field} must be a built-in int. A bound counts "
+            "how many times an operation may run."
+        )
+
+
 @dataclass(frozen=True)
 class CallBounds:
     """How many times an operation may run within one request."""
@@ -88,6 +115,16 @@ class CallBounds:
     maximum: int | None = None
 
     def __post_init__(self) -> None:
+        # Kind before value. A bound counts operation starts, so a float, a
+        # string or a bool is the wrong *kind* of thing rather than a bad count,
+        # and conflating the two produced three different outcomes for three
+        # equally invalid declarations: `Exactly(1.5)` was accepted, `Exactly(
+        # True)` was accepted as 1, and `AtLeast("1")` died in the `<` below
+        # with a comparison TypeError that named neither the field nor the rule.
+        _reject_non_count(self.minimum, "minimum")
+        if self.maximum is not None:
+            _reject_non_count(self.maximum, "maximum")
+
         if self.minimum < 0:
             raise ValueError("Call bounds cannot require a negative number of calls.")
         if self.maximum is not None and self.maximum < self.minimum:
