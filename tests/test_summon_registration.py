@@ -756,3 +756,178 @@ def test_bodyless_methods_are_unaffected():
         ...
 
     assert summon.endpoints[0].path_parameter_names == ("customer_id",)
+
+
+# --- #79: deterministic, unique OpenAPI operation ids ------------------------
+
+
+def test_operation_id_is_derived_from_the_endpoint_name_and_method():
+    summon = Summon("app")
+
+    @summon.summon("/customers", method="POST")
+    def create_customer(name: str) -> str:
+        """Create one customer."""
+        ...
+
+    assert summon.endpoints[0].operation_id == "create_customer_post"
+
+
+def test_two_methods_on_one_path_get_distinct_ids():
+    summon = Summon("app")
+
+    @summon.summon("/orders", method="GET")
+    def list_orders() -> str:
+        """List orders."""
+        ...
+
+    @summon.summon("/orders", method="POST")
+    def create_order(sku: str) -> str:
+        """Create an order."""
+        ...
+
+    ids = [e.operation_id for e in summon.endpoints]
+    assert ids == ["list_orders_get", "create_order_post"]
+    assert len(set(ids)) == len(ids)
+
+
+def test_paths_that_sanitize_alike_get_distinct_ids():
+    """The reported collision: /user-profile and /user_profile.
+
+    FastAPI derived the id from the internal ``handle`` factory plus the
+    sanitised path, so both produced ``handle_user_profile_get``.
+    """
+    summon = Summon("app")
+
+    @summon.summon("/user-profile", method="GET")
+    def user_profile_dashed() -> str:
+        """Dashed."""
+        ...
+
+    @summon.summon("/user_profile", method="GET")
+    def user_profile_underscored() -> str:
+        """Underscored."""
+        ...
+
+    ids = [e.operation_id for e in summon.endpoints]
+    assert ids == ["user_profile_dashed_get", "user_profile_underscored_get"]
+
+
+def test_repeated_endpoint_name_and_method_is_rejected_at_registration():
+    """A collision fails before serving, naming both endpoints."""
+    summon = Summon("app")
+
+    @summon.summon("/a", method="GET")
+    def profile() -> str:
+        """First."""
+        ...
+
+    with pytest.raises(ValueError) as excinfo:
+        # Same function name on a different path: the collision this rejects.
+        @summon.summon("/b", method="GET")
+        def profile() -> str:
+            """Second, different path, same name."""
+            ...
+
+    message = str(excinfo.value)
+    assert "profile" in message
+    assert "profile_get" in message
+    assert "operationId" in message
+
+
+def test_repeated_endpoint_name_with_a_different_method_is_allowed():
+    """Only the name/method *pair* must be unique."""
+    summon = Summon("app")
+
+    @summon.summon("/a", method="GET")
+    def profile() -> str:
+        """Read."""
+        ...
+
+    @summon.summon("/a", method="POST")
+    def profile_post() -> str:
+        """Write."""
+        ...
+
+    assert [e.operation_id for e in summon.endpoints] == [
+        "profile_get",
+        "profile_post_post",
+    ]
+
+
+def test_an_identifier_name_is_carried_through_unchanged():
+    """Every name that can reach here is `func.__name__`, so folding it only loses."""
+    from summonpot.models import operation_id_for
+
+    assert operation_id_for("getUser", "get") == "getUser_get"
+    assert operation_id_for("__weird__name__", "PATCH") == "__weird__name___patch"
+
+
+def test_case_is_significant_in_an_operation_id():
+    """`getUser` and `getuser` are two functions and must stay two operations."""
+    from summonpot.models import operation_id_for
+
+    assert operation_id_for("getUser", "POST") != operation_id_for("getuser", "POST")
+
+
+@pytest.mark.parametrize("name", ["用户", "管理", "Ünter", "naïve"])
+def test_a_non_ascii_identifier_survives(name):
+    """Python allows these; replacing them mapped every one onto `endpoint`."""
+    from summonpot.models import operation_id_for
+
+    assert name.isidentifier()
+    assert operation_id_for(name, "POST") == f"{name}_post"
+
+
+def test_two_distinct_non_ascii_names_do_not_collide():
+    """The reported case: both normalised to `endpoint`, so the second was rejected."""
+    summon = Summon("svc")
+
+    def 用户() -> str:
+        """Read a user."""
+        return ""
+
+    def 管理() -> str:
+        """Read an admin."""
+        return ""
+
+    summon.summon("/users", method="POST")(用户)
+    summon.summon("/admins", method="POST")(管理)
+
+    ids = [e.operation_id for e in summon.endpoints]
+    assert ids == ["用户_post", "管理_post"]
+    assert len(set(ids)) == 2
+
+
+def test_two_case_distinct_names_do_not_collide():
+    summon = Summon("svc")
+
+    def getUser() -> str:
+        """Read a user."""
+        return ""
+
+    def getuser() -> str:
+        """Read a user, differently."""
+        return ""
+
+    summon.summon("/users", method="POST")(getUser)
+    summon.summon("/users-lower", method="POST")(getuser)
+
+    assert len({e.operation_id for e in summon.endpoints}) == 2
+
+
+def test_a_name_with_nothing_to_build_an_id_from_is_rejected():
+    """Better an explicit error than a placeholder every such name would share."""
+    from summonpot.models import operation_id_for
+
+    with pytest.raises(ValueError, match="no characters an OpenAPI operationId"):
+        operation_id_for("", "POST")
+
+    with pytest.raises(ValueError, match="no characters an OpenAPI operationId"):
+        operation_id_for("---", "POST")
+
+
+def test_a_non_identifier_name_is_still_normalised():
+    """`operation_id_for` is public, so it must handle a name the decorator cannot pass."""
+    from summonpot.models import operation_id_for
+
+    assert operation_id_for("user-profile", "GET") == "user_profile_get"

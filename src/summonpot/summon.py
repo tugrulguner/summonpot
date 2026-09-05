@@ -22,7 +22,13 @@ from summonpot._annotations import (
 from summonpot._execution import _register_endpoint
 from summonpot._validation import validate_contracts
 from summonpot.dependencies import Dependency
-from summonpot.models import EndpointDef, ParamDef, ToolDef, path_placeholders
+from summonpot.models import (
+    EndpointDef,
+    ParamDef,
+    ToolDef,
+    operation_id_for,
+    path_placeholders,
+)
 from summonpot.runtime import Runtime
 from summonpot.tools import build_tool_from_func
 
@@ -105,6 +111,10 @@ class Summon:
         self._endpoints: list[EndpointDef] = []
         # (path, method) -> endpoint name, for duplicate-route detection.
         self._routes: dict[tuple[str, str], str] = {}
+        # operation_id -> endpoint name. Distinct routes can still collide here:
+        # the id is derived from the declared name, and two endpoints may share
+        # a name while sitting on different paths.
+        self._operation_ids: dict[str, str] = {}
         self._runtime = runtime if runtime is not None else Runtime(model=model)
 
     def __repr__(self) -> str:
@@ -337,6 +347,20 @@ class Summon:
                     "so the second would be silently dead code."
                 )
 
+            # Checked here rather than at schema-generation time so a collision
+            # is a registration error rather than a duplicate-operation warning
+            # buried in the OpenAPI output -- and so it can never reach a client
+            # generator, which would emit two identically named methods.
+            operation_id = operation_id_for(endpoint_name, normalized_method)
+            clashing_name = self._operation_ids.get(operation_id)
+            if clashing_name is not None:
+                raise ValueError(
+                    f"{endpoint_name!r} and {clashing_name!r} both produce the "
+                    f"OpenAPI operationId {operation_id!r}. Operation ids must be "
+                    "unique, so a generated client would have two methods with "
+                    "the same name. Rename one of the two endpoints."
+                )
+
             endpoint = EndpointDef(
                 path=path,
                 name=endpoint_name,
@@ -350,9 +374,11 @@ class Summon:
                 model=model,
                 method=normalized_method,
                 path_parameter_names=path_parameter_names,
+                operation_id=operation_id,
             )
             _register_endpoint(endpoint)
             self._routes[route] = endpoint_name
+            self._operation_ids[operation_id] = endpoint_name
             self._endpoints.append(endpoint)
 
             @wraps(func)
