@@ -116,6 +116,14 @@ immutability. Scalar request declarations also remain agent-backed.
 
 ## What the boundary does and does not cover
 
+Output from runtime-enforced operations is validated against its declared schema without
+invoking serializers.
+When an existing model instance allows extras, a colliding extra cannot overwrite a
+canonical field. During this revalidation, model `before` validators receive canonical
+fields plus noncolliding extras; colliding extras are validated separately and restored
+before model `after` and outer `wrap` validators observe the result. Caller-owned model
+storage is not rewritten. Raw mapping outputs retain their declared alias policy.
+
 The endpoint agent receives its declared dependencies and no ambient application access. An operation can contain deterministic business logic or a safe database adapter. Raw database sessions, connections, cursors, ORM registries, shells, and arbitrary SQL execution should not be exposed.
 
 For databases, the target adapter API accepts exact prepared operations rather than broad infrastructure objects:

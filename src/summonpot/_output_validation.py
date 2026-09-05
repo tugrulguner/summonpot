@@ -9,6 +9,7 @@ fall back to the original adapter if compilation fails.
 
 from __future__ import annotations
 
+from contextvars import ContextVar
 from dataclasses import is_dataclass
 from typing import Any, cast
 
@@ -22,6 +23,102 @@ def _input_kind(value: Any) -> str:
         if isinstance(value, BaseModel)
         or (is_dataclass(value) and not isinstance(value, type))
         else "input"
+    )
+
+
+def _separate_model_extras(model: dict[str, Any]) -> dict[str, Any]:
+    """Keep colliding extras out of core's instance-dict merge.
+
+    Before validators receive canonical fields plus noncolliding extras, just as
+    mapping validation does; one mapping cannot represent both namespaces. After
+    and outer wrap validators receive the reconstructed model with both intact.
+    A per-model ContextVar carries only the detached collision dictionary to the
+    model-fields schema. Tokens make recursive/reentrant validation independent.
+    """
+    pending: ContextVar[tuple[dict[str, Any], bool] | None] = ContextVar(
+        "output_extras", default=None
+    )
+    field_names: set[str] = set()
+
+    def split(value: Any) -> tuple[Any, dict[str, Any]]:
+        state = pending.get()
+        if state is None:
+            return value, {}
+        collisions, internal_slot = state
+        if internal_slot and isinstance(value, dict):
+            value = {
+                key: item for key, item in value.items() if key != "__pydantic_extra__"
+            }
+        return value, collisions
+
+    def join(value: Any) -> Any:
+        (fields, extras, fields_set), collisions = value
+        return fields, {**(extras or {}), **collisions}, fields_set
+
+    def replace_fields(schema: dict[str, Any]) -> dict[str, Any]:
+        if schema.get("type") == "model-fields":
+            field_names.update(schema["fields"])
+            extra_schema = core_schema.dict_schema(
+                keys_schema=schema.get("extras_keys_schema", core_schema.str_schema()),
+                values_schema=schema.get("extras_schema", core_schema.any_schema()),
+            )
+            return cast(
+                dict[str, Any],
+                core_schema.no_info_after_validator_function(
+                    join,
+                    core_schema.no_info_before_validator_function(
+                        split,
+                        core_schema.tuple_positional_schema(
+                            [cast(core_schema.CoreSchema, schema), extra_schema]
+                        ),
+                    ),
+                ),
+            )
+        # Model before/wrap hooks surround model-fields; do not descend into
+        # field schemas or reference definitions belonging to other models.
+        if "schema" in schema:
+            return {**schema, "schema": replace_fields(schema["schema"])}
+        return schema
+
+    inner = {**model, "schema": replace_fields(model["schema"])}
+
+    def detach(value: Any, handler: Any) -> Any:
+        if not isinstance(value, model["cls"]):
+            return handler(value)
+        extras = value.__pydantic_extra__ or {}
+        collisions = {key: item for key, item in extras.items() if key in field_names}
+        # Do not invoke application copy hooks or write to the caller's storage.
+        detached = object.__new__(type(value))
+        storage = value.__dict__.copy()
+        # Pydantic model_construct can place this annotated internal slot in
+        # __dict__ as well; it is not a declared field or an additional extra.
+        storage.pop("__pydantic_extra__", None)
+        object.__setattr__(detached, "__dict__", storage)
+        object.__setattr__(
+            detached,
+            "__pydantic_extra__",
+            {key: item for key, item in extras.items() if key not in field_names},
+        )
+        object.__setattr__(
+            detached, "__pydantic_fields_set__", value.__pydantic_fields_set__.copy()
+        )
+        private = value.__pydantic_private__
+        object.__setattr__(
+            detached,
+            "__pydantic_private__",
+            None if private is None else private.copy(),
+        )
+        token = pending.set((collisions, "__pydantic_extra__" in detached.__dict__))
+        try:
+            return handler(detached)
+        finally:
+            pending.reset(token)
+
+    return cast(
+        dict[str, Any],
+        core_schema.no_info_wrap_validator_function(
+            detach, cast(core_schema.CoreSchema, inner)
+        ),
     )
 
 
@@ -59,6 +156,11 @@ def _revalidating_schema(node: Any) -> Any:
                 "validate_by_name": True,
             },
         }
+        if (
+            node.get("type") == "model"
+            and config.get("extra_fields_behavior") == "allow"
+        ):
+            canonical = _separate_model_extras(canonical)
         branch: dict[str, Any] = {
             "type": "tagged-union",
             "choices": {"instance": canonical, "input": result},
