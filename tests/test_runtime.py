@@ -1212,3 +1212,140 @@ def test_endpoint_runs_on_the_keyless_test_model():
     result = asyncio.run(summon._runtime.call(summon.endpoints[0], {"query": "agents"}))
 
     assert isinstance(result, ResearchResponse)
+
+
+# --- retries validation -------------------------------------------------------
+
+# `retries` counts how many times a failed model call is retried, so none of
+# these can be one. `bool` is included because it is an `int` subclass and was
+# therefore stored silently as 0 or 1.
+NOT_A_RETRY_COUNT = [
+    pytest.param(True, id="bool-true"),
+    pytest.param(False, id="bool-false"),
+    pytest.param(1.5, id="float"),
+    pytest.param(2.0, id="whole-float"),
+    pytest.param("2", id="str"),
+    pytest.param(None, id="none"),
+    pytest.param([1], id="list"),
+]
+
+
+@pytest.mark.parametrize("value", NOT_A_RETRY_COUNT)
+def test_a_non_integer_retry_count_fails_at_construction(value):
+    with pytest.raises(TypeError, match="retries must be a built-in int"):
+        Runtime(model="test", retries=value)
+
+
+def test_a_negative_retry_count_is_a_value_error():
+    """Right kind of value, invalid value -- the distinction is deliberate."""
+    with pytest.raises(ValueError, match="retries must be 0 or more"):
+        Runtime(model="test", retries=-1)
+
+
+@pytest.mark.parametrize("value", [*NOT_A_RETRY_COUNT, pytest.param(-1, id="negative")])
+def test_the_retry_error_names_the_field_and_the_range(value):
+    """The old failure named neither, so a 500 gave the operator nothing to act on."""
+    with pytest.raises((TypeError, ValueError)) as excinfo:
+        Runtime(model="test", retries=value)
+
+    message = str(excinfo.value)
+    assert "retries" in message
+    assert "0 or more" in message
+    if type(value) is int:
+        # A built-in int is safe to render, and the count is the actionable
+        # detail for a negative one.
+        assert str(value) in message
+
+
+def test_the_retry_error_does_not_echo_the_rejected_value():
+    """`retries` is configuration, so it can arrive holding a credential."""
+    secret = "sk-live-2f8c41d9e7b0"
+
+    with pytest.raises(TypeError) as excinfo:
+        Runtime(model="test", retries=secret)  # pyright: ignore[reportArgumentType]
+
+    message = str(excinfo.value)
+    assert secret not in message
+    assert message == (
+        "retries must be a built-in int. It counts how many times a "
+        "failed model call is retried, so it must be 0 or more."
+    )
+
+
+def test_a_retry_count_whose_repr_raises_still_gets_the_actionable_error():
+    """Rendering the value would hand control to the caller's ``__repr__``."""
+
+    class Unprintable:
+        def __repr__(self) -> str:
+            raise RuntimeError("repr exploded")
+
+    with pytest.raises(TypeError, match="retries must be a built-in int"):
+        Runtime(model="test", retries=Unprintable())  # pyright: ignore[reportArgumentType]
+
+
+def test_a_hostile_retry_type_name_never_reaches_the_error():
+    """``__name__`` is caller-controlled too, so it is not a safe substitute."""
+
+    class Secretive:
+        pass
+
+    Secretive.__name__ = "sk-live-2f8c41d9e7b0"
+
+    with pytest.raises(TypeError) as excinfo:
+        Runtime(model="test", retries=Secretive())  # pyright: ignore[reportArgumentType]
+
+    assert "sk-live-2f8c41d9e7b0" not in str(excinfo.value)
+
+
+def test_a_retry_type_whose_name_raises_still_gets_the_actionable_error():
+    """A metaclass can make even reading ``__name__`` hand over control."""
+
+    class Hostile(type):
+        @property
+        def __name__(cls) -> str:  # pyright: ignore[reportIncompatibleVariableOverride]
+            raise RuntimeError("name exploded")
+
+    class Unnameable(metaclass=Hostile):
+        pass
+
+    with pytest.raises(TypeError, match="retries must be a built-in int"):
+        Runtime(model="test", retries=Unnameable())  # pyright: ignore[reportArgumentType]
+
+
+@pytest.mark.parametrize("value", [0, 1, 3])
+def test_a_valid_retry_count_is_stored_unchanged(value):
+    assert Runtime(model="test", retries=value).retries == value
+
+
+def test_the_default_retry_count_is_unchanged():
+    assert Runtime(model="test").retries == 1
+
+
+def test_an_invalid_retry_count_never_reaches_registration_or_a_request():
+    """The AC in its own terms: the failure must land before anything is served.
+
+    Previously the float survived construction, survived `@summon`, and only
+    failed inside agent construction on the first request -- as
+    `AttributeError: 'float' object has no attribute 'copy'`, which the server
+    turned into an unexplained 500.
+    """
+    from fastapi.testclient import TestClient
+
+    from summonpot.server import build_app
+
+    with pytest.raises(TypeError):
+        # Deliberately the wrong static type: this is the runtime guard's job.
+        Runtime(model="test", retries=1.5)  # pyright: ignore[reportArgumentType]
+
+    # And the working counterpart still serves, so the guard is not just a
+    # blanket rejection.
+    summon = Summon("svc", runtime=Runtime(model="test", retries=0))
+
+    @summon.summon("/ping", method="POST")
+    def ping() -> str:
+        """Ping."""
+        return ""
+
+    assert summon._runtime.retries == 0
+    client = TestClient(build_app(summon), raise_server_exceptions=False)
+    assert client.post("/ping").status_code == 200
