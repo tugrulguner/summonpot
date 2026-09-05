@@ -202,6 +202,14 @@ execution begins. Multi-operation chains, `FromResult`, `FromContext`, `after`,
 collection-backed choices, and broader call bounds remain registration-only. Unsupported
 shapes keep the existing model-supplied argument behavior.
 
+Runtime-enforced output schemas must not define a custom model `__init__`, including
+nested models. Registration rejects that unsupported constructor path rather than
+allowing it to bypass nested output validation. Use Pydantic model validators instead.
+
+HTTP request validation runs once. The server transfers a detached, plan-bound validated
+snapshot to the runtime rather than revalidating its JSON prompt representation. Raw
+runtime inputs still undergo validation; ordinary request wrappers are not trusted.
+
 
 Supported immutable callable defaults are exact built-in `None`, `bool`, `int`,
 `float`, `complex`, `str`, and `bytes` values, plus tuples and frozensets containing

@@ -113,6 +113,49 @@ class _CompiledEndpoint:
 _REGISTERED_PLANS: dict[int, tuple[ReferenceType[EndpointDef], _CompiledEndpoint]] = {}
 
 
+class _TransportRequest(_RequestValues):
+    """Transport envelope; its mutable public views confer no validation authority."""
+
+    __slots__ = ("__weakref__",)
+
+
+@dataclass(frozen=True, slots=True)
+class _TransportSnapshot:
+    reference: ReferenceType[_TransportRequest]
+    plan: _CompiledEndpoint
+    prompt: dict[str, Any]
+    typed: dict[str, Any]
+
+
+_TRANSPORT_SNAPSHOTS: dict[int, _TransportSnapshot] = {}
+
+
+def _validated_transport_request(
+    plan: _CompiledEndpoint,
+    prompt: Mapping[str, Any],
+    *,
+    typed: Mapping[str, Any],
+) -> _RequestValues:
+    """Seal FastAPI-validated values for this exact compiled route plan.
+
+    Only the HTTP adapter calls this factory after validation. Neither an ordinary
+    _RequestValues nor the envelope's mutable views is proof of validation. Keep
+    detached data privately, and release it when the envelope leaves scope.
+    """
+    request = _TransportRequest(prompt, typed=typed)
+    identity = id(request)
+
+    def discard(reference: ReferenceType[_TransportRequest]) -> None:
+        current = _TRANSPORT_SNAPSHOTS.get(identity)
+        if current is not None and current.reference is reference:
+            _TRANSPORT_SNAPSHOTS.pop(identity, None)
+
+    _TRANSPORT_SNAPSHOTS[identity] = _TransportSnapshot(
+        ref(request, discard), plan, deepcopy(dict(prompt)), deepcopy(dict(typed))
+    )
+    return request
+
+
 def _register_endpoint(
     endpoint: EndpointDef,
     *,
@@ -353,7 +396,13 @@ def _prepare_request(
     plan: _CompiledEndpoint,
     params: Mapping[str, Any],
 ) -> _RequestValues:
-    """Validate and snapshot raw input or copy an adapter-validated request view."""
+    """Validate raw external input once, or consume a plan-bound transport snapshot."""
+    snapshot = _TRANSPORT_SNAPSHOTS.get(id(params))
+    if snapshot is not None and snapshot.reference() is params:
+        if snapshot.plan is not plan:
+            raise ValueError("Validated request belongs to a different endpoint plan")
+        return _RequestValues(deepcopy(snapshot.prompt), typed=deepcopy(snapshot.typed))
+
     if plan.input_adapter is not None:
         validated = plan.input_adapter.validate_python(deepcopy(dict(params)))
         prompt = validated.model_dump(mode="json", by_alias=True)
@@ -363,7 +412,7 @@ def _prepare_request(
         return _RequestValues(prompt, typed=typed)
 
     prompt = deepcopy(dict(params))
-    typed_source = params.typed if isinstance(params, _RequestValues) else params
+    typed_source = params
     typed: dict[str, Any] = {}
     for parameter in plan.parameters:
         if parameter.name not in typed_source and parameter.name not in prompt:

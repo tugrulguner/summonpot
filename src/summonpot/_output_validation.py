@@ -131,6 +131,18 @@ def _revalidating_schema(node: Any) -> Any:
     globally. Any schemas deliberately remain Any: do not traverse runtime data.
     """
     if isinstance(node, dict):
+        if node.get("type") == "model" and node.get("custom_init"):
+            # Core invokes custom constructors even with _use_prebuilt=False.
+            # A normal super().__init__ call then re-enters the original class
+            # validator, bypassing our nested instance revalidation. Disabling
+            # custom_init would silently discard mapping-input transformations;
+            # reject the unsupported contract at registration instead.
+            cls = node["cls"]
+            raise TypeError(
+                f"Output model {cls.__qualname__!r} uses a custom __init__, which "
+                "is unsupported for runtime-enforced operation outputs; use "
+                "model validators instead (including for nested models)."
+            )
         is_schema = isinstance(node.get("type"), str)
         result = {
             key: value

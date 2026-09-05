@@ -8,7 +8,12 @@ from types import UnionType
 from typing import TYPE_CHECKING, Annotated, Any, Union, get_args, get_origin
 
 from summonpot import __version__
-from summonpot._execution import _registered_plan, _RequestValues
+from summonpot._execution import (
+    _CompiledEndpoint,
+    _registered_plan,
+    _RequestValues,
+    _validated_transport_request,
+)
 from summonpot.summon import BODYLESS_METHODS, _unwrap_annotated
 
 if TYPE_CHECKING:
@@ -259,9 +264,12 @@ def _make_body_handler(
                 value if isinstance(value, (str, int, float, bool)) else str(value)
             )
 
-        return await _run_endpoint(
-            summon, endpoint, _RequestValues(prompt, typed=typed)
+        params = (
+            _validated_transport_request(definition, prompt, typed=typed)
+            if isinstance(definition, _CompiledEndpoint)
+            else _RequestValues(prompt, typed=typed)
         )
+        return await _run_endpoint(summon, endpoint, params)
 
     # FastAPI reads __signature__, so naming the path parameters explicitly is
     # what turns them into bound, validated, documented path parameters instead
@@ -314,7 +322,12 @@ def _make_query_handler(
     from fastapi import Query
 
     async def handle(**kwargs: Any) -> Any:
-        return await _run_endpoint(summon, endpoint, kwargs)
+        params = (
+            _validated_transport_request(definition, kwargs, typed=kwargs)
+            if isinstance(definition, _CompiledEndpoint)
+            else kwargs
+        )
+        return await _run_endpoint(summon, endpoint, params)
 
     parameters = []
     annotations: dict[str, Any] = {}

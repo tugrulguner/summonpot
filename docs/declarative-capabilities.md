@@ -117,7 +117,10 @@ immutability. Scalar request declarations also remain agent-backed.
 ## What the boundary does and does not cover
 
 Output from runtime-enforced operations is validated against its declared schema without
-invoking serializers.
+invoking serializers. Custom model `__init__` methods in these output schemas (including
+nested models) are rejected at registration: core's custom-constructor path can leave the
+compiled validator and trust unchecked nested instances. Use Pydantic model validators
+rather than a custom initializer for supported output validation.
 When an existing model instance allows extras, a colliding extra cannot overwrite a
 canonical field. During this revalidation, model `before` validators receive canonical
 fields plus noncolliding extras; colliding extras are validated separately and restored
