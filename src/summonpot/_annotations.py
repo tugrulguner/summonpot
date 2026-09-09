@@ -7,6 +7,7 @@ signature, so the answers live here once rather than in two copies that can drif
 from __future__ import annotations
 
 import inspect
+import types
 import typing
 from collections.abc import Callable
 from typing import Any
@@ -14,6 +15,11 @@ from typing import Any
 
 def type_name(tp: Any) -> str:
     """Render an annotation as a short display string."""
+    # PEP 604 unions expose __origin__ on 3.14+, so handle them before the
+    # generic branch which would otherwise recurse into "__origin__".
+    origin = typing.get_origin(tp)
+    if origin is types.UnionType or origin is typing.Union:
+        return " | ".join(type_name(arg) for arg in typing.get_args(tp))
     if hasattr(tp, "__origin__"):
         origin = tp.__origin__
         args = tp.__args__
