@@ -126,7 +126,7 @@ def test_skill_documents_runtime_extras_and_safe_network_exposure():
 def test_skill_states_python_support_and_executor_neutral_contract_terms():
     body = " ".join(skill_body().split())
 
-    assert "Python 3.11 through 3.13" in body
+    assert "Python 3.11 through 3.14" in body
     assert "fixed execution goal" in body
     assert "available to execution" in body
     assert "On the agent-backed path" in body

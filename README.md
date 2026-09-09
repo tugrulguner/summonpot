@@ -200,7 +200,7 @@ routing, and OpenAPI under Summonpot.
 pip install "summonpot[serve,cli]"
 ```
 
-Python 3.11 through 3.13 is supported. Summonpot requires Pydantic
+Python 3.11 through 3.14 is supported. Summonpot requires Pydantic
 `>=2.13.5,<2.14` and pydantic-core `>=2.46.5,<2.47`. Earlier Pydantic versions
 are no longer supported. Output
 revalidation uses a version-sensitive core option to avoid reusing validators that

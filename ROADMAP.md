@@ -52,7 +52,7 @@ The current release line provides:
   and non-finite values. An absent maximum (`None`) remains valid for unbounded calls;
   this count-type validation does not imply broader runtime call-bound enforcement.
 - Registration-time validation for complete bindings, request and result references, operation ordering, selectable collections, and provable type incompatibility.
-- Python 3.11–3.13 CI, package builds, and expanded runtime/CLI coverage.
+- Python 3.11–3.14 CI, package builds, and expanded runtime/CLI coverage.
 
 ### 0.5.0 boundary
 
