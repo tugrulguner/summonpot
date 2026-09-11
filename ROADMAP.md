@@ -34,6 +34,8 @@ The current release line provides:
 - Configurable request, token, cost, and timeout limits for each endpoint call.
 - Redacted HTTP mappings for usage limits, timeouts, provider failures, and unsatisfied model contracts.
 - GET, POST, PUT, PATCH, DELETE, and HEAD routing with validated body or query contracts.
+- Stable OpenAPI `operationId` values derived from each endpoint's declared name and HTTP
+  method, with registration-time collision rejection.
 - A keyless test model for exercising routing and capability wiring without provider credentials.
 - Installable coding-agent skills describing the endpoint contract, typed operation bindings, and the current runtime boundary for Claude Code, Cursor, Windsurf, GitHub Copilot, Cline, and OpenAI Codex.
 - Ellipsis declaration bodies that avoid abstract-method semantics, with direct Python calls rejected at the decorator boundary.
@@ -91,6 +93,18 @@ multi-operation deterministic compiler remains planned.
 Multi-operation graphs, `FromResult`, `FromContext`, `after`, broader call bounds, and
 broader no-model execution remain planned. Those unsupported shapes remain on the agent
 runtime until their full semantics ship.
+
+### 0.8.0 boundary
+
+Version 0.8.0 gives generated routes stable endpoint-derived OpenAPI `operationId` values,
+validates call-bound count types when declarations are constructed, and hardens the
+validated HTTP request handoff so compatibility views cannot invoke application copy,
+serialization, string, representation, or container hooks against canonical operation
+inputs. It preserves safe native query values for agent prompts and custom runtimes while
+keeping unsupported values inert.
+
+This release does not broaden runtime enforcement to multi-operation graphs. The remaining
+enforce-or-reject, input/output, failure, and deadline semantics stay in milestone 1 below.
 
 ## Next milestones
 

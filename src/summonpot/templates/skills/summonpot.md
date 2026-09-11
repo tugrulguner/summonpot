@@ -87,6 +87,9 @@ these is a hard error:
 - **Paths start with `/`.**
 - **One endpoint per `(path, method)`.** `GET /orders` and `POST /orders` may coexist;
   two `GET /orders` may not.
+- **Every route receives a stable OpenAPI `operationId`.** It is derived from the endpoint
+  function name and HTTP method. Two routes that would produce the same ID are rejected
+  during registration.
 - **Annotations must resolve at runtime.** Under `from __future__ import annotations`,
   or with a quoted annotation, the name is looked up when the endpoint registers — so a
   `TYPE_CHECKING`-only import, or a model defined in a function scope that is no longer
