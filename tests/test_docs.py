@@ -135,6 +135,14 @@ def test_execution_overview_is_executor_neutral():
     assert "On the agent-backed path" in capability_guide
 
 
+def test_public_surfaces_document_stable_openapi_operation_ids():
+    skill = ROOT / "src/summonpot/templates/skills/summonpot.md"
+    for path in (README, ROADMAP, skill):
+        text = " ".join(path.read_text(encoding="utf-8").split())
+        assert "OpenAPI `operationId`" in text
+        assert "registration" in text.lower()
+
+
 def test_reviewing_distinguishes_shipped_direct_execution_from_planned_work():
     reviewing = " ".join(REVIEWING.read_text(encoding="utf-8").split())
 

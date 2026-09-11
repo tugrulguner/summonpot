@@ -182,6 +182,8 @@ routing, and OpenAPI under Summonpot.
 - **Provider-neutral model selection** for OpenAI, Anthropic, Google, Groq, Mistral,
   OpenRouter, and xAI.
 - **Generated HTTP and OpenAPI contracts** for body and query endpoints.
+- **Stable OpenAPI `operationId` values** derived from each endpoint's declared name and
+  HTTP method, with registration-time rejection when two routes would produce the same ID.
 - **GET, POST, PUT, PATCH, DELETE, and HEAD routes**, keyed by `(path, method)`.
 - **Local response validation**, bounded retries, usage limits, timeouts, and redacted
   public failures.

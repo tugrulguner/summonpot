@@ -10,6 +10,23 @@ release assembles them here — run `make changelog-draft` to preview them.
 
 <!-- towncrier release notes start -->
 
+## [0.8.0] - 2026-09-11
+
+### Added
+
+- Every generated route now carries an explicit OpenAPI `operationId` derived from the declared endpoint name and HTTP method, instead of FastAPI deriving one from the internal `handle` factory. Distinct paths that sanitise alike -- `/user-profile` and `/user_profile` -- no longer collide on a single id, and a name/method collision is rejected at registration with a message naming both endpoints rather than surfacing as a duplicate-operation warning in the schema. The metadata captured at registration is authoritative: `build_app()` serves ids from the plan compiled then, so later edits to a registered `EndpointDef` do not reach the schema. A definition that never went through registration is still validated when the app is built, and is rejected if its id is not the one its name and method derive. ([#79](https://github.com/tugrulguner/summonpot/issues/79))
+
+### Changed
+
+- `Exactly`, `AtLeast`, `AtMost` and `Between` now reject a bound that is not a built-in `int`, raising `TypeError` when the declaration is constructed rather than accepting it or failing later on a comparison. `bool` is rejected too, despite being an `int` subclass, so `Exactly(True)` no longer silently becomes `Exactly(1)`. An explicitly written `None` maximum is rejected as well -- `AtMost(None)` and `Between(1, None)` name a maximum and name it wrongly, where an omitted maximum still means unbounded, so `CallBounds(minimum=1)` and `AtLeast(1)` are unchanged. Negative and unsatisfiable integer ranges keep raising `ValueError`, and zero bounds such as `Exactly(0)` and `AtMost(0)` remain constructible. The rejection names the offending field and the rule only -- never the value it was given, and never its type -- so a declaration holding a credential cannot copy it into startup logs, and a value whose `__repr__` or type name raises still gets the documented `TypeError`. ([#92](https://github.com/tugrulguner/summonpot/issues/92))
+- Prioritize enforce-or-reject contracts and input/output hardening in the roadmap; require failure semantics with result chains before broader execution and database adapters. Add a research-informed agent/context track for budgeted working context, scoped tool discovery and memory, bounded delegation, and evaluation gates while preserving body-free endpoint contracts.
+
+### Fixed
+
+- Correct execution-boundary documentation to distinguish one permitted operation start per request from exactly-once completion, describe direct and agent-backed endpoint paths without assuming a model, accept no-model bug reports, and keep contributor-only guidance out of distributions.
+- Prevent HTTP request transport from invoking application-defined copy hooks after validation, so operations receive the exact validated value graph. Public compatibility views no longer alias that graph, and a consumed transport cannot be replayed through request defaults. Compatibility views and the runtime prompt use detached inert built-in projections, without invoking declared serializers or string/representation hooks. Unsupported values, cycles, excessive nesting, and non-finite floats use an inert placeholder; non-string mapping keys are omitted. Safe exact native UUID, date/time, timedelta, Decimal, and bytes values remain usable in prompts and typed compatibility views without application hooks. Tuple, set, and frozenset query values also retain their native kind in typed views and their contents in JSON-safe prompts. Canonical bound values are unchanged.
+
+
 ## [0.7.0] - 2026-09-05
 
 ### Added

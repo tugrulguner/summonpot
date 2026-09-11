@@ -31,6 +31,7 @@ def test_description_says_when_to_load_it():
         "docstring",  # required, and it is the goal
         "start with `/`",  # path validation
         "(path, method)",  # duplicate-route rule
+        "OpenAPI `operationId`",  # stable endpoint-derived schema identifier
         "TYPE_CHECKING",  # unresolvable annotations are rejected
         "unbound method",  # capability must be bound
         "stream=True",  # not implemented, raises
