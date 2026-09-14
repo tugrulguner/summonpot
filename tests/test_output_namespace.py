@@ -1,7 +1,7 @@
 """Output models must have one unambiguous emitted JSON namespace."""
 
 import asyncio
-from typing import Any, TypedDict
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,6 +17,7 @@ from pydantic import (
     model_serializer,
 )
 from pydantic.dataclasses import dataclass
+from typing_extensions import TypedDict
 
 from summonpot import Exactly, FromRequest, Operation, Required, Summon
 from summonpot._output_validation import _compile_output_validator
