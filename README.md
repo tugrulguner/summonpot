@@ -335,6 +335,29 @@ visible to the agent. Request values on agentic paths still appear in the agent'
 message; tool-schema hiding is not prompt secrecy. Other operation shapes remain on the
 legacy agent-supplied path until their execution semantics ship. Every operation must still
 enforce authorization.
+
+Before either supported path invokes the capability, each injected `FromRequest` value is
+checked strictly against its receiving operation parameter, including `Annotated`
+constraints. A broader request contract therefore does not authorize a narrower operation
+parameter. The check runs strictly before application code starts and rejects coercion: a
+valid canonical validated request value is passed through unchanged, not replaced by a
+coerced value. It does not rerun request-model validators.
+
+The supported receiver vocabulary is exact primitive types with common non-transforming
+numeric constraints and non-pattern string constraints, primitive `Literal` values with
+exact-type semantics, unions when any branch safely matches, recursively checked built-in
+containers, and structurally checked Pydantic model instances. The predicate uses unbound
+built-in container operations, does not rebuild sets or dictionaries, and never calls a
+serializer. Receiver models with typed `extra="allow"` fields have those extras checked
+structurally too. Bare Decimal receivers require finite values before bounds or
+`multiple_of` are checked. Decimal `allow_inf_nan=True`, float `multiple_of`, enum receiver
+contracts, callable discriminators, and string `pattern` constraints are rejected at
+registration because the hook-free predicate cannot reproduce their semantics exactly;
+non-pattern string constraints remain supported. Integer and finite Decimal `multiple_of`
+constraints remain supported. Receiver schemas containing custom functional validators
+(`BeforeValidator`, `AfterValidator`, `WrapValidator`, or `PlainValidator`), transforming
+string constraints, custom literal values, custom instance-checking metaclasses, or
+unsupported core schemas are rejected at registration rather than silently stripped.
 Pass exact operations, never raw database sessions, engines, connections, cursors,
 arbitrary SQL, shell access, or ambient filesystem authority.
 

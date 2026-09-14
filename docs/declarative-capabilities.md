@@ -176,6 +176,29 @@ the agent may call only that set. For one required `Exactly(1)` operation using
 - a second start is rejected before application code; and
 - invalid `output=` data does not satisfy `Required` and is not retried automatically.
 
+On both the direct and agent-backed forms of this supported slice, every injected
+`FromRequest` value is checked against its receiving operation parameter, including
+`Annotated` primitive constraints, strictly before application code starts. The check is
+noncoercive: a broader request contract cannot satisfy a narrower receiver by conversion.
+When the check succeeds, the canonical validated request value is passed unchanged, not
+replaced by a coerced value, and request-model validators are not rerun.
+
+The supported receiver vocabulary is exact primitive types with common non-transforming
+numeric constraints and non-pattern string constraints, primitive `Literal` values with
+exact-type semantics, unions when any branch safely matches, recursively checked built-in
+containers, and structurally checked Pydantic model instances. The predicate uses unbound
+built-in container operations, does not rebuild sets or dictionaries, and never calls a
+serializer. Receiver models with typed `extra="allow"` fields have those extras checked
+structurally too. Bare Decimal receivers require finite values before bounds or
+`multiple_of` are checked. Decimal `allow_inf_nan=True`, float `multiple_of`, enum receiver
+contracts, callable discriminators, and string `pattern` constraints are rejected at
+registration because the hook-free predicate cannot reproduce their semantics exactly;
+non-pattern string constraints remain supported. Integer and finite Decimal `multiple_of`
+constraints remain supported. Receiver schemas containing custom functional validators
+(`BeforeValidator`, `AfterValidator`, `WrapValidator`, or `PlainValidator`), transforming
+string constraints, custom literal values, custom instance-checking metaclasses, or
+unsupported core schemas are rejected at registration rather than silently stripped.
+
 Broader operation shapes retain their existing model-supplied argument behavior until the
 complete graph semantics ship. In particular, `FromResult`, `FromContext`, `after`, and
 collection-backed choices are still declarations rather than runtime injection. Continue

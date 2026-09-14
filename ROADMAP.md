@@ -41,6 +41,13 @@ The current release line provides:
 - Ellipsis declaration bodies that avoid abstract-method semantics, with direct Python calls rejected at the decorator boundary.
 - Immutable `Operation` declarations with `FromRequest`, `FromResult`, `FromContext`, and `AgentChoice` argument sources.
 - Runtime enforcement for one required `Exactly(1)` operation using `FromRequest`, direct `AgentChoice`, or callable defaults: trusted arguments are hidden and injected, the one start is reserved before invocation, and declared output is locally validated before success.
+- Receiving-operation constraint validation is shipped for injected `FromRequest` values in
+  that supported direct and agent-backed slice. The runtime checks each receiving operation
+  parameter strictly before application code, rejects coercion, preserves the canonical
+  validated request value, and does not rerun request-model validators. The closed hook-free
+  vocabulary accepts finite Decimal values and non-pattern string length constraints while
+  rejecting non-finite bare Decimals, Decimal `allow_inf_nan=True`, callable discriminators,
+  and string patterns at registration.
 - Single-operation deterministic execution when the endpoint uses a Pydantic request model,
   that slice has no `AgentChoice`, contains at
   least one `FromRequest` binding, uses only `FromRequest` or immutable identity-stable
@@ -127,10 +134,6 @@ Close the gaps in existing declarations before adding result chains:
   capability must not remove enforcement from an existing operation. Preserve legacy
   model-supplied arguments only for bare capabilities without unsupported explicit constraints;
   do not add a strict-mode switch.
-- Define how receiving operation constraints are checked before application code runs,
-  without silently transforming canonical bound values or unexpectedly rerunning application
-  validators. Request validation alone must not imply compatibility with a narrower operation
-  parameter contract.
 - Keep canonical validated request values separate from model-facing representations. Remove
   application copy, serialization, and string-rendering hooks from the authoritative handoff;
   render model input only when agent execution needs it. Preserve aliases, defaults, custom
@@ -149,8 +152,8 @@ Close the gaps in existing declarations before adding result chains:
 
 Acceptance requires registration checks and real HTTP probes for the relevant boundaries,
 including a second-capability regression, invalid source rejection, unsupported runtime
-call-bound rejection, narrower receiving
-constraints, mutating serializers, output alias collisions, and sensitive failure logging.
+call-bound rejection, receiving operation constraints, mutating serializers, output alias
+collisions, and sensitive failure logging.
 Keep fixes independently reviewable; a copy-hook fix alone is not completion of the transport
 boundary.
 

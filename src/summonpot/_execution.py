@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
@@ -42,6 +42,16 @@ class _RequestValues(dict[str, Any]):
 class _CompiledBinding:
     argument: str
     source: Any
+    validator: _CompiledReceivingValidator | None
+
+
+@dataclass(frozen=True, slots=True)
+class _CompiledReceivingValidator:
+    predicate: Callable[[Any, set[tuple[int, int]]], bool]
+
+    def accepts(self, value: Any) -> bool:
+        """Inspect the canonical value without transforming or copying it."""
+        return self.predicate(value, set())
 
 
 @dataclass(frozen=True, slots=True)
@@ -382,6 +392,368 @@ def _is_immutable_default(value: Any) -> bool:
     return False
 
 
+_ReceivingPredicate = Callable[[Any, set[tuple[int, int]]], bool]
+_LITERAL_TYPES = (type(None), bool, int, float, str, bytes)
+
+
+def _class_is_in_mro(value: Any, expected: type[Any]) -> bool:
+    """Perform an instance check without a custom metaclass __instancecheck__."""
+    value_type = type(value)
+    return any(
+        base is expected for base in type.__getattribute__(value_type, "__mro__")
+    )
+
+
+def _length_ok(length: int, schema: Mapping[str, Any]) -> bool:
+    minimum = schema.get("min_length")
+    maximum = schema.get("max_length")
+    return (minimum is None or length >= minimum) and (
+        maximum is None or length <= maximum
+    )
+
+
+def _number_ok(value: Any, schema: Mapping[str, Any]) -> bool:
+    if schema.get("allow_inf_nan") is False:
+        finite = value.is_finite() if type(value) is Decimal else math.isfinite(value)
+        if not finite:
+            return False
+    for key, operation in (
+        ("gt", lambda left, right: left > right),
+        ("ge", lambda left, right: left >= right),
+        ("lt", lambda left, right: left < right),
+        ("le", lambda left, right: left <= right),
+    ):
+        boundary = schema.get(key)
+        if boundary is not None and not operation(value, boundary):
+            return False
+    multiple = schema.get("multiple_of")
+    return multiple is None or value % multiple == 0
+
+
+def _seen_before(value: Any, token: int, seen: set[tuple[int, int]]) -> bool:
+    marker = (id(value), token)
+    if marker in seen:
+        return True
+    seen.add(marker)
+    return False
+
+
+def _unsupported_receiver(message: str) -> TypeError:
+    return TypeError(f"Unsupported receiving parameter contract: {message}.")
+
+
+def _require_supported_schema_keys(
+    schema: Mapping[str, Any], allowed: set[str]
+) -> None:
+    bookkeeping = {"type", "strict", "ref", "metadata", "serialization"}
+    unsupported = set(schema).difference(bookkeeping, allowed)
+    if unsupported:
+        names = ", ".join(sorted(unsupported))
+        raise _unsupported_receiver(f"constraints {names} are not supported")
+
+
+def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
+    """Compile the hook-free core-schema subset used for receiving checks."""
+    definitions: dict[str, Any] = {}
+    references: dict[str, _ReceivingPredicate] = {}
+
+    def compile_node(node: Any) -> _ReceivingPredicate:
+        if type(node) is not dict or type(node.get("type")) is not str:
+            raise _unsupported_receiver("invalid Pydantic core schema")
+        kind = node["type"]
+
+        if kind.startswith("function-"):
+            raise _unsupported_receiver(
+                "custom functional validators are not hook-free"
+            )
+        if kind == "definitions":
+            for definition in node.get("definitions", ()):
+                reference = definition.get("ref")
+                if type(reference) is str:
+                    definitions[reference] = definition
+            return compile_node(node["schema"])
+        if kind == "definition-ref":
+            reference = node["schema_ref"]
+            existing = references.get(reference)
+            if existing is not None:
+                return existing
+            holder: list[_ReceivingPredicate] = []
+
+            def deferred(value: Any, seen: set[tuple[int, int]]) -> bool:
+                return holder[0](value, seen)
+
+            references[reference] = deferred
+            target = definitions.get(reference)
+            if target is None:
+                raise _unsupported_receiver("unresolved recursive schema reference")
+            holder.append(compile_node(target))
+            return deferred
+        if kind in {"default", "nullable", "custom-error"}:
+            child = compile_node(node["schema"])
+            if kind == "nullable":
+                return lambda value, seen: value is None or child(value, seen)
+            return child
+        if kind == "lax-or-strict":
+            return compile_node(node["strict_schema"])
+        if kind == "json-or-python":
+            return compile_node(node["python_schema"])
+        if kind == "any":
+            return lambda value, seen: True
+        if kind == "none":
+            return lambda value, seen: value is None
+
+        exact_types: dict[str, type[Any]] = {
+            "bool": bool,
+            "bytes": bytes,
+            "complex": complex,
+            "date": date,
+            "datetime": datetime,
+            "decimal": Decimal,
+            "float": float,
+            "int": int,
+            "str": str,
+            "time": time,
+            "timedelta": timedelta,
+            "uuid": UUID,
+        }
+        if kind in exact_types:
+            expected = exact_types[kind]
+            if kind == "float" and node.get("multiple_of") is not None:
+                raise _unsupported_receiver(
+                    "float multiple_of constraints are not supported"
+                )
+            if kind == "decimal" and node.get("allow_inf_nan") is True:
+                raise _unsupported_receiver(
+                    "Decimal allow_inf_nan=True is not supported"
+                )
+            allowed_constraints = {
+                "int": {"gt", "ge", "lt", "le", "multiple_of"},
+                "float": {
+                    "gt",
+                    "ge",
+                    "lt",
+                    "le",
+                    "multiple_of",
+                    "allow_inf_nan",
+                },
+                "decimal": {
+                    "gt",
+                    "ge",
+                    "lt",
+                    "le",
+                    "multiple_of",
+                    "allow_inf_nan",
+                },
+                "str": {"min_length", "max_length", "pattern"},
+                "bytes": {"min_length", "max_length"},
+                # Parsing precision has no effect on an already-canonical object.
+                "datetime": {"microseconds_precision"},
+                "time": {"microseconds_precision"},
+                "timedelta": {"microseconds_precision"},
+                "uuid": {"version"},
+            }
+            _require_supported_schema_keys(node, allowed_constraints.get(kind, set()))
+            if kind == "str" and node.get("pattern") is not None:
+                raise _unsupported_receiver(
+                    "string pattern constraints are not supported"
+                )
+
+            def scalar(value: Any, seen: set[tuple[int, int]]) -> bool:
+                if type(value) is not expected:
+                    return False
+                if kind == "decimal" and not Decimal.is_finite(value):
+                    return False
+                if kind in {"int", "float", "decimal"} and not _number_ok(value, node):
+                    return False
+                if kind in {"str", "bytes"} and not _length_ok(len(value), node):
+                    return False
+                version = node.get("version")
+                return not (
+                    kind == "uuid" and version is not None and value.version != version
+                )
+
+            return scalar
+        if kind == "literal":
+            expected_values = tuple(node.get("expected", ()))
+            if any(type(item) not in _LITERAL_TYPES for item in expected_values):
+                raise _unsupported_receiver(
+                    "non-primitive Literal values are not hook-free"
+                )
+
+            def literal(value: Any, seen: set[tuple[int, int]]) -> bool:
+                return any(
+                    type(value) is type(expected) and value == expected
+                    for expected in expected_values
+                )
+
+            return literal
+        if kind in {"union", "tagged-union"}:
+            if kind == "tagged-union" and callable(node.get("discriminator")):
+                raise _unsupported_receiver("callable discriminators are not hook-free")
+            raw_choices = (
+                node.get("choices", ())
+                if kind == "union"
+                else tuple(node.get("choices", {}).values())
+            )
+            choices = tuple(
+                compile_node(choice[0] if type(choice) is tuple else choice)
+                for choice in raw_choices
+            )
+            return lambda value, seen: any(
+                choice(value, set(seen)) for choice in choices
+            )
+        if kind == "is-instance":
+            expected_class = node["cls"]
+            if type(expected_class) is not type:
+                raise _unsupported_receiver(
+                    "custom instance-checking metaclasses are not supported"
+                )
+            return lambda value, seen: _class_is_in_mro(value, expected_class)
+        if kind == "enum":
+            raise _unsupported_receiver("enum contracts are not supported")
+        if kind in {"list", "set", "frozenset"}:
+            expected_class = {"list": list, "set": set, "frozenset": frozenset}[kind]
+            length = {
+                "list": list.__len__,
+                "set": set.__len__,
+                "frozenset": frozenset.__len__,
+            }[kind]
+            iterator = {
+                "list": list.__iter__,
+                "set": set.__iter__,
+                "frozenset": frozenset.__iter__,
+            }[kind]
+            child = compile_node(node.get("items_schema", {"type": "any"}))
+            token = id(node)
+
+            def collection(value: Any, seen: set[tuple[int, int]]) -> bool:
+                if not _class_is_in_mro(value, expected_class):
+                    return False
+                if not _length_ok(length(value), node):
+                    return False
+                if _seen_before(value, token, seen):
+                    return True
+                return all(child(item, seen) for item in iterator(value))
+
+            return collection
+        if kind == "tuple":
+            children = tuple(
+                compile_node(item) for item in node.get("items_schema", ())
+            )
+            variadic = node.get("variadic_item_index")
+            token = id(node)
+
+            def tuple_value(value: Any, seen: set[tuple[int, int]]) -> bool:
+                if not _class_is_in_mro(value, tuple) or not _length_ok(
+                    tuple.__len__(value), node
+                ):
+                    return False
+                if _seen_before(value, token, seen):
+                    return True
+                items = tuple.__iter__(value)
+                if variadic is not None:
+                    return all(children[variadic](item, seen) for item in items)
+                if tuple.__len__(value) != len(children):
+                    return False
+                return all(
+                    child(item, seen)
+                    for child, item in zip(children, items, strict=True)
+                )
+
+            return tuple_value
+        if kind == "dict":
+            key_predicate = compile_node(node.get("keys_schema", {"type": "any"}))
+            value_predicate = compile_node(node.get("values_schema", {"type": "any"}))
+            token = id(node)
+
+            def dictionary(value: Any, seen: set[tuple[int, int]]) -> bool:
+                if not _class_is_in_mro(value, dict) or not _length_ok(
+                    dict.__len__(value), node
+                ):
+                    return False
+                if _seen_before(value, token, seen):
+                    return True
+                return all(
+                    key_predicate(key, seen) and value_predicate(item, seen)
+                    for key, item in dict.items(value)
+                )
+
+            return dictionary
+        if kind == "model-field":
+            return compile_node(node["schema"])
+        if kind == "model-fields":
+            fields = tuple(
+                (name, compile_node(field_schema))
+                for name, field_schema in node.get("fields", {}).items()
+            )
+
+            def model_fields(value: Any, seen: set[tuple[int, int]]) -> bool:
+                if type(value) is not dict:
+                    return False
+                for name, predicate in fields:
+                    if not dict.__contains__(value, name) or not predicate(
+                        dict.__getitem__(value, name), seen
+                    ):
+                        return False
+                return True
+
+            return model_fields
+        if kind == "model":
+            model_class = node["cls"]
+            child = compile_node(node["schema"])
+            model_schema = node["schema"]
+            extra_behavior = node.get("config", {}).get("extra_fields_behavior")
+            extras_schema = (
+                model_schema.get("extras_schema")
+                if type(model_schema) is dict
+                and model_schema.get("type") == "model-fields"
+                else None
+            )
+            extra_predicate = (
+                compile_node(extras_schema)
+                if extras_schema is not None
+                else lambda value, seen: True
+            )
+            token = id(node)
+
+            def model(value: Any, seen: set[tuple[int, int]]) -> bool:
+                if not _class_is_in_mro(value, model_class):
+                    return False
+                if _seen_before(value, token, seen):
+                    return True
+                values = object.__getattribute__(value, "__dict__")
+                if node.get("root_model"):
+                    return (
+                        type(values) is dict
+                        and dict.__contains__(values, "root")
+                        and child(dict.__getitem__(values, "root"), seen)
+                    )
+                if not child(values, seen):
+                    return False
+                extras = object.__getattribute__(value, "__pydantic_extra__")
+                if extras is None:
+                    return True
+                if type(extras) is not dict:
+                    return False
+                if extra_behavior != "allow":
+                    return dict.__len__(extras) == 0
+                return all(
+                    type(name) is str and extra_predicate(item, seen)
+                    for name, item in dict.items(extras)
+                )
+
+            return model
+        raise _unsupported_receiver(f"core schema type {kind!r} is not supported")
+
+    return compile_node(schema)
+
+
+def _compile_receiving_validator(annotation: Any) -> _CompiledReceivingValidator:
+    """Compile a non-transforming predicate or reject the receiver at registration."""
+    schema = TypeAdapter(annotation).core_schema
+    return _CompiledReceivingValidator(_compile_receiving_schema(schema))
+
+
 def _compile_tool(
     tool: ToolDef,
     identity: int,
@@ -390,9 +762,40 @@ def _compile_tool(
     snapshot_defaults: bool,
 ) -> _CompiledTool:
     signature, annotations = _resolved_signature(tool.fn)
+    if enforce:
+        resolved_parameters = {
+            parameter.name: parameter.annotation for parameter in tool.parameters
+        }
+        compiled_parameters: list[inspect.Parameter] = []
+        for name, parameter in signature.parameters.items():
+            annotation = resolved_parameters.get(name, parameter.annotation)
+            if isinstance(annotation, str):
+                raise _unsupported_receiver(
+                    f"annotation for parameter {name!r} could not be resolved"
+                )
+            if annotation is None and parameter.annotation is inspect.Parameter.empty:
+                annotation = inspect.Parameter.empty
+            compiled_parameters.append(parameter.replace(annotation=annotation))
+        signature = signature.replace(parameters=compiled_parameters)
+        annotations.update(
+            {
+                name: parameter.annotation
+                for name, parameter in signature.parameters.items()
+                if parameter.annotation is not inspect.Parameter.empty
+            }
+        )
     contract = tool.contract
     bindings = (
-        tuple(_CompiledBinding(name, source) for name, source in contract.bind.items())
+        tuple(
+            _CompiledBinding(
+                name,
+                source,
+                _compile_receiving_validator(signature.parameters[name].annotation)
+                if signature.parameters[name].annotation is not inspect.Parameter.empty
+                else None,
+            )
+            for name, source in contract.bind.items()
+        )
         if enforce and contract is not None and contract.bind is not None
         else ()
     )

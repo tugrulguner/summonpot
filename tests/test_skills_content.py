@@ -83,6 +83,22 @@ def test_skill_states_the_current_binding_execution_boundary():
     assert "uses a Pydantic request model" in body
     assert "Scalar request declarations also remain agent-backed" in body
     assert "copy hooks are not proof of immutability" in body
+    assert "receiving operation parameter" in body
+    assert "strictly before application code starts" in body
+    assert "not replaced by a coerced value" in body
+    assert "exact primitive types" in body
+    assert "primitive `Literal` values" in body
+    assert "structurally checked Pydantic model instances" in body
+    assert 'typed `extra="allow"` fields' in body
+    assert "float `multiple_of`" in body
+    assert "enum receiver contracts" in body
+    assert "Bare Decimal receivers require finite values" in body
+    assert "Decimal `allow_inf_nan=True`" in body
+    assert "callable discriminators" in body
+    assert "string `pattern` constraints" in body
+    assert "non-pattern string constraints remain supported" in body
+    assert "custom functional validators" in body
+    assert "rejected at registration" in body
 
 
 def test_skill_uses_the_current_ai_api_positioning_and_direct_runtime_boundary():

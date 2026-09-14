@@ -33,6 +33,10 @@ class _OperationOutputError(RuntimeError):
     """A capability returned a value outside its declared output contract."""
 
 
+class _OperationInputError(RuntimeError):
+    """An injected value failed the receiving capability parameter contract."""
+
+
 def _tracked_operation(tool: _CompiledTool) -> Any:
     """Build a model tool backed by one immutable compiled capability."""
     visible_signature = tool.visible_signature
@@ -87,11 +91,18 @@ async def _invoke_bound_operation(
     for binding in tool.bindings:
         if isinstance(binding.source, FromRequest):
             try:
-                values[binding.argument] = run.request[binding.source.field]
+                value = run.request[binding.source.field]
             except KeyError:
                 raise RuntimeError(
                     f"Required request field {binding.source.field!r} is unavailable."
                 ) from None
+            if binding.validator is not None and not binding.validator.accepts(value):
+                raise _OperationInputError(
+                    f"Capability {tool.name!r} received an injected value that "
+                    f"does not satisfy parameter {binding.argument!r}'s receiving "
+                    "parameter contract."
+                ) from None
+            values[binding.argument] = value
         elif isinstance(binding.source, AgentChoice):
             # Already validated against the model-visible signature when agent-owned.
             continue
