@@ -18,7 +18,10 @@ from weakref import ReferenceType, ref
 from pydantic import TypeAdapter
 from pydantic_core import SchemaValidator, TzInfo
 
-from summonpot._output_validation import _compile_output_validator
+from summonpot._output_validation import (
+    _compile_output_validator,
+    _reject_ambiguous_object_namespaces,
+)
 from summonpot.contracts import AgentChoice, FromRequest
 from summonpot.models import EndpointDef, ParamDef, ToolDef
 
@@ -278,6 +281,17 @@ def _compile_endpoint(
 ) -> _CompiledEndpoint:
     """Snapshot validated endpoint metadata into an immutable runtime plan."""
     source_tools = tuple(endpoint.tools)
+    output_shapes = [
+        endpoint.output_model,
+        *(
+            tool.contract.output
+            for tool in source_tools
+            if tool.contract is not None and tool.contract.output is not None
+        ),
+    ]
+    for output in output_shapes:
+        if output is not None:
+            _reject_ambiguous_object_namespaces(TypeAdapter(output).core_schema)
     enforce_index = _bound_exact_tool_index(source_tools)
     direct_index = (
         _direct_tool_index(endpoint, source_tools, enforce_index)

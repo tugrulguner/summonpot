@@ -210,6 +210,19 @@ Runtime-enforced output schemas must not define a custom model `__init__`, inclu
 nested models. Registration rejects that unsupported constructor path rather than
 allowing it to bypass nested output validation. Use Pydantic model validators instead.
 
+Output object keys must be unambiguous. Registration checks aliases, serialization aliases,
+or computed fields in their respective namespaces for every endpoint response model and every
+declared operation `output=` shape, including unsupported and multi-operation runtime shapes.
+Enabled direct validation aliases cannot claim the same input key under the model's configured
+validation policy; declared fields,
+serialization aliases, and computed fields cannot emit the same JSON key, including inside
+nested models, dataclasses, and typed dictionaries. This admission does not provide runtime
+structural validation for broader graphs, whose execution remains unsupported. For a model with
+`extra="allow"` on a runtime-enforced path, validation rejects an extra from an instance or
+raw mapping after construction if it shadows a canonical field name or emitted alias, while
+preserving and validating noncolliding extras. The check does not invoke application
+serializers, copy hooks, `repr`, or `str`.
+
 HTTP request validation runs once. The adapter transfers a private, plan-bound validated
 value graph to the runtime rather than revalidating its JSON prompt representation or
 calling application-defined copy hooks. Mutable compatibility views cannot change bound
