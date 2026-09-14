@@ -122,7 +122,12 @@ def _separate_model_extras(model: dict[str, Any]) -> dict[str, Any]:
     )
 
 
-def _revalidating_schema(node: Any) -> Any:
+def _revalidating_schema(
+    node: Any,
+    *,
+    reject_custom_init: bool = True,
+    structural_only: bool = False,
+) -> Any:
     """Copy schema containers, retaining classes, hooks and definition references.
 
     Model instances hold canonical field names; mappings must retain their
@@ -131,12 +136,27 @@ def _revalidating_schema(node: Any) -> Any:
     globally. Any schemas deliberately remain Any: do not traverse runtime data.
     """
     if isinstance(node, dict):
-        if node.get("type") == "model" and node.get("custom_init"):
+        if structural_only and str(node.get("type", "")).startswith("function-"):
+            inner = node.get("schema")
+            return (
+                core_schema.any_schema()
+                if inner is None
+                else _revalidating_schema(
+                    inner,
+                    reject_custom_init=reject_custom_init,
+                    structural_only=True,
+                )
+            )
+        if (
+            reject_custom_init
+            and node.get("type") == "model"
+            and node.get("custom_init")
+        ):
             # Core invokes custom constructors even with _use_prebuilt=False.
             # A normal super().__init__ call then re-enters the original class
             # validator, bypassing our nested instance revalidation. Disabling
             # custom_init would silently discard mapping-input transformations;
-            # reject the unsupported contract at registration instead.
+            # reject the unsupported output contract at registration instead.
             cls = node["cls"]
             raise TypeError(
                 f"Output model {cls.__qualname__!r} uses a custom __init__, which "
@@ -147,7 +167,11 @@ def _revalidating_schema(node: Any) -> Any:
         result = {
             key: value
             if is_schema and key in {"default", "metadata", "config", "serialization"}
-            else _revalidating_schema(value)
+            else _revalidating_schema(
+                value,
+                reject_custom_init=reject_custom_init,
+                structural_only=structural_only,
+            )
             for key, value in node.items()
         }
         if (
@@ -157,6 +181,8 @@ def _revalidating_schema(node: Any) -> Any:
         ):
             return result
         result["revalidate_instances"] = "always"
+        if structural_only and node.get("type") == "model":
+            result["custom_init"] = False
         config = {**result.get("config", {}), "revalidate_instances": "always"}
         result["config"] = config
         reference = result.pop("ref", None)
@@ -182,9 +208,23 @@ def _revalidating_schema(node: Any) -> Any:
             branch["ref"] = reference
         return branch
     if isinstance(node, list):
-        return [_revalidating_schema(value) for value in node]
+        return [
+            _revalidating_schema(
+                value,
+                reject_custom_init=reject_custom_init,
+                structural_only=structural_only,
+            )
+            for value in node
+        ]
     if isinstance(node, tuple):
-        return tuple(_revalidating_schema(value) for value in node)
+        return tuple(
+            _revalidating_schema(
+                value,
+                reject_custom_init=reject_custom_init,
+                structural_only=structural_only,
+            )
+            for value in node
+        )
     return node
 
 
@@ -194,3 +234,56 @@ def _compile_output_validator(adapter: TypeAdapter[Any]) -> SchemaValidator:
     # REQUIRED: prebuilt class validators bypass our nested model branches and
     # revalidation policy. This private flag is covered by nested/recursive tests.
     return SchemaValidator(schema, _use_prebuilt=False)
+
+
+def _compile_input_validator(adapter: TypeAdapter[Any]) -> SchemaValidator:
+    """Compile request admission while preserving Pydantic custom constructors."""
+    source = adapter.core_schema
+    if _contains_custom_init(source):
+        # Apply custom constructors and request validators once, then inspect the
+        # result structurally without replaying application hooks. The second pass
+        # catches model_construct instances accepted by the class validator.
+        structural = cast(
+            core_schema.CoreSchema,
+            _revalidating_schema(
+                source,
+                reject_custom_init=False,
+                structural_only=True,
+            ),
+        )
+
+        def validate_structure(value: Any, handler: Any) -> Any:
+            handler(value)
+            return value
+
+        schema = core_schema.chain_schema(
+            [
+                cast(core_schema.CoreSchema, source),
+                core_schema.no_info_wrap_validator_function(
+                    validate_structure, structural
+                ),
+            ]
+        )
+    else:
+        schema = cast(
+            core_schema.CoreSchema,
+            _revalidating_schema(source, reject_custom_init=False),
+        )
+    return SchemaValidator(schema, _use_prebuilt=False)
+
+
+def _contains_custom_init(node: Any) -> bool:
+    if isinstance(node, dict):
+        if node.get("type") == "model" and node.get("custom_init"):
+            return True
+        is_schema = isinstance(node.get("type"), str)
+        return any(
+            _contains_custom_init(value)
+            for key, value in node.items()
+            if not (
+                is_schema and key in {"default", "metadata", "config", "serialization"}
+            )
+        )
+    if isinstance(node, (list, tuple)):
+        return any(_contains_custom_init(value) for value in node)
+    return False

@@ -106,6 +106,13 @@ keeping unsupported values inert.
 This release does not broaden runtime enforcement to multi-operation graphs. The remaining
 enforce-or-reject, input/output, failure, and deadline semantics stay in milestone 1 below.
 
+### Unreleased / next release boundary
+
+Raw runtime mappings use the declared request contract for the same required-field, default,
+alias, and canonical-value semantics as HTTP without rerunning the HTTP adapter's one-shot
+validation. Parameterless endpoints compile an explicit empty raw contract, rejecting
+undeclared keys before application hooks or model execution.
+
 ## Next milestones
 
 The ordering below prioritizes complete, enforceable contracts before expanding execution.
@@ -135,8 +142,6 @@ Close the gaps in existing declarations before adding result chains:
   application copy, serialization, and string-rendering hooks from the authoritative handoff;
   render model input only when agent execution needs it. Preserve aliases, defaults, custom
   runtime compatibility, and the validate-once boundary through explicit tests.
-- Align raw runtime input validation with HTTP required-field, default, and canonical-value
-  semantics, including scalar declarations.
 - Prevent output extras and serialization aliases from shadowing validated fields or producing
   duplicate JSON keys. Unsupported output shapes should fail explicitly rather than weakening
   validation. Keep private Pydantic integration isolated and dependency upgrades gated by the

@@ -139,6 +139,12 @@ validated Python values. This does not change the HTTP adapter's earlier body se
 or path-parameter rendering.
 As with any Pydantic application validator, code that retains and later mutates an object
 it returned remains application-owned behavior rather than a second request input.
+Raw `Runtime.call` mappings use the endpoint's declared request contract once, matching HTTP
+required fields, defaults, aliases, and canonical typed values for Pydantic request models
+and individual parameters. Unlike the body adapter's model-facing rendering, raw runtime
+preparation does not call declared field serializers, application copy hooks, or string hooks.
+For a parameterless endpoint the raw contract is explicitly empty: undeclared keys are rejected
+before model execution or application value hooks, while HTTP exposes no request fields.
 
 Output from runtime-enforced operations is validated against its declared schema without
 invoking serializers. Custom model `__init__` methods in these output schemas (including

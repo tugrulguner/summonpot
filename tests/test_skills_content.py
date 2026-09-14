@@ -111,6 +111,18 @@ def test_skill_documents_supported_request_declaration_shapes():
     assert "scalar or sequences-of-scalars query parameters" in body_lower
 
 
+def test_skill_documents_raw_runtime_and_http_input_parity():
+    body = " ".join(skill_body().split())
+
+    assert "Raw `Runtime.call` mappings use the same declared input contract" in body
+    assert "required fields, defaults, aliases, and canonical typed values" in body
+    assert "HTTP validation remains a one-shot handoff" in body
+    assert "does not rerun request validators" in body
+    assert "does not call field serializers or application copy/string hooks" in body
+    assert "Parameterless endpoints accept only an empty raw mapping" in body
+    assert "before model execution" in body
+
+
 def test_skill_documents_runtime_extras_and_safe_network_exposure():
     body = " ".join(skill_body().split())
 

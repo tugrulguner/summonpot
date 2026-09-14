@@ -46,6 +46,27 @@ def test_count_type_validation_is_shipped_not_future_runtime_enforcement():
     assert "invalid source/count rejection" not in planned
 
 
+def test_raw_runtime_input_parity_is_unreleased_not_part_of_080_history():
+    text = " ".join(ROADMAP.read_text(encoding="utf-8").split())
+    shipped = text.split("## Shipped foundation", 1)[1].split("### 0.5.0 boundary", 1)[
+        0
+    ]
+    released_080 = text.split("### 0.8.0 boundary", 1)[1].split(
+        "### Unreleased / next release boundary", 1
+    )[0]
+    unreleased = text.split("### Unreleased / next release boundary", 1)[1].split(
+        "## Next milestones", 1
+    )[0]
+
+    for behavior in (
+        "Raw runtime mappings use the declared request contract",
+        "Parameterless endpoints compile an explicit empty raw contract",
+    ):
+        assert behavior not in released_080
+        assert behavior in unreleased
+    assert "Matching raw `Runtime.call` input validation" not in shipped
+
+
 def test_context_slices_require_their_actual_execution_prerequisites():
     text = " ".join(ROADMAP.read_text(encoding="utf-8").split())
     basic = text.split("#### A1.", 1)[1].split("#### A2.", 1)[0]

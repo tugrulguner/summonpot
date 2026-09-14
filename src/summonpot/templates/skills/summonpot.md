@@ -229,6 +229,14 @@ prompt receives its own detached projection, while bound operations retain the e
 validated Python values. This does not change the HTTP adapter's earlier body serialization
 or path-parameter rendering.
 Raw runtime inputs still undergo validation; ordinary request wrappers are not trusted.
+Raw `Runtime.call` mappings use the same declared input contract for required fields,
+defaults, aliases, and canonical typed values, whether the endpoint declares a Pydantic
+request model or individual parameters. HTTP validation remains a one-shot handoff: runtime
+preparation does not rerun request validators. Raw preparation does not call field serializers
+or application copy/string hooks when it builds the model-facing prompt projection.
+Parameterless endpoints accept only an empty raw mapping; undeclared raw keys are rejected
+before model execution or application value hooks can run. Their HTTP routes still expose no
+request fields.
 
 
 Supported immutable callable defaults are exact built-in `None`, `bool`, `int`,
