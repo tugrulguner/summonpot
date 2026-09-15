@@ -260,11 +260,20 @@ def _has_nested_model_instance(
     if kind not in (dict, list, tuple, set, frozenset):
         return False
     identity = id(value)
-    if identity in ancestors or len(ancestors) >= 64:
+    if identity in ancestors:
         return False
+    if len(ancestors) >= 64:
+        # The scan cannot prove a deeper application-owned graph safe. Reject
+        # before a custom constructor can observe it rather than fail open.
+        return True
     ancestors = ancestors | {identity}
-    values = value.values() if kind is dict else value
-    return any(_has_nested_model_instance(item, ancestors) for item in values)
+    if kind is dict:
+        return any(
+            _has_nested_model_instance(key, ancestors)
+            or _has_nested_model_instance(item, ancestors)
+            for key, item in dict.items(value)
+        )
+    return any(_has_nested_model_instance(item, ancestors) for item in value)
 
 
 def _contains_custom_init(node: Any) -> bool:

@@ -569,6 +569,192 @@ def test_custom_init_rejects_coercing_nested_constructed_model():
     assert received == []
 
 
+@pytest.mark.parametrize("constructed_x", [-1, "7"])
+def test_custom_init_rejects_constructed_model_dict_keys_without_hooks(
+    constructed_x: Any,
+):
+    events: list[str] = []
+    initializations: list[dict[Any, int]] = []
+    received: list[dict[Any, int]] = []
+
+    class Inner(BaseModel):
+        model_config = {"frozen": True}
+
+        x: int = Field(gt=0)
+
+        @field_serializer("x")
+        def serialize_x(self, value: int) -> int:
+            events.append("serialize")
+            return value
+
+        def __getattribute__(self, name: str) -> Any:
+            if name == "x":
+                events.append("attribute")
+            return super().__getattribute__(name)
+
+        def __repr__(self) -> str:
+            events.append("repr")
+            return "inner"
+
+        def __eq__(self, other: object) -> bool:
+            events.append("eq")
+            return self is other
+
+        def __hash__(self) -> int:
+            events.append("hash")
+            return 1
+
+    class Request(BaseModel):
+        payload: Any
+
+        def __init__(self, *, payload: Any) -> None:
+            initializations.append(payload)
+            super().__init__(payload=payload)
+
+    def apply(payload: dict[Any, int]) -> Result:
+        received.append(payload)
+        return Result(value=len(payload))
+
+    operation = Operation(
+        apply, bind={"payload": FromRequest("payload")}, output=Result
+    )
+    summon = Summon("custom-init-dict-key-admission")
+
+    def endpoint(
+        request: Any,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> Result:
+        """Apply one dictionary after request admission."""
+        ...
+
+    endpoint.__annotations__["request"] = Request
+    summon("/dict-key")(endpoint)
+
+    key = Inner.model_construct(x=constructed_x)
+    payload = {key: 1}
+    events.clear()  # Building the dictionary necessarily hashes its key once.
+
+    with pytest.raises(ValidationError):
+        asyncio.run(Runtime().call(summon.endpoints[0], {"payload": payload}))
+
+    assert initializations == []
+    assert received == []
+    assert events == []
+
+
+def test_custom_init_rejects_raw_container_graph_beyond_scan_limit():
+    initializations: list[Any] = []
+    operation_calls: list[Any] = []
+    summon = _custom_init_payload_service(
+        "custom-init-deep-admission", initializations, operation_calls
+    )
+    payload: Any = "leaf"
+    for _ in range(64):
+        payload = [payload]
+
+    with pytest.raises(ValidationError):
+        asyncio.run(Runtime().call(summon.endpoints[0], {"payload": payload}))
+
+    assert initializations == []
+    assert operation_calls == []
+
+
+def _custom_init_payload_service(
+    name: str, initializations: list[Any], received: list[Any]
+) -> Summon:
+    class Request(BaseModel):
+        payload: Any
+
+        def __init__(self, *, payload: Any) -> None:
+            initializations.append(payload)
+            super().__init__(payload=payload)
+
+    def apply(payload: Any) -> Result:
+        received.append(payload)
+        return Result(value=1)
+
+    operation = Operation(
+        apply, bind={"payload": FromRequest("payload")}, output=Result
+    )
+    summon = Summon(name)
+
+    def endpoint(
+        request: Any,
+        result=Required(operation, calls=Exactly(1)),
+    ) -> Result:
+        """Apply one nested request value."""
+        ...
+
+    endpoint.__annotations__["request"] = Request
+    summon("/payload")(endpoint)
+    return summon
+
+
+def test_custom_init_accepts_depth_64_for_raw_and_http_once():
+    initializations: list[Any] = []
+    received: list[Any] = []
+    raw = _custom_init_payload_service("depth-boundary-raw", initializations, received)
+    http = _custom_init_payload_service(
+        "depth-boundary-http", initializations, received
+    )
+    payload: Any = "leaf"
+    # The runtime's outer parameter dictionary plus these 63 lists is the
+    # maximum 64-container path inspected by request admission.
+    for _ in range(63):
+        payload = [payload]
+
+    assert asyncio.run(
+        Runtime().call(raw.endpoints[0], {"payload": payload})
+    ) == Result(value=1)
+    assert received[0] is payload
+    assert initializations[0] is payload
+
+    response = TestClient(build_app(http)).post("/payload", json={"payload": payload})
+    assert response.status_code == 200, response.text
+    assert response.json() == {"value": 1}
+    assert len(initializations) == len(received) == 2
+
+
+def test_custom_init_accepts_ordinary_dict_for_raw_and_http_once():
+    initializations: list[Any] = []
+    received: list[Any] = []
+    raw = _custom_init_payload_service("ordinary-dict-raw", initializations, received)
+    http = _custom_init_payload_service("ordinary-dict-http", initializations, received)
+    payload = {"ordinary": [1, 2]}
+
+    assert asyncio.run(
+        Runtime().call(raw.endpoints[0], {"payload": payload})
+    ) == Result(value=1)
+    assert initializations[0] is received[0] is payload
+
+    response = TestClient(build_app(http)).post("/payload", json={"payload": payload})
+    assert response.status_code == 200, response.text
+    assert response.json() == {"value": 1}
+    assert len(initializations) == len(received) == 2
+
+
+@pytest.mark.parametrize("shared", [False, True], ids=["cycle", "shared"])
+def test_custom_init_accepts_cyclic_and_shared_builtin_graphs_without_recursing(
+    shared: bool,
+):
+    initializations: list[Any] = []
+    received: list[Any] = []
+    summon = _custom_init_payload_service(
+        f"builtin-graph-{shared}", initializations, received
+    )
+    child: list[Any] = []
+    payload = [child, child] if shared else child
+    if not shared:
+        child.append(child)
+
+    assert asyncio.run(
+        Runtime().call(summon.endpoints[0], {"payload": payload})
+    ) == Result(value=1)
+    assert initializations == [payload]
+    assert received == [payload]
+    assert initializations[0] is received[0] is payload
+
+
 def test_custom_init_model_post_init_runs_once_per_raw_and_http_request():
     post_init_calls: list[int] = []
 
