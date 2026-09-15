@@ -1,7 +1,8 @@
 """Output models must have one unambiguous emitted JSON namespace."""
 
 import asyncio
-from typing import Any
+from dataclasses import InitVar
+from typing import Annotated, Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,6 +16,7 @@ from pydantic import (
     ValidationError,
     computed_field,
     model_serializer,
+    model_validator,
 )
 from pydantic.dataclasses import dataclass
 from typing_extensions import TypedDict
@@ -34,6 +36,49 @@ class AliasedExtraOutput(BaseModel):
     value: int = Field(serialization_alias="wireValue")
 
 
+class AfterValidatorExtraOutput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    value: int = Field(serialization_alias="wireValue")
+
+    @model_validator(mode="after")
+    def add_extra(self) -> "AfterValidatorExtraOutput":
+        assert self.__pydantic_extra__ is not None
+        self.__pydantic_extra__["wireValue"] = 99
+        return self
+
+
+class WrapValidatorExtraOutput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    value: int = Field(serialization_alias="wireValue")
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def add_extra(cls, value: Any, handler: Any) -> "WrapValidatorExtraOutput":
+        result = handler(value)
+        assert result.__pydantic_extra__ is not None
+        result.__pydantic_extra__["wireValue"] = 99
+        return result
+
+
+class ValidatorSafeExtraOutput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    value: int = Field(serialization_alias="wireValue")
+
+    @model_validator(mode="after")
+    def add_after_extra(self) -> "ValidatorSafeExtraOutput":
+        assert self.__pydantic_extra__ is not None
+        self.__pydantic_extra__["afterNote"] = "safe"
+        return self
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def add_wrap_extra(cls, value: Any, handler: Any) -> "ValidatorSafeExtraOutput":
+        result = handler(value)
+        assert result.__pydantic_extra__ is not None
+        result.__pydantic_extra__["wrapNote"] = "safe"
+        return result
+
+
 class DuplicateFieldOutput(BaseModel):
     first: int = Field(serialization_alias="value")
     value: int
@@ -44,9 +89,27 @@ class DuplicateAliasOutput(BaseModel):
     value: int
 
 
+class SerializerCollisionOutput(BaseModel):
+    value: int
+
+    @model_serializer
+    def serialize(self) -> DuplicateFieldOutput:
+        return DuplicateFieldOutput.model_construct(first=self.value, value=self.value)
+
+
 class SafeAliasesOutput(BaseModel):
     first: int = Field(validation_alias="inputValue", serialization_alias="firstValue")
     value: int
+
+
+class SerializerSafeOutput(BaseModel):
+    value: int
+
+    @model_serializer
+    def serialize(self) -> SafeAliasesOutput:
+        return SafeAliasesOutput.model_validate(
+            {"inputValue": self.value, "value": self.value}
+        )
 
 
 class ComputedCollisionOutput(BaseModel):
@@ -72,6 +135,62 @@ class ComputedExtraOutput(BaseModel):
 class DataclassCollisionOutput:
     first: int = Field(serialization_alias="value")
     value: int = 0
+
+
+@dataclass
+class InitVarSerializationAliasOutput:
+    init_value: InitVar[int] = Field(serialization_alias="value")
+    value: int = 0
+
+
+@dataclass
+class InitVarValidationCollisionOutput:
+    init_value: InitVar[int] = Field(
+        validation_alias="value", serialization_alias="initValue"
+    )
+    value: int = 0
+
+
+class NestedInitVarOutput(BaseModel):
+    item: InitVarSerializationAliasOutput
+
+
+@dataclass
+class NestedDataclassCarrier:
+    item: AliasedExtraOutput
+
+    @model_validator(mode="after")
+    def add_nested_collision(self) -> "NestedDataclassCarrier":
+        assert self.item.__pydantic_extra__ is not None
+        self.item.__pydantic_extra__["wireValue"] = "hostile"
+        return self
+
+
+@dataclass
+class SafeNestedDataclassCarrier:
+    item: AliasedExtraOutput
+
+    @model_validator(mode="after")
+    def add_nested_extra(self) -> "SafeNestedDataclassCarrier":
+        assert self.item.__pydantic_extra__ is not None
+        self.item.__pydantic_extra__["note"] = "safe"
+        return self
+
+
+class NestedDataclassEnvelope(BaseModel):
+    payload: NestedDataclassCarrier
+
+
+class RootDataclassEnvelope(BaseModel):
+    payload: RootModel[NestedDataclassCarrier]
+
+
+class UnionDataclassEnvelope(BaseModel):
+    payload: NestedDataclassCarrier | int
+
+
+class SafeNestedDataclassEnvelope(BaseModel):
+    payload: SafeNestedDataclassCarrier
 
 
 class TypedDictCollisionOutput(TypedDict):
@@ -118,7 +237,7 @@ def _set_extra(model: BaseModel, **extras: Any) -> BaseModel:
     return model
 
 
-def _direct_summon(output: type[BaseModel], result: BaseModel) -> Summon:
+def _direct_summon(output: Any, result: Any) -> Summon:
     def operation(value: int) -> output:  # type: ignore[valid-type]
         return result
 
@@ -156,6 +275,31 @@ def test_extra_cannot_shadow_a_computed_field_alias():
         )
 
 
+@pytest.mark.parametrize(
+    "output",
+    [AfterValidatorExtraOutput, WrapValidatorExtraOutput],
+)
+def test_model_validators_cannot_add_colliding_extras_after_fields_join(output: Any):
+    result = output.model_construct(value=7)
+
+    with pytest.raises(ValidationError, match="wireValue"):
+        _compile_output_validator(TypeAdapter(output)).validate_python(result)
+
+
+def test_model_validators_can_add_noncolliding_extras_after_fields_join():
+    result = ValidatorSafeExtraOutput.model_construct(value=7)
+
+    validated = _compile_output_validator(
+        TypeAdapter(ValidatorSafeExtraOutput)
+    ).validate_python(result)
+
+    assert validated.model_dump(mode="json", by_alias=True) == {
+        "wireValue": 7,
+        "afterNote": "safe",
+        "wrapNote": "safe",
+    }
+
+
 def test_noncolliding_extra_preserves_alias_serialization():
     output = _set_extra(AliasedExtraOutput(value=7), note="safe")
 
@@ -191,6 +335,15 @@ def test_duplicate_declared_keys_fail_during_endpoint_registration():
         _direct_summon(DuplicateFieldOutput, result)
 
 
+def test_declared_serializer_return_schema_rejects_duplicate_emitted_keys():
+    with pytest.raises(TypeError, match="duplicate JSON key 'value'"):
+        _compile_output_validator(TypeAdapter(SerializerCollisionOutput))
+
+
+def test_declared_serializer_return_schema_with_distinct_keys_remains_supported():
+    _compile_output_validator(TypeAdapter(SerializerSafeOutput))
+
+
 def test_distinct_validation_and_serialization_aliases_remain_supported():
     validated = _compile_output_validator(
         TypeAdapter(SafeAliasesOutput)
@@ -209,6 +362,44 @@ def test_distinct_validation_and_serialization_aliases_remain_supported():
 def test_other_object_shaped_outputs_reject_duplicate_emitted_keys(output: Any):
     with pytest.raises(TypeError, match="duplicate JSON key 'value'"):
         _compile_output_validator(TypeAdapter(output))
+
+
+def test_dataclass_init_var_is_excluded_from_the_emitted_namespace():
+    validator = _compile_output_validator(TypeAdapter(NestedInitVarOutput))
+
+    validated = validator.validate_python({"item": {"init_value": 3, "value": 7}})
+
+    assert validated.model_dump(mode="json", by_alias=True) == {"item": {"value": 7}}
+
+
+def test_dataclass_init_var_remains_in_the_validation_namespace():
+    with pytest.raises(TypeError, match=r"validation.*key 'value'"):
+        _compile_output_validator(TypeAdapter(InitVarValidationCollisionOutput))
+
+
+@pytest.mark.parametrize(
+    "output,value",
+    [
+        (NestedDataclassCarrier, {"item": {"value": 7}}),
+        (RootModel[NestedDataclassCarrier], {"item": {"value": 7}}),
+        (NestedDataclassCarrier | int, {"item": {"value": 7}}),
+    ],
+)
+def test_dataclass_carrier_cannot_hide_nested_post_validation_collision(
+    output: Any, value: Any
+):
+    with pytest.raises(ValidationError, match="wireValue"):
+        _compile_output_validator(TypeAdapter(output)).validate_python(value)
+
+
+def test_dataclass_carrier_preserves_nested_noncolliding_post_validation_extra():
+    validator = _compile_output_validator(TypeAdapter(SafeNestedDataclassCarrier))
+
+    validated = validator.validate_python({"item": {"value": 7}})
+
+    assert TypeAdapter(SafeNestedDataclassCarrier).dump_python(
+        validated, mode="json", by_alias=True
+    ) == {"item": {"wireValue": 7, "note": "safe"}}
 
 
 def test_root_scalar_output_remains_supported():
@@ -260,6 +451,49 @@ def test_http_emits_each_safe_output_key_once():
     assert response.text.count('"note"') == 1
 
 
+@pytest.mark.parametrize(
+    "output,result",
+    [
+        (NestedDataclassEnvelope, {"payload": {"item": {"value": 7}}}),
+        (RootDataclassEnvelope, {"payload": {"item": {"value": 7}}}),
+        (UnionDataclassEnvelope, {"payload": {"item": {"value": 7}}}),
+    ],
+)
+def test_http_rejects_nested_dataclass_post_validation_collision(
+    output: Any, result: Any
+):
+    summon = _direct_summon(output, result)
+
+    with pytest.raises(_OperationOutputError, match="invalid declared output"):
+        asyncio.run(
+            Runtime(model="invalid:no-model").call(summon.endpoints[0], {"value": 7})
+        )
+
+    response = TestClient(
+        build_app(summon),
+        raise_server_exceptions=False,
+    ).post("/output", json={"value": 7})
+
+    assert response.status_code == 500
+    assert "hostile" not in response.text
+
+
+def test_http_emits_nested_dataclass_noncolliding_extra_once():
+    response = TestClient(
+        build_app(
+            _direct_summon(
+                SafeNestedDataclassEnvelope,
+                {"payload": {"item": {"value": 7}}},
+            )
+        )
+    ).post("/output", json={"value": 7})
+
+    assert response.status_code == 200
+    assert response.json() == {"payload": {"item": {"wireValue": 7, "note": "safe"}}}
+    assert response.text.count('"wireValue"') == 1
+    assert response.text.count('"note"') == 1
+
+
 class SeparateNamespaceCollisionOutput(BaseModel):
     first: int = Field(alias="value", serialization_alias="firstValue")
     value: int
@@ -296,6 +530,19 @@ class NestedAliasedExtraOutput(BaseModel):
     item: AliasedExtraOutput
 
 
+class AllowedExtraTypedDict(TypedDict):
+    value: Annotated[int, Field(serialization_alias="wireValue")]
+
+
+AllowedExtraTypedDict.__pydantic_config__ = ConfigDict(  # type: ignore[attr-defined]
+    extra="allow"
+)
+
+
+class NestedAllowedExtraTypedDictOutput(BaseModel):
+    item: AllowedExtraTypedDict
+
+
 def test_mapping_extra_cannot_shadow_a_declared_serialization_alias():
     with pytest.raises(ValidationError, match="wireValue"):
         _compile_output_validator(TypeAdapter(AliasedExtraOutput)).validate_python(
@@ -308,6 +555,23 @@ def test_nested_mapping_extra_cannot_shadow_a_declared_serialization_alias():
         _compile_output_validator(
             TypeAdapter(NestedAliasedExtraOutput)
         ).validate_python({"item": {"value": 7, "wireValue": "hostile"}})
+
+
+def test_nested_typed_dict_extra_cannot_shadow_a_serialization_alias():
+    with pytest.raises(ValidationError, match="wireValue"):
+        _compile_output_validator(
+            TypeAdapter(NestedAllowedExtraTypedDictOutput)
+        ).validate_python({"item": {"value": 7, "wireValue": 99}})
+
+
+def test_nested_typed_dict_noncolliding_extra_remains_supported():
+    validated = _compile_output_validator(
+        TypeAdapter(NestedAllowedExtraTypedDictOutput)
+    ).validate_python({"item": {"value": 7, "note": "safe"}})
+
+    assert validated.model_dump(mode="json", by_alias=True) == {
+        "item": {"wireValue": 7, "note": "safe"}
+    }
 
 
 def test_mapping_and_nested_mapping_noncolliding_extras_remain_supported():

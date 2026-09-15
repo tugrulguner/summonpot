@@ -240,7 +240,11 @@ def _reject_ambiguous_object_namespaces(schema: Any) -> None:
                 )
             elif node_type == "dataclass-args":
                 fields = [(field["name"], field) for field in node.get("fields", [])]
-                emitted_fields = [*fields]
+                emitted_fields = [
+                    (name, field)
+                    for name, field in fields
+                    if not field.get("init_only")
+                ]
                 emitted_fields.extend(
                     (field["property_name"], field)
                     for field in node.get("computed_fields", [])
@@ -257,6 +261,9 @@ def _reject_ambiguous_object_namespaces(schema: Any) -> None:
                         current_config and current_config.get("validate_by_name", False)
                     ),
                 )
+            serialization = node.get("serialization")
+            if isinstance(serialization, dict) and "return_schema" in serialization:
+                inspect(serialization["return_schema"], current_owner, current_config)
             for key, value in node.items():
                 if key not in {"config", "default", "metadata", "serialization"}:
                     inspect(value, current_owner, current_config)
@@ -265,6 +272,138 @@ def _reject_ambiguous_object_namespaces(schema: Any) -> None:
                 inspect(value, owner, config)
 
     inspect(schema)
+
+
+def _runtime_model_extra_collision_auditor(schema: Any) -> Any:
+    """Build a final storage audit without invoking application object hooks."""
+    dataclass_fields: list[tuple[type[Any], tuple[str, ...]]] = []
+    seen_schema: set[int] = set()
+
+    def collect_dataclasses(node: Any) -> None:
+        if isinstance(node, dict):
+            identity = id(node)
+            if identity in seen_schema:
+                return
+            seen_schema.add(identity)
+            if node.get("type") == "dataclass" and isinstance(node.get("cls"), type):
+                dataclass_fields.append((node["cls"], tuple(node.get("fields", ()))))
+            for value in dict.values(node):
+                collect_dataclasses(value)
+        elif isinstance(node, (list, tuple)):
+            for value in node:
+                collect_dataclasses(value)
+
+    collect_dataclasses(schema)
+
+    def reject(value: Any) -> Any:
+        seen: set[int] = set()
+
+        def inspect(current: Any) -> None:
+            current_type = type(current)
+            for dataclass_type, field_names in dataclass_fields:
+                if current_type is not dataclass_type:
+                    continue
+                identity = id(current)
+                if identity in seen:
+                    return
+                seen.add(identity)
+                state = object.__getstate__(current)
+                storages = (
+                    (state,)
+                    if isinstance(state, dict)
+                    else tuple(item for item in state if isinstance(item, dict))
+                    if isinstance(state, tuple)
+                    else ()
+                )
+                for name in field_names:
+                    for storage in storages:
+                        if name in storage:
+                            inspect(dict.__getitem__(storage, name))
+                            break
+                return
+
+            if isinstance(current, BaseModel):
+                identity = id(current)
+                if identity in seen:
+                    return
+                seen.add(identity)
+                model_type = type(current)
+                emitted = {
+                    field.serialization_alias or name
+                    for name, field in model_type.model_fields.items()
+                    if not field.exclude
+                }
+                emitted.update(
+                    field.alias or name
+                    for name, field in model_type.model_computed_fields.items()
+                )
+                extras = object.__getattribute__(current, "__pydantic_extra__") or {}
+                shadowed = (set(model_type.model_fields) | emitted).intersection(extras)
+                if shadowed:
+                    names = ", ".join(repr(name) for name in sorted(shadowed))
+                    raise ValueError(
+                        f"output extras shadow declared serialized field keys: {names}"
+                    )
+                storage = object.__getattribute__(current, "__dict__")
+                for item in dict.values(storage):
+                    inspect(item)
+                for item in dict.values(extras):
+                    inspect(item)
+            elif isinstance(current, dict):
+                identity = id(current)
+                if identity in seen:
+                    return
+                seen.add(identity)
+                for item in dict.values(current):
+                    inspect(item)
+            elif isinstance(current, list):
+                identity = id(current)
+                if identity in seen:
+                    return
+                seen.add(identity)
+                for item in list.__iter__(current):
+                    inspect(item)
+            elif isinstance(current, tuple):
+                identity = id(current)
+                if identity in seen:
+                    return
+                seen.add(identity)
+                for item in tuple.__iter__(current):
+                    inspect(item)
+
+        inspect(value)
+        return value
+
+    return reject
+
+
+def _separate_typed_dict_extras(schema: dict[str, Any]) -> dict[str, Any]:
+    """Reject extras that would duplicate declared TypedDict output keys."""
+    fields = schema.get("fields", {})
+    field_names = set(fields)
+    emitted_names = {
+        field.get("serialization_alias", name)
+        for name, field in fields.items()
+        if not field.get("serialization_exclude")
+    }
+
+    def reject(value: Any) -> Any:
+        if isinstance(value, dict):
+            extras = set(value).difference(field_names)
+            shadowed = emitted_names.intersection(extras)
+            if shadowed:
+                names = ", ".join(repr(name) for name in sorted(shadowed))
+                raise ValueError(
+                    f"output extras shadow declared serialized field keys: {names}"
+                )
+        return value
+
+    return cast(
+        dict[str, Any],
+        core_schema.no_info_after_validator_function(
+            reject, cast(core_schema.CoreSchema, schema)
+        ),
+    )
 
 
 def _revalidating_schema(node: Any) -> Any:
@@ -295,6 +434,11 @@ def _revalidating_schema(node: Any) -> Any:
             else _revalidating_schema(value)
             for key, value in node.items()
         }
+        if (
+            node.get("type") == "typed-dict"
+            and result.get("config", {}).get("extra_fields_behavior") == "allow"
+        ):
+            return _separate_typed_dict_extras(result)
         if (
             node.get("type") not in ("model", "dataclass")
             or "cls" not in node
@@ -337,7 +481,10 @@ def _revalidating_schema(node: Any) -> Any:
 def _compile_output_validator(adapter: TypeAdapter[Any]) -> SchemaValidator:
     """Compile once at registration without modifying class-owned schemas."""
     _reject_ambiguous_object_namespaces(adapter.core_schema)
-    schema = cast(core_schema.CoreSchema, _revalidating_schema(adapter.core_schema))
+    schema = core_schema.no_info_after_validator_function(
+        _runtime_model_extra_collision_auditor(adapter.core_schema),
+        cast(core_schema.CoreSchema, _revalidating_schema(adapter.core_schema)),
+    )
     # REQUIRED: prebuilt class validators bypass our nested model branches and
     # revalidation policy. This private flag is covered by nested/recursive tests.
     return SchemaValidator(schema, _use_prebuilt=False)
