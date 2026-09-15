@@ -12,10 +12,12 @@ from pydantic import (
     BaseModel,
     Field,
     ValidationError,
+    create_model,
     field_serializer,
     field_validator,
+    model_validator,
 )
-from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
+from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart, UserPromptPart
 from pydantic_ai.models.function import FunctionModel
 
 from summonpot import Exactly, FromRequest, Operation, Required, Summon
@@ -477,6 +479,13 @@ def test_custom_init_request_still_rejects_invalid_nested_constructed_model():
     class Inner(BaseModel):
         x: int
 
+        @field_validator("x")
+        @classmethod
+        def require_positive(cls, value: int) -> int:
+            if value <= 0:
+                raise ValueError("must be positive")
+            return value
+
         @field_serializer("x")
         def serialize_x(self, value: int) -> int:
             hooks.append("serialize")
@@ -526,14 +535,90 @@ def test_custom_init_request_still_rejects_invalid_nested_constructed_model():
     endpoint.__annotations__["request"] = Request
     summon("/model")(endpoint)
 
-    invalid = Inner.model_construct(x="ATTACKER")
+    invalid = Inner.model_construct(x=-1)
     with pytest.raises(ValidationError):
         asyncio.run(Runtime().call(summon.endpoints[0], {"value": invalid}))
 
-    assert len(initializations) == 1
-    assert initializations[0] is invalid
+    assert initializations == []
     assert operation_calls == []
     assert hooks == []
+
+
+def test_custom_init_rejects_coercing_nested_constructed_model():
+    initializations: list[Inner] = []
+    received: list[Any] = []
+
+    class Inner(BaseModel):
+        x: int
+
+    class Request(BaseModel):
+        value: Inner
+
+        def __init__(self, *, value: Inner) -> None:
+            initializations.append(value)
+            super().__init__(value=value)
+
+    summon = _model_service(Request, received)
+
+    with pytest.raises(ValidationError, match="equivalent mapping"):
+        asyncio.run(
+            Runtime().call(summon.endpoints[0], {"value": Inner.model_construct(x="7")})
+        )
+
+    assert initializations == []
+    assert received == []
+
+
+def test_custom_init_model_post_init_runs_once_per_raw_and_http_request():
+    post_init_calls: list[int] = []
+
+    class Request(BaseModel):
+        value: int
+
+        def __init__(self, *, value: int) -> None:
+            super().__init__(value=value)
+
+        def model_post_init(self, context: Any) -> None:
+            post_init_calls.append(self.value)
+
+    raw = _model_service(Request, [])
+    assert asyncio.run(Runtime().call(raw.endpoints[0], {"value": 3})) == Result(
+        value=3
+    )
+    assert post_init_calls == [3]
+
+    http = _model_service(Request, [])
+    response = TestClient(build_app(http)).post("/model", json={"value": 5})
+    assert response.status_code == 200, response.text
+    assert response.json() == {"value": 5}
+    assert post_init_calls == [3, 5]
+
+
+def test_recursive_custom_init_request_with_model_validator_registers():
+    class Node(BaseModel):
+        child: Node | None = None
+
+        def __init__(self, *, child: Node | None = None) -> None:
+            super().__init__(child=child)
+
+        @model_validator(mode="after")
+        def preserve_identity(self) -> Node:
+            return self
+
+    summon = Summon("recursive-custom-init")
+
+    def endpoint(request: Any) -> str:
+        """Accept a recursive request tree."""
+        ...
+
+    endpoint.__annotations__["request"] = Node
+    summon("/recursive")(endpoint)
+
+    plan = Runtime()._plan_for(summon.endpoints[0])
+    validated = plan.input_validator.validate_python({"child": {"child": None}})
+    assert isinstance(validated, Node)
+    assert isinstance(validated.child, Node)
+    assert validated.child.child is None
 
 
 def test_raw_model_validation_preserves_canonical_value_without_lossy_hooks():
@@ -853,3 +938,127 @@ def test_parameterless_empty_input_reaches_agent_for_raw_and_http():
     assert response.status_code == 200, response.text
     assert response.json() == "ready"
     assert calls == ["model", "model"]
+
+
+def test_raw_agent_prompt_projects_nested_models_like_http_without_hooks():
+    hooks: list[str] = []
+    prompts: list[str] = []
+
+    class Inner(BaseModel):
+        x: int
+
+        def __copy__(self):
+            hooks.append("copy")
+            return self
+
+        def __deepcopy__(self, memo=None):
+            hooks.append("deepcopy")
+            return self
+
+        def __repr__(self) -> str:
+            hooks.append("repr")
+            return "lossy"
+
+        def __eq__(self, other: object) -> bool:
+            hooks.append("eq")
+            return False
+
+        def __hash__(self) -> int:
+            hooks.append("hash")
+            return 0
+
+    class Request(BaseModel):
+        value: Inner
+
+    def model(messages, info):
+        prompt = next(
+            part.content
+            for message in messages
+            for part in message.parts
+            if isinstance(part, UserPromptPart)
+        )
+        assert type(prompt) is str
+        prompts.append(prompt)
+        return ModelResponse(parts=[TextPart("done")])
+
+    def service(name: str) -> Summon:
+        summon = Summon(name)
+        summon._runtime = Runtime(model=FunctionModel(model))
+
+        def endpoint(request: Any) -> str:
+            """Inspect one nested request value."""
+            ...
+
+        endpoint.__annotations__["request"] = Request
+        summon("/nested-prompt")(endpoint)
+        return summon
+
+    raw = service("nested-prompt-raw")
+    assert (
+        asyncio.run(raw._runtime.call(raw.endpoints[0], {"value": Inner(x=23)}))
+        == "done"
+    )
+
+    http = service("nested-prompt-http")
+    response = TestClient(build_app(http)).post(
+        "/nested-prompt", json={"value": {"x": 23}}
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == "done"
+    assert prompts[0] == prompts[1]
+    assert '  value: {"x": 23}' in prompts[0]
+    assert hooks == []
+
+
+@pytest.mark.parametrize("container_type", [set, frozenset])
+def test_hashed_container_of_nested_models_projects_for_raw_and_http(
+    container_type: Any,
+):
+    prompts: list[str] = []
+
+    class Inner(BaseModel):
+        model_config = {"frozen": True}
+
+        x: int
+
+    Request = create_model("Request", value=(container_type[Inner], ...))
+
+    def model(messages, info):
+        prompt = next(
+            part.content
+            for message in messages
+            for part in message.parts
+            if isinstance(part, UserPromptPart)
+        )
+        assert type(prompt) is str
+        prompts.append(prompt)
+        return ModelResponse(parts=[TextPart("done")])
+
+    def service(name: str) -> Summon:
+        summon = Summon(name)
+        summon._runtime = Runtime(model=FunctionModel(model))
+
+        def endpoint(request: Any) -> str:
+            """Inspect a hashed container of nested request values."""
+            ...
+
+        endpoint.__annotations__["request"] = Request
+        summon("/nested-set-prompt")(endpoint)
+        return summon
+
+    raw = service(f"nested-{container_type.__name__}-prompt-raw")
+    assert (
+        asyncio.run(raw._runtime.call(raw.endpoints[0], {"value": [{"x": 23}]}))
+        == "done"
+    )
+
+    http = service(f"nested-{container_type.__name__}-prompt-http")
+    response = TestClient(build_app(http), raise_server_exceptions=False).post(
+        "/nested-set-prompt", json={"value": [{"x": 23}]}
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == "done"
+    assert prompts[0] == prompts[1]
+    assert '  value: [{"x": 23}]' in prompts[0]

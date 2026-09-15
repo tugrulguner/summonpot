@@ -14,7 +14,7 @@ from dataclasses import is_dataclass
 from typing import Any, cast
 
 from pydantic import BaseModel, TypeAdapter
-from pydantic_core import SchemaValidator, core_schema
+from pydantic_core import PydanticCustomError, SchemaValidator, core_schema
 
 
 def _input_kind(value: Any) -> str:
@@ -126,7 +126,6 @@ def _revalidating_schema(
     node: Any,
     *,
     reject_custom_init: bool = True,
-    structural_only: bool = False,
 ) -> Any:
     """Copy schema containers, retaining classes, hooks and definition references.
 
@@ -136,17 +135,6 @@ def _revalidating_schema(
     globally. Any schemas deliberately remain Any: do not traverse runtime data.
     """
     if isinstance(node, dict):
-        if structural_only and str(node.get("type", "")).startswith("function-"):
-            inner = node.get("schema")
-            return (
-                core_schema.any_schema()
-                if inner is None
-                else _revalidating_schema(
-                    inner,
-                    reject_custom_init=reject_custom_init,
-                    structural_only=True,
-                )
-            )
         if (
             reject_custom_init
             and node.get("type") == "model"
@@ -170,7 +158,6 @@ def _revalidating_schema(
             else _revalidating_schema(
                 value,
                 reject_custom_init=reject_custom_init,
-                structural_only=structural_only,
             )
             for key, value in node.items()
         }
@@ -181,8 +168,6 @@ def _revalidating_schema(
         ):
             return result
         result["revalidate_instances"] = "always"
-        if structural_only and node.get("type") == "model":
-            result["custom_init"] = False
         config = {**result.get("config", {}), "revalidate_instances": "always"}
         result["config"] = config
         reference = result.pop("ref", None)
@@ -212,7 +197,6 @@ def _revalidating_schema(
             _revalidating_schema(
                 value,
                 reject_custom_init=reject_custom_init,
-                structural_only=structural_only,
             )
             for value in node
         ]
@@ -221,7 +205,6 @@ def _revalidating_schema(
             _revalidating_schema(
                 value,
                 reject_custom_init=reject_custom_init,
-                structural_only=structural_only,
             )
             for value in node
         )
@@ -240,29 +223,15 @@ def _compile_input_validator(adapter: TypeAdapter[Any]) -> SchemaValidator:
     """Compile request admission while preserving Pydantic custom constructors."""
     source = adapter.core_schema
     if _contains_custom_init(source):
-        # Apply custom constructors and request validators once, then inspect the
-        # result structurally without replaying application hooks. The second pass
-        # catches model_construct instances accepted by the class validator.
-        structural = cast(
-            core_schema.CoreSchema,
-            _revalidating_schema(
-                source,
-                reject_custom_init=False,
-                structural_only=True,
-            ),
-        )
-
-        def validate_structure(value: Any, handler: Any) -> Any:
-            handler(value)
-            return value
-
-        schema = core_schema.chain_schema(
-            [
-                cast(core_schema.CoreSchema, source),
-                core_schema.no_info_wrap_validator_function(
-                    validate_structure, structural
-                ),
-            ]
+        # Pydantic custom constructors accept nested model instances without
+        # revalidating them. A second model pass cannot repair that safely: it
+        # repeats outer hooks/post-init and can validate a converted replacement
+        # while returning the unchecked original. Reject such raw graphs before
+        # any application constructor runs; callers can provide the equivalent
+        # mapping, which follows the same one-pass path as HTTP JSON.
+        schema = core_schema.no_info_before_validator_function(
+            _reject_nested_model_instances,
+            cast(core_schema.CoreSchema, source),
         )
     else:
         schema = cast(
@@ -270,6 +239,32 @@ def _compile_input_validator(adapter: TypeAdapter[Any]) -> SchemaValidator:
             _revalidating_schema(source, reject_custom_init=False),
         )
     return SchemaValidator(schema, _use_prebuilt=False)
+
+
+def _reject_nested_model_instances(value: Any) -> Any:
+    if _has_nested_model_instance(value):
+        raise PydanticCustomError(
+            "custom_init_model_instance",
+            "raw model instances are unsupported for custom-initialized request "
+            "contracts; provide an equivalent mapping",
+        )
+    return value
+
+
+def _has_nested_model_instance(
+    value: Any, ancestors: frozenset[int] = frozenset()
+) -> bool:
+    if isinstance(value, BaseModel):
+        return True
+    kind = type(value)
+    if kind not in (dict, list, tuple, set, frozenset):
+        return False
+    identity = id(value)
+    if identity in ancestors or len(ancestors) >= 64:
+        return False
+    ancestors = ancestors | {identity}
+    values = value.values() if kind is dict else value
+    return any(_has_nested_model_instance(item, ancestors) for item in values)
 
 
 def _contains_custom_init(node: Any) -> bool:

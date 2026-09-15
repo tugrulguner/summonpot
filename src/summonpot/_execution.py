@@ -14,7 +14,7 @@ from typing import Any
 from uuid import UUID
 from weakref import ReferenceType, ref
 
-from pydantic import ConfigDict, TypeAdapter, create_model
+from pydantic import BaseModel, ConfigDict, TypeAdapter, create_model
 from pydantic_core import SchemaValidator, TzInfo
 
 from summonpot._output_validation import (
@@ -143,6 +143,29 @@ _TRANSPORT_SNAPSHOTS: dict[int, _TransportSnapshot | _ConsumedTransport] = {}
 _UNAVAILABLE = "<unavailable>"
 
 
+def _inert_hashable(value: Any) -> bool:
+    """Return whether a projected value can be hashed without application code."""
+    kind = type(value)
+    if kind in (
+        type(None),
+        bool,
+        int,
+        float,
+        str,
+        bytes,
+        date,
+        datetime,
+        time,
+        timedelta,
+        Decimal,
+        UUID,
+    ):
+        return True
+    if kind is tuple or kind is frozenset:
+        return all(_inert_hashable(item) for item in value)
+    return False
+
+
 def _inert_transport_value(
     value: Any, ancestors: frozenset[int] = frozenset(), *, native: bool = False
 ) -> Any:
@@ -167,6 +190,31 @@ def _inert_transport_value(
         return value
     if kind is float:
         return value if math.isfinite(value) else _UNAVAILABLE
+    if isinstance(value, BaseModel):
+        if id(value) in ancestors or len(ancestors) >= 64:
+            return _UNAVAILABLE
+        ancestors = ancestors | {id(value)}
+        # Read Pydantic's storage directly: model_dump, getattr, repr, copy and
+        # equality can all dispatch application code.  Declared aliases and
+        # exact built-in descendants are enough for the model-facing view.
+        storage = object.__getattribute__(value, "__dict__")
+        projected = {
+            field.serialization_alias or field.alias or name: _inert_transport_value(
+                storage[name], ancestors, native=native
+            )
+            for name, field in type(value).model_fields.items()
+            if name in storage
+        }
+        extras = object.__getattribute__(value, "__pydantic_extra__")
+        if type(extras) is dict:
+            projected.update(
+                {
+                    key: _inert_transport_value(item, ancestors, native=native)
+                    for key, item in extras.items()
+                    if type(key) is str and key not in projected
+                }
+            )
+        return projected
     if (
         (
             kind is not dict
@@ -188,6 +236,10 @@ def _inert_transport_value(
             if type(key) is str
         }
     items = [_inert_transport_value(item, ancestors, native=native) for item in value]
+    if native and kind in (set, frozenset):
+        if not all(_inert_hashable(item) for item in items):
+            return _UNAVAILABLE
+        return kind(items)
     return kind(items) if native else items
 
 

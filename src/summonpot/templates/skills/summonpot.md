@@ -216,7 +216,11 @@ calling application-defined copy hooks. Mutable compatibility views cannot chang
 operation inputs, and consumed transports cannot be replayed through request defaults.
 Compatibility projection preserves exact built-in JSON scalars and dictionaries with exact
 string keys. Exact list, tuple, set, and frozenset containers are recursively detached;
-typed views preserve their native kind, while prompts receive JSON arrays.
+typed views preserve their native kind when projected members remain safely hashable, while
+prompts receive JSON arrays. Hashed containers whose projected members are not hashable use
+the inert `"<unavailable>"` fallback instead of invoking application hash/equality hooks.
+Pydantic model values are projected from declared field storage, including aliases and
+supported nested values, without calling model serializers or representation hooks.
 Exact UUID, date, datetime, time, timedelta,
 Decimal, and bytes values remain usable: prompts receive framework-safe strings and
 custom-runtime typed views retain native values, with UUIDs independently reconstructed.
@@ -234,6 +238,9 @@ defaults, aliases, and canonical typed values, whether the endpoint declares a P
 request model or individual parameters. HTTP validation remains a one-shot handoff: runtime
 preparation does not rerun request validators. Raw preparation does not call field serializers
 or application copy/string hooks when it builds the model-facing prompt projection.
+For a custom-initialized request contract, a raw mapping containing a model instance is
+rejected before its constructor runs; provide the equivalent nested mapping so Pydantic can
+validate it once. Already validated HTTP transport graphs remain one-shot handoffs.
 Parameterless endpoints accept only an empty raw mapping; undeclared raw keys are rejected
 before model execution or application value hooks can run. Their HTTP routes still expose no
 request fields.
