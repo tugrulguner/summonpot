@@ -42,3 +42,27 @@ def test_request_copy_hook_boundary_is_documented_in_both_guides():
         assert "custom-runtime typed views retain native values" in text
         assert "UUIDs independently reconstructed" in text
         assert "application-defined timezone callbacks are not invoked" in text
+
+
+def test_output_namespace_boundary_is_documented_in_both_guides():
+    for path in (
+        ROOT / "docs/declarative-capabilities.md",
+        ROOT / "src/summonpot/templates/skills/summonpot.md",
+    ):
+        text = " ".join(path.read_text(encoding="utf-8").split())
+        assert "serialization aliases" in text
+        assert "computed fields" in text
+        assert "nested models" in text
+        assert "dataclasses" in text
+        assert "typed dictionaries" in text
+        assert 'extra="allow"' in text
+        assert "canonical field name" in text
+        assert "emitted alias" in text
+        assert "noncolliding extras" in text.lower()
+        assert "every endpoint response model" in text
+        assert "every declared operation" in text
+        assert "validation aliases" in text
+        assert "raw mapping" in text
+        assert "after" in text and "construction" in text
+        assert "runtime structural validation" in text
+        assert "unsupported" in text
