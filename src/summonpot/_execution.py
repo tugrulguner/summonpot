@@ -205,6 +205,8 @@ def _inert_transport_value(
         # equality can all dispatch application code.  Declared aliases and
         # exact built-in descendants are enough for the model-facing view.
         storage = _BASE_MODEL_DICT_DESCRIPTOR.__get__(value, kind)
+        if type(storage) is not dict:
+            return _UNAVAILABLE
         projected = {
             (
                 field.serialization_alias

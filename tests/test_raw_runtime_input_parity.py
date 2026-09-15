@@ -1303,6 +1303,74 @@ def test_nested_model_dict_descriptor_is_bypassed_for_raw_and_http_prompts():
     assert hooks == []
 
 
+def test_nested_model_hostile_dict_subclass_is_unavailable_for_raw_and_http_prompts():
+    hooks: list[str] = []
+    prompts: list[str] = []
+    base_descriptor = BaseModel.__dict__["__dict__"]
+
+    class HostileDict(dict):
+        def __contains__(self, key):
+            hooks.append("contains")
+            raise RuntimeError("application contains")
+
+        def __getitem__(self, key):
+            hooks.append("getitem")
+            raise RuntimeError("application getitem")
+
+        def __iter__(self):
+            hooks.append("iter")
+            raise RuntimeError("application iter")
+
+        def items(self):
+            hooks.append("items")
+            raise RuntimeError("application items")
+
+    class Inner(BaseModel):
+        x: int
+
+        def __init__(self, **data: Any):
+            super().__init__(**data)
+            base_descriptor.__set__(self, HostileDict(x=data["x"]))
+
+    def model(messages, info):
+        prompt = next(
+            part.content
+            for message in messages
+            for part in message.parts
+            if isinstance(part, UserPromptPart)
+        )
+        assert type(prompt) is str
+        prompts.append(prompt)
+        return ModelResponse(parts=[TextPart("done")])
+
+    def service(name: str) -> Summon:
+        summon = Summon(name)
+        summon._runtime = Runtime(model=FunctionModel(model))
+        annotation = Annotated[int, AfterValidator(lambda value: Inner(x=value))]
+
+        def endpoint(value: Any) -> str:
+            """Inspect a model without dispatching hostile storage hooks."""
+            ...
+
+        endpoint.__annotations__["value"] = annotation
+        summon("/hostile-dict-storage-prompt", method="GET")(endpoint)
+        return summon
+
+    raw = service("hostile-dict-storage-prompt-raw")
+    assert asyncio.run(raw._runtime.call(raw.endpoints[0], {"value": 23})) == "done"
+
+    http = service("hostile-dict-storage-prompt-http")
+    response = TestClient(build_app(http)).get(
+        "/hostile-dict-storage-prompt", params={"value": "23"}
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == "done"
+    assert prompts[0] == prompts[1]
+    assert '  value: "<unavailable>"' in prompts[0]
+    assert hooks == []
+
+
 def test_nested_model_extra_descriptor_is_bypassed_for_raw_and_http_prompts():
     hooks: list[str] = []
     prompts: list[str] = []
