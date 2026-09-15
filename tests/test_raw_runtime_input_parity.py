@@ -1197,6 +1197,168 @@ def test_raw_agent_prompt_projects_nested_models_like_http_without_hooks():
     assert hooks == []
 
 
+def test_nested_model_empty_alias_is_preserved_in_raw_and_http_prompts():
+    prompts: list[str] = []
+
+    class Inner(BaseModel):
+        x: int = Field(alias="")
+
+    class Request(BaseModel):
+        value: Inner
+
+    def model(messages, info):
+        prompt = next(
+            part.content
+            for message in messages
+            for part in message.parts
+            if isinstance(part, UserPromptPart)
+        )
+        assert type(prompt) is str
+        prompts.append(prompt)
+        return ModelResponse(parts=[TextPart("done")])
+
+    def service(name: str) -> Summon:
+        summon = Summon(name)
+        summon._runtime = Runtime(model=FunctionModel(model))
+
+        def endpoint(request: Any) -> str:
+            """Inspect a nested request with an empty field alias."""
+            ...
+
+        endpoint.__annotations__["request"] = Request
+        summon("/empty-alias-prompt")(endpoint)
+        return summon
+
+    raw = service("empty-alias-prompt-raw")
+    assert (
+        asyncio.run(raw._runtime.call(raw.endpoints[0], {"value": {"": 23}})) == "done"
+    )
+
+    http = service("empty-alias-prompt-http")
+    response = TestClient(build_app(http)).post(
+        "/empty-alias-prompt", json={"value": {"": 23}}
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == "done"
+    assert prompts[0] == prompts[1]
+    assert '  value: {"": 23}' in prompts[0]
+
+
+def test_nested_model_dict_descriptor_is_bypassed_for_raw_and_http_prompts():
+    hooks: list[str] = []
+    prompts: list[str] = []
+    base_descriptor = BaseModel.__dict__["__dict__"]
+
+    class HostileDictDescriptor:
+        def __get__(self, instance, owner=None):
+            hooks.append("__dict__ descriptor")
+            raise RuntimeError("application __dict__ descriptor")
+
+        def __set__(self, instance, value):
+            base_descriptor.__set__(instance, value)
+
+    class Inner(BaseModel):
+        x: int
+        __dict__ = HostileDictDescriptor()  # pyright: ignore[reportGeneralTypeIssues]
+
+    def model(messages, info):
+        prompt = next(
+            part.content
+            for message in messages
+            for part in message.parts
+            if isinstance(part, UserPromptPart)
+        )
+        assert type(prompt) is str
+        prompts.append(prompt)
+        return ModelResponse(parts=[TextPart("done")])
+
+    def service(name: str) -> Summon:
+        summon = Summon(name)
+        summon._runtime = Runtime(model=FunctionModel(model))
+
+        annotation = Annotated[int, AfterValidator(lambda value: Inner(x=value))]
+
+        def endpoint(value: Any) -> str:
+            """Inspect a model without dispatching its storage descriptor."""
+            ...
+
+        endpoint.__annotations__["value"] = annotation
+        summon("/dict-descriptor-prompt", method="GET")(endpoint)
+
+        return summon
+
+    raw = service("dict-descriptor-prompt-raw")
+    assert asyncio.run(raw._runtime.call(raw.endpoints[0], {"value": 23})) == "done"
+
+    http = service("dict-descriptor-prompt-http")
+    response = TestClient(build_app(http)).get(
+        "/dict-descriptor-prompt", params={"value": "23"}
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == "done"
+    assert prompts[0] == prompts[1]
+    assert '  value: {"x": 23}' in prompts[0]
+    assert hooks == []
+
+
+def test_nested_model_extra_descriptor_is_bypassed_for_raw_and_http_prompts():
+    hooks: list[str] = []
+    prompts: list[str] = []
+    base_descriptor = BaseModel.__dict__["__pydantic_extra__"]
+
+    class HostileExtraDescriptor:
+        def __get__(self, instance, owner=None):
+            hooks.append("__pydantic_extra__ descriptor")
+            raise RuntimeError("application __pydantic_extra__ descriptor")
+
+        def __set__(self, instance, value):
+            base_descriptor.__set__(instance, value)
+
+    class Inner(BaseModel):
+        x: int
+        __pydantic_extra__ = HostileExtraDescriptor()  # pyright: ignore[reportGeneralTypeIssues]
+
+    def model(messages, info):
+        prompt = next(
+            part.content
+            for message in messages
+            for part in message.parts
+            if isinstance(part, UserPromptPart)
+        )
+        assert type(prompt) is str
+        prompts.append(prompt)
+        return ModelResponse(parts=[TextPart("done")])
+
+    def service(name: str) -> Summon:
+        summon = Summon(name)
+        summon._runtime = Runtime(model=FunctionModel(model))
+        annotation = Annotated[int, AfterValidator(lambda value: Inner(x=value))]
+
+        def endpoint(value: Any) -> str:
+            """Inspect a model without dispatching its extra-storage descriptor."""
+            ...
+
+        endpoint.__annotations__["value"] = annotation
+        summon("/extra-descriptor-prompt", method="GET")(endpoint)
+        return summon
+
+    raw = service("extra-descriptor-prompt-raw")
+    assert asyncio.run(raw._runtime.call(raw.endpoints[0], {"value": 23})) == "done"
+
+    http = service("extra-descriptor-prompt-http")
+    response = TestClient(build_app(http)).get(
+        "/extra-descriptor-prompt", params={"value": "23"}
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == "done"
+    assert prompts[0] == prompts[1]
+    assert '  value: {"x": 23}' in prompts[0]
+    assert hooks == []
+
+
 @pytest.mark.parametrize("container_type", [set, frozenset])
 def test_hashed_container_of_nested_models_projects_for_raw_and_http(
     container_type: Any,

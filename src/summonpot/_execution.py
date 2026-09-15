@@ -141,6 +141,8 @@ class _ConsumedTransport:
 
 _TRANSPORT_SNAPSHOTS: dict[int, _TransportSnapshot | _ConsumedTransport] = {}
 _UNAVAILABLE = "<unavailable>"
+_BASE_MODEL_DICT_DESCRIPTOR = BaseModel.__dict__["__dict__"]
+_BASE_MODEL_EXTRA_DESCRIPTOR = BaseModel.__dict__["__pydantic_extra__"]
 
 
 def _pydantic_fields(value: BaseModel) -> dict[str, Any]:
@@ -202,15 +204,19 @@ def _inert_transport_value(
         # Read Pydantic's storage directly: model_dump, getattr, repr, copy and
         # equality can all dispatch application code.  Declared aliases and
         # exact built-in descendants are enough for the model-facing view.
-        storage = object.__getattribute__(value, "__dict__")
+        storage = _BASE_MODEL_DICT_DESCRIPTOR.__get__(value, kind)
         projected = {
-            field.serialization_alias or field.alias or name: _inert_transport_value(
-                storage[name], ancestors, native=native
-            )
+            (
+                field.serialization_alias
+                if field.serialization_alias is not None
+                else field.alias
+                if field.alias is not None
+                else name
+            ): _inert_transport_value(storage[name], ancestors, native=native)
             for name, field in _pydantic_fields(value).items()
             if name in storage
         }
-        extras = object.__getattribute__(value, "__pydantic_extra__")
+        extras = _BASE_MODEL_EXTRA_DESCRIPTOR.__get__(value, kind)
         if type(extras) is dict:
             projected.update(
                 {
@@ -563,15 +569,19 @@ def _prepare_request(
 
     validated = plan.input_validator.validate_python(dict(params))
     fields = _pydantic_fields(validated)
-    storage = object.__getattribute__(validated, "__dict__")
+    storage = _BASE_MODEL_DICT_DESCRIPTOR.__get__(validated, type(validated))
     typed = {name: storage[name] for name in fields if name in storage}
     prompt = {
-        field.serialization_alias or field.alias or name: _inert_transport_value(
-            typed[name]
-        )
+        (
+            field.serialization_alias
+            if field.serialization_alias is not None
+            else field.alias
+            if field.alias is not None
+            else name
+        ): _inert_transport_value(typed[name])
         for name, field in fields.items()
     }
-    extras = object.__getattribute__(validated, "__pydantic_extra__")
+    extras = _BASE_MODEL_EXTRA_DESCRIPTOR.__get__(validated, type(validated))
     if type(extras) is dict:
         prompt.update(
             {
