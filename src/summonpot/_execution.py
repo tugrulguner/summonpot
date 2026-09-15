@@ -15,7 +15,7 @@ from typing import Any
 from uuid import UUID
 from weakref import ReferenceType, ref
 
-from pydantic import TypeAdapter
+from pydantic import BaseModel, TypeAdapter
 from pydantic_core import SchemaValidator, TzInfo
 
 from summonpot._output_validation import _compile_output_validator
@@ -394,6 +394,8 @@ def _is_immutable_default(value: Any) -> bool:
 
 _ReceivingPredicate = Callable[[Any, set[tuple[int, int]]], bool]
 _LITERAL_TYPES = (type(None), bool, int, float, str, bytes)
+_BASE_MODEL_DICT_DESCRIPTOR = BaseModel.__dict__["__dict__"]
+_BASE_MODEL_EXTRA_DESCRIPTOR = BaseModel.__dict__["__pydantic_extra__"]
 
 
 def _class_is_in_mro(value: Any, expected: type[Any]) -> bool:
@@ -404,6 +406,24 @@ def _class_is_in_mro(value: Any, expected: type[Any]) -> bool:
     )
 
 
+def _base_model_extra(value: Any, values: dict[str, Any]) -> Any:
+    """Read Pydantic extra storage without invoking subclass descriptors."""
+    try:
+        return type(_BASE_MODEL_EXTRA_DESCRIPTOR).__get__(
+            _BASE_MODEL_EXTRA_DESCRIPTOR, value, type(value)
+        )
+    except AttributeError:
+        for name, item in dict.items(values):
+            if type(name) is str and name == "__pydantic_extra__":
+                return item
+        return None
+
+
+def _has_exact_string_keys(value: dict[Any, Any]) -> bool:
+    """Reject malformed model storage before any hash-based field lookup."""
+    return all(type(name) is str for name in dict.__iter__(value))
+
+
 def _length_ok(length: int, schema: Mapping[str, Any]) -> bool:
     minimum = schema.get("min_length")
     maximum = schema.get("max_length")
@@ -412,8 +432,11 @@ def _length_ok(length: int, schema: Mapping[str, Any]) -> bool:
     )
 
 
-def _number_ok(value: Any, schema: Mapping[str, Any]) -> bool:
-    if schema.get("allow_inf_nan") is False:
+def _number_ok(
+    value: Any, schema: Mapping[str, Any], model_config: Mapping[str, Any]
+) -> bool:
+    allow_inf_nan = schema.get("allow_inf_nan", model_config.get("allow_inf_nan"))
+    if allow_inf_nan is False:
         finite = value.is_finite() if type(value) is Decimal else math.isfinite(value)
         if not finite:
             return False
@@ -452,12 +475,38 @@ def _require_supported_schema_keys(
         raise _unsupported_receiver(f"constraints {names} are not supported")
 
 
+def _receiving_model_config(node: Mapping[str, Any]) -> Mapping[str, Any]:
+    config = node.get("config", {})
+    if type(config) is not dict:
+        raise _unsupported_receiver("invalid Pydantic model config")
+    transforming = {
+        name
+        for name in (
+            "str_strip_whitespace",
+            "str_to_lower",
+            "str_to_upper",
+            "coerce_numbers_to_str",
+        )
+        if config.get(name) is True
+    }
+    if transforming:
+        names = ", ".join(sorted(transforming))
+        raise _unsupported_receiver(
+            f"transforming model config options {names} are not hook-free"
+        )
+    return config
+
+
 def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
     """Compile the hook-free core-schema subset used for receiving checks."""
     definitions: dict[str, Any] = {}
     references: dict[str, _ReceivingPredicate] = {}
 
-    def compile_node(node: Any) -> _ReceivingPredicate:
+    def compile_node(
+        node: Any, model_config: Mapping[str, Any] | None = None
+    ) -> _ReceivingPredicate:
+        if model_config is None:
+            model_config = {}
         if type(node) is not dict or type(node.get("type")) is not str:
             raise _unsupported_receiver("invalid Pydantic core schema")
         kind = node["type"]
@@ -471,7 +520,7 @@ def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
                 reference = definition.get("ref")
                 if type(reference) is str:
                     definitions[reference] = definition
-            return compile_node(node["schema"])
+            return compile_node(node["schema"], model_config)
         if kind == "definition-ref":
             reference = node["schema_ref"]
             existing = references.get(reference)
@@ -486,17 +535,17 @@ def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
             target = definitions.get(reference)
             if target is None:
                 raise _unsupported_receiver("unresolved recursive schema reference")
-            holder.append(compile_node(target))
+            holder.append(compile_node(target, model_config))
             return deferred
         if kind in {"default", "nullable", "custom-error"}:
-            child = compile_node(node["schema"])
+            child = compile_node(node["schema"], model_config)
             if kind == "nullable":
                 return lambda value, seen: value is None or child(value, seen)
             return child
         if kind == "lax-or-strict":
-            return compile_node(node["strict_schema"])
+            return compile_node(node["strict_schema"], model_config)
         if kind == "json-or-python":
-            return compile_node(node["python_schema"])
+            return compile_node(node["python_schema"], model_config)
         if kind == "any":
             return lambda value, seen: True
         if kind == "none":
@@ -522,7 +571,8 @@ def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
                 raise _unsupported_receiver(
                     "float multiple_of constraints are not supported"
                 )
-            if kind == "decimal" and node.get("allow_inf_nan") is True:
+            allow_inf_nan = node.get("allow_inf_nan", model_config.get("allow_inf_nan"))
+            if kind == "decimal" and allow_inf_nan is True:
                 raise _unsupported_receiver(
                     "Decimal allow_inf_nan=True is not supported"
                 )
@@ -563,9 +613,23 @@ def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
                     return False
                 if kind == "decimal" and not Decimal.is_finite(value):
                     return False
-                if kind in {"int", "float", "decimal"} and not _number_ok(value, node):
+                if kind in {"int", "float", "decimal"} and not _number_ok(
+                    value, node, model_config
+                ):
                     return False
-                if kind in {"str", "bytes"} and not _length_ok(len(value), node):
+                length_schema = node
+                if kind == "str":
+                    length_schema = {
+                        "min_length": node.get(
+                            "min_length", model_config.get("str_min_length")
+                        ),
+                        "max_length": node.get(
+                            "max_length", model_config.get("str_max_length")
+                        ),
+                    }
+                if kind in {"str", "bytes"} and not _length_ok(
+                    len(value), length_schema
+                ):
                     return False
                 version = node.get("version")
                 return not (
@@ -596,7 +660,9 @@ def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
                 else tuple(node.get("choices", {}).values())
             )
             choices = tuple(
-                compile_node(choice[0] if type(choice) is tuple else choice)
+                compile_node(
+                    choice[0] if type(choice) is tuple else choice, model_config
+                )
                 for choice in raw_choices
             )
             return lambda value, seen: any(
@@ -623,7 +689,9 @@ def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
                 "set": set.__iter__,
                 "frozenset": frozenset.__iter__,
             }[kind]
-            child = compile_node(node.get("items_schema", {"type": "any"}))
+            child = compile_node(
+                node.get("items_schema", {"type": "any"}), model_config
+            )
             token = id(node)
 
             def collection(value: Any, seen: set[tuple[int, int]]) -> bool:
@@ -638,7 +706,8 @@ def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
             return collection
         if kind == "tuple":
             children = tuple(
-                compile_node(item) for item in node.get("items_schema", ())
+                compile_node(item, model_config)
+                for item in node.get("items_schema", ())
             )
             variadic = node.get("variadic_item_index")
             token = id(node)
@@ -662,8 +731,12 @@ def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
 
             return tuple_value
         if kind == "dict":
-            key_predicate = compile_node(node.get("keys_schema", {"type": "any"}))
-            value_predicate = compile_node(node.get("values_schema", {"type": "any"}))
+            key_predicate = compile_node(
+                node.get("keys_schema", {"type": "any"}), model_config
+            )
+            value_predicate = compile_node(
+                node.get("values_schema", {"type": "any"}), model_config
+            )
             token = id(node)
 
             def dictionary(value: Any, seen: set[tuple[int, int]]) -> bool:
@@ -680,10 +753,10 @@ def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
 
             return dictionary
         if kind == "model-field":
-            return compile_node(node["schema"])
+            return compile_node(node["schema"], model_config)
         if kind == "model-fields":
             fields = tuple(
-                (name, compile_node(field_schema))
+                (name, compile_node(field_schema, model_config))
                 for name, field_schema in node.get("fields", {}).items()
             )
 
@@ -700,9 +773,10 @@ def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
             return model_fields
         if kind == "model":
             model_class = node["cls"]
-            child = compile_node(node["schema"])
+            nested_config = _receiving_model_config(node)
+            child = compile_node(node["schema"], nested_config)
             model_schema = node["schema"]
-            extra_behavior = node.get("config", {}).get("extra_fields_behavior")
+            extra_behavior = nested_config.get("extra_fields_behavior")
             extras_schema = (
                 model_schema.get("extras_schema")
                 if type(model_schema) is dict
@@ -710,7 +784,7 @@ def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
                 else None
             )
             extra_predicate = (
-                compile_node(extras_schema)
+                compile_node(extras_schema, nested_config)
                 if extras_schema is not None
                 else lambda value, seen: True
             )
@@ -721,19 +795,23 @@ def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
                     return False
                 if _seen_before(value, token, seen):
                     return True
-                values = object.__getattribute__(value, "__dict__")
+                values = type(_BASE_MODEL_DICT_DESCRIPTOR).__get__(
+                    _BASE_MODEL_DICT_DESCRIPTOR, value, type(value)
+                )
+                if type(values) is not dict or not _has_exact_string_keys(values):
+                    return False
                 if node.get("root_model"):
-                    return (
-                        type(values) is dict
-                        and dict.__contains__(values, "root")
-                        and child(dict.__getitem__(values, "root"), seen)
+                    return dict.__contains__(values, "root") and child(
+                        dict.__getitem__(values, "root"), seen
                     )
                 if not child(values, seen):
                     return False
-                extras = object.__getattribute__(value, "__pydantic_extra__")
+                extras = _base_model_extra(value, values)
                 if extras is None:
                     return True
                 if type(extras) is not dict:
+                    return False
+                if not _has_exact_string_keys(extras):
                     return False
                 if extra_behavior != "allow":
                     return dict.__len__(extras) == 0
@@ -791,7 +869,8 @@ def _compile_tool(
                 name,
                 source,
                 _compile_receiving_validator(signature.parameters[name].annotation)
-                if signature.parameters[name].annotation is not inspect.Parameter.empty
+                if isinstance(source, FromRequest)
+                and signature.parameters[name].annotation is not inspect.Parameter.empty
                 else None,
             )
             for name, source in contract.bind.items()

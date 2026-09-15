@@ -26,11 +26,12 @@ from pydantic import (
     WrapValidator,
     field_validator,
 )
-from pydantic_ai.messages import ModelResponse, ToolCallPart
+from pydantic_ai import UnexpectedModelBehavior
+from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_core import core_schema
 
-from summonpot import Exactly, FromRequest, Operation, Required, Summon
+from summonpot import AgentChoice, Exactly, FromRequest, Operation, Required, Summon
 from summonpot._execution import _registered_plan, _validated_transport_request
 from summonpot.runtime import Runtime, _OperationInputError
 from summonpot.server import build_app
@@ -329,8 +330,6 @@ def test_agent_backed_path_checks_injected_values_before_application_code():
         starts += 1
         return Result(value=value)
 
-    from summonpot import AgentChoice
-
     operation = Operation(
         apply,
         bind={"value": FromRequest("value"), "format": AgentChoice()},
@@ -356,6 +355,58 @@ def test_agent_backed_path_checks_injected_values_before_application_code():
         )
 
     assert starts == 0
+
+
+def test_agent_choice_pattern_uses_tool_schema_not_receiving_predicate():
+    received: list[tuple[int, str]] = []
+
+    def apply(value: int, format: Annotated[str, Field(pattern=r"^ok$")]) -> Result:
+        received.append((value, format))
+        return Result(value=value)
+
+    operation = Operation(
+        apply,
+        bind={"value": FromRequest("value"), "format": AgentChoice()},
+        output=Result,
+    )
+    summon = Summon("mixed-agent-choice-receiving-contract")
+
+    @summon("/apply")
+    def endpoint(
+        request: BroadRequest, result=Required(operation, calls=Exactly(1))
+    ) -> str:
+        """Validate agent-owned choices through the model-visible tool schema."""
+        ...
+
+    valid_turns = 0
+
+    def valid_model(messages: Any, info: AgentInfo) -> ModelResponse:
+        nonlocal valid_turns
+        valid_turns += 1
+        if valid_turns == 1:
+            return ModelResponse(parts=[ToolCallPart("apply", {"format": "ok"})])
+        return ModelResponse(parts=[TextPart('{"value":12}')])
+
+    result = asyncio.run(
+        Runtime(model=FunctionModel(valid_model), retries=0).call(
+            summon.endpoints[0], {"value": 12}
+        )
+    )
+
+    assert result == '{"value":12}'
+    assert received == [(12, "ok")]
+
+    def invalid_model(messages: Any, info: AgentInfo) -> ModelResponse:
+        return ModelResponse(parts=[ToolCallPart("apply", {"format": "bad"})])
+
+    with pytest.raises(UnexpectedModelBehavior, match="max retries"):
+        asyncio.run(
+            Runtime(model=FunctionModel(invalid_model), retries=0).call(
+                summon.endpoints[0], {"value": 12}
+            )
+        )
+
+    assert received == [(12, "ok")]
 
 
 def test_receiving_failure_does_not_render_a_hostile_value():
@@ -597,6 +648,65 @@ def test_receiver_structurally_revalidates_constructed_model_instances():
     assert received[0] is valid
 
 
+def test_receiver_model_config_constraints_apply_to_constructed_fields():
+    class Payload(BaseModel):
+        model_config = ConfigDict(str_max_length=2, allow_inf_nan=False)
+
+        text: str
+        number: float
+
+    received: list[Any] = []
+    summon = _receiver_service(Payload, received)
+
+    with pytest.raises(_OperationInputError):
+        _call_with_canonical(
+            summon, Payload.model_construct(text="too long", number=float("inf"))
+        )
+
+    valid = Payload(text="ok", number=1.0)
+    assert _call_with_canonical(summon, valid) == Result(value=1)
+    assert received == [valid]
+
+
+def test_receiver_uses_narrow_model_config_for_a_broader_validated_subclass():
+    class NarrowPayload(BaseModel):
+        model_config = ConfigDict(str_max_length=2)
+
+        text: str
+
+    class BroadPayload(NarrowPayload):
+        model_config = ConfigDict(str_max_length=20)
+
+    received: list[Any] = []
+    summon = _receiver_service(NarrowPayload, received)
+
+    with pytest.raises(_OperationInputError):
+        _call_with_canonical(summon, BroadPayload(text="too broad"))
+
+    assert received == []
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        ConfigDict(str_strip_whitespace=True),
+        ConfigDict(str_to_lower=True),
+        ConfigDict(str_to_upper=True),
+        ConfigDict(coerce_numbers_to_str=True),
+    ],
+)
+def test_transforming_receiver_model_config_is_rejected_at_registration(
+    config: ConfigDict,
+):
+    class Payload(BaseModel):
+        model_config = config
+
+        text: str
+
+    with pytest.raises(TypeError, match=r"transforming model config.*not hook-free"):
+        _receiver_service(Payload, [])
+
+
 def test_receiver_structurally_checks_typed_model_extras():
     class Payload(BaseModel):
         model_config = ConfigDict(extra="allow")
@@ -617,6 +727,75 @@ def test_receiver_structurally_checks_typed_model_extras():
     assert _call_with_canonical(summon, valid) == Result(value=1)
     assert received == [valid]
     assert received[0] is valid
+
+
+def test_model_storage_is_read_without_shadowed_descriptor_hooks():
+    events: list[str] = []
+
+    def hostile_dict(value: Any) -> dict[str, int]:
+        events.append("dict")
+        return {"count": 1}
+
+    def hostile_extra(value: Any) -> dict[str, int]:
+        events.append("extra")
+        return {"note": 1}
+
+    payload_type = type(
+        "Payload",
+        (BaseModel,),
+        {
+            "__annotations__": {
+                "__pydantic_extra__": dict[str, int],
+                "count": int,
+            },
+            "model_config": ConfigDict(extra="allow"),
+            "__dict__": property(hostile_dict),
+            "__pydantic_extra__": property(hostile_extra),
+        },
+    )
+    invalid = object.__new__(payload_type)
+    dict_descriptor = BaseModel.__dict__["__dict__"]
+    extra_descriptor = BaseModel.__dict__["__pydantic_extra__"]
+    type(dict_descriptor).__set__(dict_descriptor, invalid, {"count": "not-an-int"})
+    type(extra_descriptor).__set__(extra_descriptor, invalid, {"note": "not-an-int"})
+    received: list[Any] = []
+    summon = _receiver_service(payload_type, received)
+
+    with pytest.raises(_OperationInputError):
+        _call_with_canonical(summon, invalid)
+
+    assert received == []
+    assert events == []
+
+
+def test_model_storage_rejects_non_string_keys_without_equality_callbacks():
+    events: list[str] = []
+
+    class Payload(BaseModel):
+        count: int
+
+    class HostileKey:
+        def __hash__(self) -> int:
+            return hash("count")
+
+        def __eq__(self, other: object) -> bool:
+            events.append("eq")
+            return True
+
+    invalid = Payload.model_construct(count=1)
+    dict_descriptor = BaseModel.__dict__["__dict__"]
+    storage = type(dict_descriptor).__get__(dict_descriptor, invalid, type(invalid))
+    dict.clear(storage)
+    storage[HostileKey()] = 1
+    events.clear()
+    received: list[Any] = []
+    summon = _receiver_service(Payload, received)
+
+    with pytest.raises(_OperationInputError):
+        _call_with_canonical(summon, invalid)
+
+    assert received == []
+    assert events == []
 
 
 @pytest.mark.parametrize(
