@@ -1202,8 +1202,16 @@ def test_hashed_container_of_nested_models_projects_for_raw_and_http(
     container_type: Any,
 ):
     prompts: list[str] = []
+    hooks: list[str] = []
 
-    class Inner(BaseModel):
+    class HostileModelMeta(type(BaseModel)):
+        def __getattribute__(cls, name):
+            if name == "model_fields":
+                hooks.append("metaclass getattribute")
+                raise RuntimeError("metaclass getattribute")
+            return super().__getattribute__(name)
+
+    class Inner(BaseModel, metaclass=HostileModelMeta):
         model_config = {"frozen": True}
 
         x: int
@@ -1248,3 +1256,44 @@ def test_hashed_container_of_nested_models_projects_for_raw_and_http(
     assert response.json() == "done"
     assert prompts[0] == prompts[1]
     assert '  value: [{"x": 23}]' in prompts[0]
+    assert hooks == []
+
+
+def test_raw_request_projection_bypasses_model_metadata_and_attribute_hooks():
+    armed = [False]
+    hooks: list[str] = []
+
+    class HostileModelMeta(type(BaseModel)):
+        def __getattribute__(cls, name):
+            if armed[0] and name == "model_fields":
+                hooks.append("metaclass getattribute")
+                raise RuntimeError("metaclass getattribute")
+            return super().__getattribute__(name)
+
+    class Request(BaseModel, metaclass=HostileModelMeta):
+        value: int
+
+        def __getattribute__(self, name):
+            if armed[0] and name in {"value", "__pydantic_extra__"}:
+                hooks.append(f"instance getattribute: {name}")
+                raise RuntimeError("instance getattribute")
+            return super().__getattribute__(name)
+
+    def model(messages, info):
+        return ModelResponse(parts=[TextPart("done")])
+
+    summon = Summon("hostile-request-projection")
+    summon._runtime = Runtime(model=FunctionModel(model))
+
+    def endpoint(request: Any) -> str:
+        """Inspect a request without application attribute hooks."""
+        ...
+
+    endpoint.__annotations__["request"] = Request
+    summon("/hostile-request")(endpoint)
+    armed[0] = True
+
+    assert (
+        asyncio.run(summon._runtime.call(summon.endpoints[0], {"value": 23})) == "done"
+    )
+    assert hooks == []

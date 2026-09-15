@@ -143,6 +143,11 @@ _TRANSPORT_SNAPSHOTS: dict[int, _TransportSnapshot | _ConsumedTransport] = {}
 _UNAVAILABLE = "<unavailable>"
 
 
+def _pydantic_fields(value: BaseModel) -> dict[str, Any]:
+    """Read Pydantic's field table without dispatching the model metaclass."""
+    return type.__getattribute__(type(value), "__pydantic_fields__")
+
+
 def _inert_hashable(value: Any) -> bool:
     """Return whether a projected value can be hashed without application code."""
     kind = type(value)
@@ -202,7 +207,7 @@ def _inert_transport_value(
             field.serialization_alias or field.alias or name: _inert_transport_value(
                 storage[name], ancestors, native=native
             )
-            for name, field in type(value).model_fields.items()
+            for name, field in _pydantic_fields(value).items()
             if name in storage
         }
         extras = object.__getattribute__(value, "__pydantic_extra__")
@@ -557,15 +562,16 @@ def _prepare_request(
         return _RequestValues(snapshot.prompt, typed=snapshot.typed)
 
     validated = plan.input_validator.validate_python(dict(params))
-    fields = type(validated).model_fields
-    typed = {name: getattr(validated, name) for name in fields}
+    fields = _pydantic_fields(validated)
+    storage = object.__getattribute__(validated, "__dict__")
+    typed = {name: storage[name] for name in fields if name in storage}
     prompt = {
         field.serialization_alias or field.alias or name: _inert_transport_value(
             typed[name]
         )
         for name, field in fields.items()
     }
-    extras = getattr(validated, "__pydantic_extra__", None)
+    extras = object.__getattribute__(validated, "__pydantic_extra__")
     if type(extras) is dict:
         prompt.update(
             {

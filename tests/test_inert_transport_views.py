@@ -154,7 +154,14 @@ def test_projection_does_not_serialize_nested_models():
 
     hooks = []
 
-    class Value(BaseModel):
+    class HostileModelMeta(type(BaseModel)):
+        def __getattribute__(cls, name):
+            if name == "model_fields":
+                hooks.append("metaclass getattribute")
+                raise RuntimeError("metaclass getattribute")
+            return super().__getattribute__(name)
+
+    class Value(BaseModel, metaclass=HostileModelMeta):
         items: list[int]
 
         @field_serializer("items")
