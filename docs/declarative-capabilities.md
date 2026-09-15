@@ -42,36 +42,36 @@ Required use is checked by runtime state. It is not only written into the prompt
 
 ## Typed operation dataflow
 
-`Operation` adds a validated declaration of where capability arguments are intended to
-come from without adding configuration to `@summon(...)`:
+`Operation` adds an enforceable declaration of where capability arguments come from without
+adding configuration to `@summon(...)`:
 
 ```python
-from summonpot import AgentChoice, FromRequest, FromResult, Operation
+from summonpot import AgentChoice, Exactly, FromRequest, Operation, Required
 
 
 customer = Operation(
     load_customer,
-    bind={"customer_id": FromRequest("customer_id")},
+    bind={
+        "customer_id": FromRequest("customer_id"),
+        "format": AgentChoice(),
+    },
     output=CustomerRecord,
 )
-ticket = Operation(
-    create_ticket,
-    bind={
-        "customer_id": FromResult(customer, "customer_id"),
-        "priority": AgentChoice(),
-        "summary": AgentChoice(),
-    },
-    output=TicketReceipt,
-    after=(customer,),
-)
+
+
+@summon("/customers")
+def get_customer(
+    request: CustomerRequest,
+    customer_result=Required(customer, calls=Exactly(1)),
+) -> CustomerResponse:
+    """Load this customer and return the approved view."""
+    ...
 ```
 
-`FromRequest` names validated request data. `FromResult` names a field on a declared
-producer's typed output. `FromContext` names framework-owned state. `AgentChoice` is the
-explicit model-controlled source. Registration rejects incomplete bindings, missing
-fields, undeclared producers, and types known to be incompatible. Dependency cycles are
-structurally unrepresentable through the immutable public `Operation` API rather than
-discovered by a separate cycle detector.
+`FromRequest` names validated request data and direct `AgentChoice` is the explicit
+model-controlled source. Registration rejects incomplete bindings, missing fields, and
+types known to be incompatible. Binding objects must be exact built-in source vocabulary
+types; subclasses are rejected.
 
 The declarations are immutable and shipped today. The first runtime-enforced slice covers
 an endpoint with one required `Exactly(1)` operation whose arguments use `FromRequest`,
@@ -79,11 +79,12 @@ direct `AgentChoice`, or callable defaults. Trusted/defaulted arguments are abse
 model schema, the single start is reserved before application code, and `output=` is
 validated before the operation satisfies `Required`.
 
-Multi-operation chains, `FromResult`, `FromContext`, `after`, and broader call bounds remain
-registration-only. See [`08_direct_execution.py`](../examples/08_direct_execution.py) for the
+Multi-operation chains, `FromResult`, `FromContext`, `after`, collection-backed choices, and
+broader call bounds remain planned and are rejected at registration. See
+[`08_direct_execution.py`](../examples/08_direct_execution.py) for the
 credential-free direct slice, [`07_bound_operation.py`](../examples/07_bound_operation.py)
-for the agent-backed enforced slice, and
-[`06_support_service`](../examples/06_support_service/app.py) for the broader declared chain.
+for the agent-backed enforced slice, and [`06_support_service`](../examples/06_support_service/app.py)
+for a multi-file service using compatible bare callable dependencies.
 
 ## Deterministic and agentic execution
 
@@ -103,7 +104,10 @@ at least one argument is bound from `FromRequest`, every remaining argument come
 `FromRequest` or an immutable identity-stable callable default, and its declared output is
 the endpoint output model by exact identity, the runtime executes that operation directly
 before model resolution. There is no model fallback after direct execution starts.
-Any unresolved choice or unsupported declaration remains on the provider-neutral agent loop.
+A direct `AgentChoice` in the admitted shape uses the provider-neutral agent loop. An
+unsupported explicit declaration fails before serving; bare callable dependencies keep their
+legacy agent behavior. `Operation(fn)` is still an explicit contract and is rejected because
+it does not provide the complete enforced shape.
 
 Dependency parameters are declaration-only. They do not appear in the HTTP request body
 or OpenAPI request schema. The ellipsis is the complete declaration body, and direct calls
@@ -176,13 +180,14 @@ the agent may call only that set. For one required `Exactly(1)` operation using
 - a second start is rejected before application code; and
 - invalid `output=` data does not satisfy `Required` and is not retried automatically.
 
-Broader operation shapes retain their existing model-supplied argument behavior until the
-complete graph semantics ship. In particular, `FromResult`, `FromContext`, `after`, and
-collection-backed choices are still declarations rather than runtime injection. Continue
-to validate inputs and enforce authorization inside every operation; trusted binding does
-not grant authorization or prove that final model claims match operation results.
+Broader explicit operation shapes are rejected before serving until complete graph semantics
+ship. In particular, `FromResult`, `FromContext`, `after`, collection-backed choices,
+broader bounds, and adding another capability cannot fall through to unenforced model
+arguments. Bare callable dependencies retain the legacy agent path. Continue to validate
+inputs and enforce authorization inside every operation; trusted binding does not grant
+authorization or prove that final model claims match operation results.
 
-Extending these guarantees across operation graphs is milestone 1 on the
+Extending these guarantees across operation graphs begins in milestone 2 on the
 [roadmap](../ROADMAP.md).
 
 Strict SQLAlchemy and SQLite operation objects are planned and not yet shipped. See the target API examples in the README and the implementation sequence in the roadmap.

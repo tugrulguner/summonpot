@@ -57,6 +57,10 @@ def place_order(customer_id: str, sku: str) -> OrderResponse:
 # --- the declaration ---------------------------------------------------------
 
 
+def test_operation_docstring_uses_the_admitted_registration_shape():
+    assert "calls=Exactly(1)" in (Operation.__doc__ or "")
+
+
 def test_operation_carries_bindings_and_output():
     contract = Operation(
         lookup_customer,
@@ -358,7 +362,7 @@ def test_calls_may_not_contradict_required():
 # --- integration with the endpoint ------------------------------------------
 
 
-def test_an_operation_registers_like_a_bare_callable():
+def test_a_supported_operation_registers_like_a_bare_callable():
     contract = Operation(
         lookup_customer,
         bind={"customer_id": FromRequest("customer_id")},
@@ -368,7 +372,7 @@ def test_an_operation_registers_like_a_bare_callable():
 
     @summon("/orders")
     def create_order(
-        request: OrderRequest, customer=Required(contract)
+        request: OrderRequest, customer=Required(contract, calls=Exactly(1))
     ) -> OrderResponse:
         """Place an order for this customer."""
         ...
@@ -377,7 +381,7 @@ def test_an_operation_registers_like_a_bare_callable():
     assert tool.name == "lookup_customer"
     assert tool.required is True
     assert tool.contract is contract
-    assert tool.bounds == CallBounds(minimum=1)
+    assert tool.bounds == CallBounds(minimum=1, maximum=1)
 
 
 def test_a_bare_callable_still_registers_with_no_contract():
@@ -435,7 +439,7 @@ def test_registered_bindings_cannot_be_changed_through_the_callers_mapping():
 
     @summon("/orders")
     def create_order(
-        request: OrderRequest, customer=Required(contract)
+        request: OrderRequest, customer=Required(contract, calls=Exactly(1))
     ) -> OrderResponse:
         """Place an order for this customer."""
         ...

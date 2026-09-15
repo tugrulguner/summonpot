@@ -48,12 +48,9 @@ def test_readme_states_the_current_runtime_boundary_before_positioning():
         "one fully resolved `exactly(1)` operation path now executes directly without "
         "resolving or constructing a model" in introduction
     )
-    assert (
-        "all other declarations still use summonpot's provider-neutral agent runtime"
-        in introduction
-    )
+    assert "bare legacy capabilities still use" in introduction
     assert "within the runtime-enforced binding slice" in introduction
-    assert "unsupported legacy binding shapes may remain model-supplied" in introduction
+    assert "unsupported explicit contract shapes fail at registration" in introduction
     assert (
         "broader multi-operation deterministic execution remains on the "
         "[roadmap](roadmap.md)" in introduction
@@ -157,7 +154,8 @@ def test_readme_distinguishes_tool_schema_hiding_from_prompt_secrecy():
     readme = _normalize(README.read_text(encoding="utf-8"))
 
     assert "tool-schema hiding is not prompt secrecy" in readme
-    assert "other operation shapes remain on the legacy agent-supplied path" in readme
+    assert "unsupported explicit operation shapes are rejected before serving" in readme
+    assert "`operation(fn)` is still an explicit contract" in readme
 
 
 def test_readme_links_the_permanent_modepot_discord_from_hero_and_community():

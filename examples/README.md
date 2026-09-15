@@ -43,8 +43,10 @@ defaulted arguments receives trusted request injection, a filtered model schema,
 operation-output validation, and one permitted start. Level 7 runs that shipped path.
 When the endpoint uses a Pydantic request model, the operation has at least one
 `FromRequest` binding, uses only `FromRequest` or supported immutable callable defaults,
-and its output exactly matches the endpoint response model, Summonpot executes it directly without a model; Level 8 runs that path. Level 6
-retains the broader multi-operation declarations that remain registration-only.
+and its output exactly matches the endpoint response model, Summonpot executes it directly
+without a model; Level 8 runs that path. Unsupported explicit contracts such as
+multi-operation chains, `FromResult`, `FromContext`, `after`, and broader bounds are rejected
+at registration instead of falling back to unenforced model arguments.
 
 ## Progression
 
@@ -132,19 +134,15 @@ Usage-limit, timeout, and provider failures are mapped to stable public HTTP err
 
 Directory: `06_support_service/`
 
-Shows models, application operations, runtime configuration, and a typed operation chain
-split across normal Python modules:
+Shows models, application operations, runtime configuration, and three bare legacy
+capabilities split across normal Python modules.
 
-- `FromRequest` declares the customer lookup's request-field source;
-- `FromResult` declares the ticket's dependency on the typed customer result;
-- `AgentChoice` marks policy, priority, and summary values that remain model-selected;
-- `after` records ordering, and `Exactly(1)` records the intended write bound.
-
-These declarations are validated and stored when the module imports. The current runtime
-does not inject bound values or enforce `after` and maximum/exact call counts yet; the model
-still supplies capability arguments, while `Required(...)` enforces successful use at
-least once. This example therefore demonstrates the shipped contract and registration
-boundary without claiming the planned capability-graph executor already exists.
+Each `Required(fn)` uses its implicit marker bound and no explicit `Operation` contract, so
+the provider-neutral agent runtime supplies arguments and the required-use gate demands one
+successful call. Level 6 deliberately does not declare `FromRequest`, `FromResult`,
+`AgentChoice`, `after`, or `Exactly(1)`: those multi-operation semantics are not enforceable
+yet and would be rejected at registration. Levels 7 and 8 demonstrate the one admitted
+typed-operation shape with a filtered model schema and one permitted start.
 
 ```bash
 export SUMMONPOT_TICKET_LOG=/tmp/my-support-tickets.jsonl

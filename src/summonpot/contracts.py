@@ -200,7 +200,7 @@ class Operation:
         @summon("/orders")
         def place_order(
             request: OrderRequest,
-            customer=Required(lookup_by_customer_id),
+            customer=Required(lookup_by_customer_id, calls=Exactly(1)),
         ) -> OrderResponse:
             \"\"\"Place an order for this customer.\"\"\"
             ...

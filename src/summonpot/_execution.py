@@ -19,6 +19,7 @@ from pydantic import TypeAdapter
 from pydantic_core import SchemaValidator, TzInfo
 
 from summonpot._output_validation import _compile_output_validator
+from summonpot._validation import _enforced_contract_tool_index
 from summonpot.contracts import AgentChoice, FromRequest
 from summonpot.models import EndpointDef, ParamDef, ToolDef
 
@@ -278,7 +279,7 @@ def _compile_endpoint(
 ) -> _CompiledEndpoint:
     """Snapshot validated endpoint metadata into an immutable runtime plan."""
     source_tools = tuple(endpoint.tools)
-    enforce_index = _bound_exact_tool_index(source_tools)
+    enforce_index = _enforced_contract_tool_index(source_tools)
     direct_index = (
         _direct_tool_index(endpoint, source_tools, enforce_index)
         if allow_direct
@@ -313,33 +314,6 @@ def _compile_endpoint(
         tools=tools,
         direct_tool=direct_index,
     )
-
-
-def _bound_exact_tool_index(tools: Sequence[ToolDef]) -> int | None:
-    """Return the one PR-1 operation eligible for bound enforcement."""
-    if len(tools) != 1:
-        return None
-    tool = tools[0]
-    contract = tool.contract
-    bounds = tool.bounds
-    if (
-        not tool.required
-        or contract is None
-        or contract.bind is None
-        or contract.output is None
-        or contract.after
-        or bounds is None
-        or bounds.minimum != 1
-        or bounds.maximum != 1
-    ):
-        return None
-    if not all(
-        isinstance(source, FromRequest)
-        or (isinstance(source, AgentChoice) and source.from_result is None)
-        for source in contract.bind.values()
-    ):
-        return None
-    return 0
 
 
 def _direct_tool_index(

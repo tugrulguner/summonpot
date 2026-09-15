@@ -16,10 +16,6 @@ def test_hardening_is_planned_and_precedes_execution_expansion():
 
     hardening = " ".join(planned.split("### 2.", 1)[0].split())
     for requirement in (
-        "reject the unsupported declaration before serving",
-        "Adding a second capability must not remove enforcement",
-        "invalid source rejection",
-        "unsupported runtime call-bound rejection",
         "receiving operation constraints",
         "render model input only when agent execution needs it",
         "duplicate JSON keys",
@@ -41,9 +37,22 @@ def test_count_type_validation_is_shipped_not_future_runtime_enforcement():
     ):
         assert requirement in shipped
         assert requirement not in hardening
-    assert "Construction-time count-type validation is already shipped" in hardening
-    assert "broader runtime enforcement follows in milestone 5" in hardening
+    assert "unsupported runtime bounds fail before serving" in hardening
+    assert "### 5. Broader bounds and private path classification" in planned
     assert "invalid source/count rejection" not in planned
+
+
+def test_fail_closed_admission_is_shipped_not_left_as_a_future_claim():
+    text = " ".join(ROADMAP.read_text(encoding="utf-8").split())
+    shipped, planned = text.split("## Next milestones", 1)
+    hardening = planned.split("### 2.", 1)[0]
+
+    assert "Fail-closed runtime admission" in shipped
+    assert "All other explicit shapes fail before serving" in shipped
+    assert "The admission gate is shipped" in hardening
+    assert "second-capability regression" in hardening
+    assert "invalid source rejection" in hardening
+    assert "unsupported runtime call-bound rejection" in hardening
 
 
 def test_context_slices_require_their_actual_execution_prerequisites():

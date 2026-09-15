@@ -30,7 +30,13 @@ from typing import (
 
 from pydantic import BaseModel
 
-from summonpot.contracts import AgentChoice, FromRequest, FromResult, Operation
+from summonpot.contracts import (
+    AgentChoice,
+    FromContext,
+    FromRequest,
+    FromResult,
+    Operation,
+)
 
 _VARIADIC = (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
 
@@ -324,8 +330,8 @@ def validate_contracts(
                 what="orders itself after",
             )
         if contract.bind is None:
-            # A contract that declares no bindings keeps the existing behaviour:
-            # every argument is chosen by the model.
+            # There are no binding details to validate here. Runtime admission below
+            # still treats the Operation itself as explicit and rejects this shape.
             continue
         _validate_bindings(
             endpoint=endpoint,
@@ -336,6 +342,82 @@ def validate_contracts(
             argument_types=_argument_annotations(tool),
             request_types=_request_annotations(input_model, parameters),
         )
+
+    _validate_runtime_admission(endpoint=endpoint, tools=tools)
+
+
+def _enforced_contract_tool_index(tools: Sequence[Any]) -> int | None:
+    """Return the sole operation shape the current runtime enforces completely."""
+    if len(tools) != 1:
+        return None
+    tool = tools[0]
+    contract = tool.contract
+    bounds = tool.bounds
+    if (
+        not tool.required
+        or contract is None
+        or contract.bind is None
+        or contract.output is None
+        or contract.after
+        or bounds is None
+        or bounds.minimum != 1
+        or bounds.maximum != 1
+    ):
+        return None
+    if not all(
+        isinstance(source, FromRequest)
+        or (isinstance(source, AgentChoice) and source.from_result is None)
+        for source in contract.bind.values()
+    ):
+        return None
+    return 0
+
+
+def _validate_runtime_admission(*, endpoint: str, tools: list[Any]) -> None:
+    """Reject explicit contracts that would fall onto unenforced agent execution."""
+    enforced = _enforced_contract_tool_index(tools)
+    for index, tool in enumerate(tools):
+        contract = tool.contract
+        explicit_contract = contract is not None
+        explicit_bounds = tool.bounds_explicit
+        if explicit_bounds is None:
+            explicit_bounds = tool.bounds is not None
+        elif not explicit_bounds and tool.bounds is not None:
+            # ``False`` is only registration provenance for the bounds implied by
+            # the dependency marker. ToolDef is public and copyable, so a caller can
+            # replace ``bounds`` while preserving the flag; treat that mismatch as
+            # an external explicit declaration rather than trusting stale metadata.
+            explicit_bounds = (
+                tool.bounds.minimum != (1 if tool.required else 0)
+                or tool.bounds.maximum is not None
+            )
+        bounds_are_exactly_once = (
+            tool.bounds is not None
+            and tool.bounds.minimum == 1
+            and tool.bounds.maximum == 1
+        )
+
+        if explicit_bounds and not bounds_are_exactly_once:
+            raise TypeError(
+                f"Endpoint {endpoint!r}: capability {tool.name!r}: Summonpot "
+                "cannot enforce the declared call bound. The current bound runtime "
+                "supports only one required typed operation with calls=Exactly(1)."
+            )
+        if explicit_contract and index != enforced:
+            raise TypeError(
+                f"Endpoint {endpoint!r}: capability {tool.name!r} would leave its "
+                "explicit contract unenforced on the agent runtime. The current "
+                "runtime supports bindings and output validation only for one required "
+                "typed operation with calls=Exactly(1), no ordering, and only "
+                "FromRequest or direct AgentChoice sources."
+            )
+        if explicit_bounds and index != enforced:
+            raise TypeError(
+                f"Endpoint {endpoint!r}: capability {tool.name!r}: Summonpot "
+                "cannot enforce the declared call bound. Add a complete typed Operation "
+                "contract supported by the single-operation Exactly(1) runtime, or "
+                "remove the explicit call bound."
+            )
 
 
 def _require_declared(
@@ -427,7 +509,14 @@ def _validate_bindings(
                 "to let the model choose it."
             )
 
+    source_types = {FromRequest, FromResult, FromContext, AgentChoice}
     for name, source in bind.items():
+        if type(source) not in source_types:
+            raise TypeError(
+                f"Endpoint {endpoint!r}: operation {operation!r} argument {name!r} "
+                "binding source must be one of the exact built-in types FromRequest, "
+                "FromResult, FromContext, or AgentChoice; subclasses are not supported."
+            )
         if isinstance(source, FromRequest):
             _validate_from_request(
                 endpoint=endpoint,

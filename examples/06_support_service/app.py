@@ -1,23 +1,9 @@
-"""Level 6: a multi-file support service with bounded capabilities."""
+"""Level 6: a multi-file support service with legacy capabilities."""
 
-from support_models import (
-    CustomerRecord,
-    SupportRequest,
-    SupportResponse,
-    TicketReceipt,
-)
+from support_models import SupportRequest, SupportResponse
 from support_operations import create_ticket, load_customer, load_policy
 
-from summonpot import (
-    AgentChoice,
-    Exactly,
-    FromRequest,
-    FromResult,
-    Operation,
-    Required,
-    Summon,
-    UsageLimits,
-)
+from summonpot import Required, Summon, UsageLimits
 from summonpot.runtime import Runtime
 
 runtime = Runtime(
@@ -27,36 +13,15 @@ runtime = Runtime(
 )
 summon = Summon("support-service", runtime=runtime)
 
-customer_lookup = Operation(
-    load_customer,
-    bind={"customer_id": FromRequest("customer_id")},
-    output=CustomerRecord,
-)
-policy_lookup = Operation(
-    load_policy,
-    bind={"topic": AgentChoice()},
-    output=str,
-)
-ticket_creation = Operation(
-    create_ticket,
-    bind={
-        "customer_id": FromResult(customer_lookup, "customer_id"),
-        "priority": AgentChoice(),
-        "summary": AgentChoice(),
-    },
-    output=TicketReceipt,
-    after=(customer_lookup, policy_lookup),
-)
-
 
 @summon("/support")
 def handle_support(
     request: SupportRequest,
-    customer=Required(customer_lookup),
-    policy=Required(policy_lookup),
-    ticket=Required(ticket_creation, calls=Exactly(1)),
+    customer=Required(load_customer),
+    policy=Required(load_policy),
+    ticket=Required(create_ticket),
 ) -> SupportResponse:
-    """Handle the customer's support message. Load the customer. Select the relevant approved policy. Mark confirmed outages urgent and everything else normal. Create exactly one ticket, then write a brief reply grounded in the customer record and policy."""
+    """Handle the customer's support message. Load the customer. Select the relevant approved policy. Mark confirmed outages urgent and everything else normal. Create one ticket, then write a brief reply grounded in the customer record and policy."""
     ...
 
 

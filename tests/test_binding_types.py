@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from summonpot import (
     AgentChoice,
+    Exactly,
     FromContext,
     FromRequest,
     FromResult,
@@ -72,7 +73,9 @@ def _register(summon: Summon, *contracts: Operation) -> None:
         _inspect.Parameter(
             f"op{index}",
             _inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            default=Required(contract),
+            default=Required(
+                contract, calls=Exactly(1) if len(contracts) == 1 else None
+            ),
             annotation=object,
         )
         for index, contract in enumerate(contracts)
@@ -232,7 +235,7 @@ def test_a_result_field_of_the_wrong_type_is_rejected():
         )
 
 
-def test_a_result_field_of_the_right_type_is_accepted():
+def test_a_compatible_result_chain_reaches_fail_closed_admission():
     def consume_tier(customer_id: str) -> Customer:
         """Take a string."""
         return Customer(name="n", tier="t")
@@ -242,31 +245,31 @@ def test_a_result_field_of_the_right_type_is_accepted():
     )
     summon = Summon("svc")
 
-    _register(
-        summon,
-        producer,
-        Operation(
-            consume_tier,
-            bind={"customer_id": FromResult(producer, "tier")},
-            output=Customer,
-        ),
-    )
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
+        _register(
+            summon,
+            producer,
+            Operation(
+                consume_tier,
+                bind={"customer_id": FromResult(producer, "tier")},
+                output=Customer,
+            ),
+        )
 
-    assert len(summon.endpoints[0].tools) == 2
 
-
-def test_a_context_binding_is_never_rejected():
-    """Framework context has no type registry, so nothing about it is provable."""
+def test_a_context_binding_reaches_fail_closed_admission():
+    """Its type is not disproven, but the current runtime cannot enforce its source."""
     summon = Summon("svc")
 
-    _register(
-        summon,
-        Operation(
-            wants_str, bind={"customer_id": FromContext("trace_id")}, output=Customer
-        ),
-    )
-
-    assert summon.endpoints[0].tools[0].contract is not None
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
+        _register(
+            summon,
+            Operation(
+                wants_str,
+                bind={"customer_id": FromContext("trace_id")},
+                output=Customer,
+            ),
+        )
 
 
 # --- what a model may be asked to choose from --------------------------------
@@ -290,7 +293,7 @@ def test_selectable_shapes(output, selectable):
     assert selectable_item_type(output)[0] is selectable
 
 
-def test_a_choice_from_a_collection_is_accepted():
+def test_a_valid_result_backed_choice_reaches_fail_closed_admission():
     def list_tiers(customer_id: str) -> list[str]:
         """List tiers."""
         return ["a"]
@@ -300,17 +303,16 @@ def test_a_choice_from_a_collection_is_accepted():
     )
     summon = Summon("svc")
 
-    _register(
-        summon,
-        producer,
-        Operation(
-            wants_str,
-            bind={"customer_id": AgentChoice(from_result=producer, item_type=str)},
-            output=Customer,
-        ),
-    )
-
-    assert len(summon.endpoints[0].tools) == 2
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
+        _register(
+            summon,
+            producer,
+            Operation(
+                wants_str,
+                bind={"customer_id": AgentChoice(from_result=producer, item_type=str)},
+                output=Customer,
+            ),
+        )
 
 
 def test_a_choice_whose_item_type_contradicts_the_collection_is_rejected():
@@ -482,21 +484,20 @@ def test_an_unconstrained_choice_is_still_accepted():
     assert summon.endpoints[0].tools[0].contract is not None
 
 
-def test_a_choice_that_fits_is_accepted():
+def test_a_choice_that_fits_reaches_fail_closed_admission():
     producer = _tier_producer()
     summon = Summon("svc")
 
-    _register(
-        summon,
-        producer,
-        Operation(
-            wants_str,
-            bind={"customer_id": AgentChoice(from_result=producer, item_type=str)},
-            output=Customer,
-        ),
-    )
-
-    assert len(summon.endpoints[0].tools) == 2
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
+        _register(
+            summon,
+            producer,
+            Operation(
+                wants_str,
+                bind={"customer_id": AgentChoice(from_result=producer, item_type=str)},
+                output=Customer,
+            ),
+        )
 
 
 # --- an unknown item_type must not erase what the producer proved ------------
@@ -547,7 +548,7 @@ def test_an_unparameterised_producer_falls_back_to_the_item_type():
         )
 
 
-def test_an_unparameterised_producer_with_no_item_type_is_accepted():
+def test_an_unparameterised_valid_choice_reaches_fail_closed_admission():
     def list_anything(customer_id: str) -> list:
         """List values."""
         return []
@@ -557,17 +558,16 @@ def test_an_unparameterised_producer_with_no_item_type_is_accepted():
     )
     summon = Summon("svc")
 
-    _register(
-        summon,
-        producer,
-        Operation(
-            wants_int,
-            bind={"quantity": AgentChoice(from_result=producer)},
-            output=Customer,
-        ),
-    )
-
-    assert len(summon.endpoints[0].tools) == 2
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
+        _register(
+            summon,
+            producer,
+            Operation(
+                wants_int,
+                bind={"quantity": AgentChoice(from_result=producer)},
+                output=Customer,
+            ),
+        )
 
 
 # --- a fixed tuple against a homogeneous one ---------------------------------
@@ -641,8 +641,8 @@ def test_a_union_output_is_selectable_when_every_member_is(output, selectable, e
     assert selectable_item_type(output) == (selectable, element)
 
 
-def test_a_choice_from_a_union_of_collections_is_accepted():
-    """Rejecting this was a false rejection: every possible output is a collection."""
+def test_a_valid_union_choice_reaches_fail_closed_admission():
+    """The type relation is valid, but result-backed execution is not shipped."""
 
     def list_tiers(customer_id: str) -> list[str] | set[str]:
         """List tiers."""
@@ -655,17 +655,16 @@ def test_a_choice_from_a_union_of_collections_is_accepted():
     )
     summon = Summon("svc")
 
-    _register(
-        summon,
-        producer,
-        Operation(
-            wants_str,
-            bind={"customer_id": AgentChoice(from_result=producer, item_type=str)},
-            output=Customer,
-        ),
-    )
-
-    assert len(summon.endpoints[0].tools) == 2
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
+        _register(
+            summon,
+            producer,
+            Operation(
+                wants_str,
+                bind={"customer_id": AgentChoice(from_result=producer, item_type=str)},
+                output=Customer,
+            ),
+        )
 
 
 def test_a_choice_from_a_union_containing_a_scalar_is_rejected():
@@ -765,7 +764,7 @@ def test_a_choice_of_differing_elements_must_still_fit_the_argument():
         )
 
 
-def test_a_choice_of_differing_elements_fits_a_matching_union_argument():
+def test_a_choice_of_differing_elements_reaches_fail_closed_admission():
     def mixed_values(customer_id: str) -> list[str] | list[int]:
         """Return values of either type."""
         return []
@@ -781,17 +780,16 @@ def test_a_choice_of_differing_elements_fits_a_matching_union_argument():
     )
     summon = Summon("svc")
 
-    _register(
-        summon,
-        producer,
-        Operation(
-            accepts_either,
-            bind={"quantity": AgentChoice(from_result=producer)},
-            output=Customer,
-        ),
-    )
-
-    assert len(summon.endpoints[0].tools) == 2
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
+        _register(
+            summon,
+            producer,
+            Operation(
+                accepts_either,
+                bind={"quantity": AgentChoice(from_result=producer)},
+                output=Customer,
+            ),
+        )
 
 
 def test_a_variadic_source_cannot_satisfy_an_empty_fixed_tuple():
@@ -839,7 +837,7 @@ def test_a_known_incompatible_possibility_survives_an_unknown_branch():
         )
 
 
-def test_a_compatible_known_possibility_still_passes_with_an_unknown_branch():
+def test_a_compatible_known_possibility_reaches_fail_closed_admission():
     def maybe_values(customer_id: str) -> list[int] | Any:
         """Return values."""
         return []
@@ -851,14 +849,13 @@ def test_a_compatible_known_possibility_still_passes_with_an_unknown_branch():
     )
     summon = Summon("svc")
 
-    _register(
-        summon,
-        producer,
-        Operation(
-            wants_int,
-            bind={"quantity": AgentChoice(from_result=producer)},
-            output=Customer,
-        ),
-    )
-
-    assert len(summon.endpoints[0].tools) == 2
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
+        _register(
+            summon,
+            producer,
+            Operation(
+                wants_int,
+                bind={"quantity": AgentChoice(from_result=producer)},
+                output=Customer,
+            ),
+        )

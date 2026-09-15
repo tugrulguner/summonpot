@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from summonpot import AgentChoice, Exactly, FromRequest, FromResult
 from summonpot.runtime import Runtime
 from summonpot.server import build_app
 
@@ -117,26 +116,13 @@ def test_direct_example_runs_without_resolving_a_model(monkeypatch):
     assert summon._runtime._agents == {}
 
 
-def test_support_example_declares_the_typed_operation_chain(monkeypatch):
+def test_support_example_uses_only_admitted_legacy_capabilities(monkeypatch):
     summon = _load_example("06_support_service/app.py", monkeypatch)
     tools = {tool.name: tool for tool in summon.endpoints[0].tools}
 
-    customer = tools["load_customer"]
-    policy = tools["load_policy"]
-    ticket = tools["create_ticket"]
-
-    assert customer.contract.bind == {"customer_id": FromRequest("customer_id")}
-    assert policy.contract.bind == {"topic": AgentChoice()}
-    assert ticket.contract.bind == {
-        "customer_id": FromResult(customer.contract, "customer_id"),
-        "priority": AgentChoice(),
-        "summary": AgentChoice(),
-    }
-    assert ticket.contract.after == (customer.contract, policy.contract)
-    assert ticket.bounds == Exactly(1)
-    assert customer.required is True
-    assert policy.required is True
-    assert ticket.required is True
+    assert set(tools) == {"load_customer", "load_policy", "create_ticket"}
+    assert all(tool.contract is None for tool in tools.values())
+    assert all(tool.required is True for tool in tools.values())
 
 
 def test_support_example_guide_states_the_current_binding_boundary():
@@ -145,7 +131,7 @@ def test_support_example_guide_states_the_current_binding_boundary():
     assert "FromRequest" in guide
     assert "FromResult" in guide
     assert "AgentChoice" in guide
-    assert "does not inject bound values" in guide
+    assert "rejected at registration" in guide
     assert "filtered model schema" in guide
     assert "one permitted start" in guide
     assert "08_direct_execution.py" in guide

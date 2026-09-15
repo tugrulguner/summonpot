@@ -39,11 +39,14 @@ Use `make format` before committing.
   operation with at least one `FromRequest` binding,
   only `FromRequest` or immutable identity-stable callable defaults, and exact output
   identity executes directly without a model.
-  Every declaration outside that narrow shipped slice remains model-backed.
+  A direct `AgentChoice` in the same admitted shape remains model-backed.
 - Registration rejects invalid declarations before traffic when the failure is knowable.
 - In the shipped single-required-operation `Exactly(1)` slice, supported `FromRequest`, direct
   `AgentChoice`, and callable-default bindings are framework-owned rather than model-controlled.
-- Unsupported binding shapes, including `FromContext`, remain model-supplied.
+- Unsupported explicit binding shapes, including `FromContext`, are rejected before serving.
+  The same enforce-or-reject rule covers ordering, bounds, operation output, and a second
+  capability. Binding-source subclasses are outside the exact built-in vocabulary.
+- Bare callable dependencies retain their implicit marker behavior and legacy agent path.
 - Provider text, model output, capability details, credentials, and private request data do
   not enter public error bodies, fixtures, issue reports, or pull requests.
 - Public contract changes update README, roadmap, examples, and packaged coding-agent
