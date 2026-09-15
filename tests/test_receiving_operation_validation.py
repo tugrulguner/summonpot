@@ -57,6 +57,186 @@ def remember_canonical(value: list[int]) -> list[int]:
     return value
 
 
+def test_custom_init_receiver_is_rejected_at_public_registration():
+    lifecycle_events: list[str] = []
+
+    class Payload(BaseModel):
+        value: int
+
+        def __init__(self, **data: Any) -> None:
+            lifecycle_events.append("init")
+            super().__init__(**data)
+
+    def apply(value: Any) -> Result:
+        raise AssertionError("operation must not start")
+
+    apply.__annotations__ = {"value": Payload, "return": Result}
+    operation = Operation(apply, bind={"value": FromRequest("value")}, output=Result)
+    summon = Summon("custom-init-receiver")
+
+    with pytest.raises(
+        TypeError,
+        match=r"^Unsupported receiving parameter contract: Pydantic model lifecycle hooks are not supported\.$",
+    ):
+
+        @summon("/apply")
+        def endpoint(
+            request: AnyRequest, result=Required(operation, calls=Exactly(1))
+        ) -> Result:
+            """Reject unsafe receiver lifecycle hooks before serving traffic."""
+            ...
+
+    assert lifecycle_events == []
+    assert summon.endpoints == []
+
+
+def test_model_post_init_receiver_is_rejected_at_public_registration():
+    lifecycle_events: list[str] = []
+
+    class Payload(BaseModel):
+        value: int
+
+        def model_post_init(self, context: Any, /) -> None:
+            lifecycle_events.append("post-init")
+
+    def apply(value: Any) -> Result:
+        raise AssertionError("operation must not start")
+
+    apply.__annotations__ = {"value": Payload, "return": Result}
+    operation = Operation(apply, bind={"value": FromRequest("value")}, output=Result)
+    summon = Summon("post-init-receiver")
+
+    with pytest.raises(
+        TypeError,
+        match=r"^Unsupported receiving parameter contract: Pydantic model lifecycle hooks are not supported\.$",
+    ):
+
+        @summon("/apply")
+        def endpoint(
+            request: AnyRequest, result=Required(operation, calls=Exactly(1))
+        ) -> Result:
+            """Reject unsafe receiver lifecycle hooks before serving traffic."""
+            ...
+
+    assert lifecycle_events == []
+    assert summon.endpoints == []
+
+
+def test_lifecycle_receivers_are_rejected_through_nested_container_and_union_nodes():
+    lifecycle_events: list[str] = []
+
+    class CustomInit(BaseModel):
+        value: int
+
+        def __init__(self, **data: Any) -> None:
+            lifecycle_events.append("init")
+            super().__init__(**data)
+
+    class PostInit(BaseModel):
+        value: int
+
+        def model_post_init(self, context: Any, /) -> None:
+            lifecycle_events.append("post-init")
+
+    class Envelope(BaseModel):
+        payload: CustomInit
+
+    annotations = (Envelope, list[PostInit], int | CustomInit)
+    for index, annotation in enumerate(annotations):
+
+        def apply(value: Any) -> Result:
+            raise AssertionError("operation must not start")
+
+        apply.__annotations__ = {"value": annotation, "return": Result}
+        operation = Operation(
+            apply, bind={"value": FromRequest("value")}, output=Result
+        )
+        summon = Summon(f"nested-lifecycle-receiver-{index}")
+
+        with pytest.raises(
+            TypeError,
+            match=r"^Unsupported receiving parameter contract: Pydantic model lifecycle hooks are not supported\.$",
+        ):
+
+            @summon("/apply")
+            def endpoint(
+                request: AnyRequest, result=Required(operation, calls=Exactly(1))
+            ) -> Result:
+                """Reject lifecycle hooks anywhere in the receiver schema."""
+                ...
+
+        assert summon.endpoints == []
+
+    assert lifecycle_events == []
+
+
+def test_ordinary_base_model_receiver_remains_supported():
+    received: list[Any] = []
+
+    class Payload(BaseModel):
+        value: int
+
+    def apply(value: Any) -> Result:
+        received.append(value)
+        return Result(value=value.value)
+
+    apply.__annotations__ = {"value": Payload, "return": Result}
+    operation = Operation(apply, bind={"value": FromRequest("value")}, output=Result)
+    summon = Summon("ordinary-model-receiver")
+
+    @summon("/apply")
+    def endpoint(
+        request: AnyRequest, result=Required(operation, calls=Exactly(1))
+    ) -> Result:
+        """Accept an ordinary model receiver without transforming it."""
+        ...
+
+    canonical = Payload.model_construct(value=7)
+    assert _call_with_canonical(summon, canonical) == Result(value=7)
+    assert received == [canonical]
+    assert received[0] is canonical
+
+
+def test_http_application_with_lifecycle_receiver_never_starts_operation():
+    starts = 0
+    lifecycle_events: list[str] = []
+
+    class Payload(BaseModel):
+        value: int
+
+        def model_post_init(self, context: Any, /) -> None:
+            lifecycle_events.append("post-init")
+
+    def apply(value: Any) -> Result:
+        nonlocal starts
+        starts += 1
+        return Result(value=value.value)
+
+    apply.__annotations__ = {"value": Payload, "return": Result}
+    operation = Operation(apply, bind={"value": FromRequest("value")}, output=Result)
+    summon = Summon("http-lifecycle-receiver")
+
+    def create_http_app() -> Any:
+        @summon("/apply")
+        def endpoint(
+            request: AnyRequest, result=Required(operation, calls=Exactly(1))
+        ) -> Result:
+            """Reject the unsafe contract before the HTTP application can launch."""
+            ...
+
+        return build_app(summon)
+
+    with pytest.raises(
+        TypeError,
+        match=r"^Unsupported receiving parameter contract: Pydantic model lifecycle hooks are not supported\.$",
+    ):
+        create_http_app()
+
+    assert starts == 0
+    assert lifecycle_events == []
+    assert summon.endpoints == []
+
+
 def test_direct_path_rejects_a_request_value_outside_the_receiving_constraint():
     starts = 0
 

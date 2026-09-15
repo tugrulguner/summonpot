@@ -772,6 +772,10 @@ def _compile_receiving_schema(schema: Any) -> _ReceivingPredicate:
 
             return model_fields
         if kind == "model":
+            if node.get("custom_init") or node.get("post_init") is not None:
+                raise _unsupported_receiver(
+                    "Pydantic model lifecycle hooks are not supported"
+                )
             model_class = node["cls"]
             nested_config = _receiving_model_config(node)
             child = compile_node(node["schema"], nested_config)
