@@ -125,7 +125,11 @@ carrier is rejected. The framework does not call application-defined copy hooks 
 handing values off.
 Compatibility projection preserves exact built-in JSON scalars and dictionaries with exact
 string keys. Exact list, tuple, set, and frozenset containers are recursively detached;
-typed views preserve their native kind, while prompts receive JSON arrays.
+typed views preserve their native kind when projected members remain safely hashable, while
+prompts receive JSON arrays. Hashed containers whose projected members are not hashable use
+the inert `"<unavailable>"` fallback instead of invoking application hash/equality hooks.
+Pydantic model values are projected from declared field storage, including aliases and
+supported nested values, without calling model serializers or representation hooks.
 Exact UUID, date, datetime, time, timedelta,
 Decimal, and bytes values remain usable: prompts receive framework-safe strings and
 custom-runtime typed views retain native values, with UUIDs independently reconstructed.
@@ -139,6 +143,17 @@ validated Python values. This does not change the HTTP adapter's earlier body se
 or path-parameter rendering.
 As with any Pydantic application validator, code that retains and later mutates an object
 it returned remains application-owned behavior rather than a second request input.
+Raw `Runtime.call` mappings use the endpoint's declared request contract once, matching HTTP
+required fields, defaults, aliases, and canonical typed values for Pydantic request models
+and individual parameters. Unlike the body adapter's model-facing rendering, raw runtime
+preparation does not call declared field serializers, application copy hooks, or string hooks.
+Custom-initialized request contracts reject raw mappings containing model instances before
+the custom constructor runs; pass the equivalent nested mapping instead. This explicit
+boundary prevents constructed instances from bypassing nested validation or authorizing an
+unchecked original after a coercing validation pass. Already validated HTTP transport graphs
+remain one-shot handoffs and are not revalidated.
+For a parameterless endpoint the raw contract is explicitly empty: undeclared keys are rejected
+before model execution or application value hooks, while HTTP exposes no request fields.
 
 Output from runtime-enforced operations is validated against its declared schema without
 invoking serializers. Custom model `__init__` methods in these output schemas (including
