@@ -329,12 +329,14 @@ def _runtime_model_extra_collision_auditor(schema: Any) -> Any:
                 seen.add(identity)
                 model_type = type(current)
                 emitted = {
-                    field.serialization_alias or name
+                    field.serialization_alias
+                    if field.serialization_alias is not None
+                    else name
                     for name, field in model_type.model_fields.items()
                     if not field.exclude
                 }
                 emitted.update(
-                    field.alias or name
+                    field.alias if field.alias is not None else name
                     for name, field in model_type.model_computed_fields.items()
                 )
                 extras = object.__getattribute__(current, "__pydantic_extra__") or {}

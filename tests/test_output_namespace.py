@@ -79,6 +79,69 @@ class ValidatorSafeExtraOutput(BaseModel):
         return result
 
 
+class EmptyAliasAfterValidatorOutput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    value: int = Field(serialization_alias="")
+
+    @model_validator(mode="after")
+    def add_empty_alias_extra(self) -> "EmptyAliasAfterValidatorOutput":
+        assert self.__pydantic_extra__ is not None
+        self.__pydantic_extra__[""] = "hostile"
+        return self
+
+
+class EmptyAliasWrapValidatorOutput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    value: int = Field(serialization_alias="")
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def add_empty_alias_extra(
+        cls, value: Any, handler: Any
+    ) -> "EmptyAliasWrapValidatorOutput":
+        result = handler(value)
+        assert result.__pydantic_extra__ is not None
+        result.__pydantic_extra__[""] = "hostile"
+        return result
+
+
+class EmptyAliasSafeExtraOutput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    value: int = Field(serialization_alias="")
+
+    @model_validator(mode="after")
+    def add_safe_extra(self) -> "EmptyAliasSafeExtraOutput":
+        assert self.__pydantic_extra__ is not None
+        self.__pydantic_extra__["note"] = "safe"
+        return self
+
+
+EMPTY_ALIAS_HOOKS: list[str] = []
+
+
+class EmptyAliasHostileOutput(EmptyAliasAfterValidatorOutput):
+    @model_serializer(mode="wrap")
+    def serialize(self, handler: Any) -> Any:
+        EMPTY_ALIAS_HOOKS.append("serializer")
+        return handler(self)
+
+    def __copy__(self):
+        EMPTY_ALIAS_HOOKS.append("copy")
+        raise AssertionError("copy hook called during output validation")
+
+    def __deepcopy__(self, memo: Any = None):
+        EMPTY_ALIAS_HOOKS.append("deepcopy")
+        raise AssertionError("deepcopy hook called during output validation")
+
+    def __repr__(self) -> str:
+        EMPTY_ALIAS_HOOKS.append("repr")
+        raise AssertionError("repr hook called during output validation")
+
+    def __str__(self) -> str:
+        EMPTY_ALIAS_HOOKS.append("str")
+        raise AssertionError("str hook called during output validation")
+
+
 class DuplicateFieldOutput(BaseModel):
     first: int = Field(serialization_alias="value")
     value: int
@@ -131,6 +194,22 @@ class ComputedExtraOutput(BaseModel):
         return self.value * 2
 
 
+class EmptyComputedAliasAfterValidatorOutput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    value: int
+
+    @computed_field(alias="")
+    @property
+    def doubled(self) -> int:
+        return self.value * 2
+
+    @model_validator(mode="after")
+    def add_empty_alias_extra(self) -> "EmptyComputedAliasAfterValidatorOutput":
+        assert self.__pydantic_extra__ is not None
+        self.__pydantic_extra__[""] = "hostile"
+        return self
+
+
 @dataclass
 class DataclassCollisionOutput:
     first: int = Field(serialization_alias="value")
@@ -175,6 +254,23 @@ class SafeNestedDataclassCarrier:
         assert self.item.__pydantic_extra__ is not None
         self.item.__pydantic_extra__["note"] = "safe"
         return self
+
+
+@dataclass
+class EmptyAliasNestedDataclassCarrier:
+    item: EmptyAliasAfterValidatorOutput
+
+
+class EmptyAliasNestedDataclassEnvelope(BaseModel):
+    payload: EmptyAliasNestedDataclassCarrier
+
+
+class EmptyAliasRootDataclassEnvelope(BaseModel):
+    payload: RootModel[EmptyAliasNestedDataclassCarrier]
+
+
+class EmptyAliasUnionDataclassEnvelope(BaseModel):
+    payload: EmptyAliasNestedDataclassCarrier | int
 
 
 class NestedDataclassEnvelope(BaseModel):
@@ -300,6 +396,32 @@ def test_model_validators_can_add_noncolliding_extras_after_fields_join():
     }
 
 
+@pytest.mark.parametrize(
+    "output,value",
+    [
+        (EmptyAliasAfterValidatorOutput, {"value": 7}),
+        (EmptyAliasWrapValidatorOutput, {"value": 7}),
+        (EmptyComputedAliasAfterValidatorOutput, {"value": 7}),
+        (RootModel[EmptyAliasAfterValidatorOutput], {"value": 7}),
+        (EmptyAliasWrapValidatorOutput | int, {"value": 7}),
+        (EmptyAliasNestedDataclassCarrier, {"item": {"value": 7}}),
+    ],
+)
+def test_post_validation_extra_cannot_shadow_an_empty_serialization_alias(
+    output: Any, value: Any
+):
+    with pytest.raises(ValidationError, match=r"shadow.*''"):
+        _compile_output_validator(TypeAdapter(output)).validate_python(value)
+
+
+def test_post_validation_noncolliding_extra_preserves_empty_serialization_alias():
+    validated = _compile_output_validator(
+        TypeAdapter(EmptyAliasSafeExtraOutput)
+    ).validate_python({"value": 7})
+
+    assert validated.model_dump(mode="json", by_alias=True) == {"": 7, "note": "safe"}
+
+
 def test_noncolliding_extra_preserves_alias_serialization():
     output = _set_extra(AliasedExtraOutput(value=7), note="safe")
 
@@ -423,6 +545,18 @@ def test_collision_validation_does_not_call_application_object_hooks():
     assert HOOKS == []
 
 
+def test_empty_alias_collision_rejection_does_not_call_application_object_hooks():
+    EMPTY_ALIAS_HOOKS.clear()
+    output = EmptyAliasHostileOutput.model_construct(value=7)
+
+    with pytest.raises(ValidationError):
+        _compile_output_validator(TypeAdapter(EmptyAliasHostileOutput)).validate_python(
+            output
+        )
+
+    assert EMPTY_ALIAS_HOOKS == []
+
+
 def test_http_rejects_colliding_extra_before_response_serialization():
     output = _set_extra(AliasedExtraOutput(value=7), wireValue="hostile")
     summon = _direct_summon(AliasedExtraOutput, output)
@@ -437,6 +571,71 @@ def test_http_rejects_colliding_extra_before_response_serialization():
     )
     assert response.status_code == 500
     assert "hostile" not in response.text
+
+
+@pytest.mark.parametrize(
+    "output,result",
+    [
+        (EmptyAliasAfterValidatorOutput, {"value": 7}),
+        (EmptyAliasWrapValidatorOutput, {"value": 7}),
+        (EmptyComputedAliasAfterValidatorOutput, {"value": 7}),
+        (RootModel[EmptyAliasAfterValidatorOutput], {"value": 7}),
+        (
+            EmptyAliasNestedDataclassEnvelope,
+            {"payload": {"item": {"value": 7}}},
+        ),
+        (
+            EmptyAliasRootDataclassEnvelope,
+            {"payload": {"item": {"value": 7}}},
+        ),
+        (
+            EmptyAliasUnionDataclassEnvelope,
+            {"payload": {"item": {"value": 7}}},
+        ),
+    ],
+)
+def test_http_rejects_post_validation_empty_alias_collision(output: Any, result: Any):
+    summon = _direct_summon(output, result)
+
+    with pytest.raises(_OperationOutputError, match="invalid declared output"):
+        asyncio.run(
+            Runtime(model="invalid:no-model").call(summon.endpoints[0], {"value": 7})
+        )
+
+    response = TestClient(build_app(summon), raise_server_exceptions=False).post(
+        "/output", json={"value": 7}
+    )
+    assert response.status_code == 500
+    assert "hostile" not in response.text
+
+
+def test_http_empty_alias_collision_rejection_does_not_call_object_hooks():
+    EMPTY_ALIAS_HOOKS.clear()
+    output = EmptyAliasHostileOutput.model_construct(value=7)
+    summon = _direct_summon(EmptyAliasHostileOutput, output)
+
+    with pytest.raises(_OperationOutputError, match="invalid declared output"):
+        asyncio.run(
+            Runtime(model="invalid:no-model").call(summon.endpoints[0], {"value": 7})
+        )
+    assert EMPTY_ALIAS_HOOKS == []
+
+    response = TestClient(build_app(summon), raise_server_exceptions=False).post(
+        "/output", json={"value": 7}
+    )
+    assert response.status_code == 500
+    assert EMPTY_ALIAS_HOOKS == []
+
+
+def test_http_preserves_valid_empty_serialization_alias():
+    response = TestClient(
+        build_app(_direct_summon(EmptyAliasSafeExtraOutput, {"value": 7}))
+    ).post("/output", json={"value": 7})
+
+    assert response.status_code == 200
+    assert response.json() == {"": 7, "note": "safe"}
+    assert response.text.count('""') == 1
+    assert response.text.count('"note"') == 1
 
 
 def test_http_emits_each_safe_output_key_once():
