@@ -1,0 +1,10 @@
+{
+  "repo": "tugrulguner/summonpot",
+  "number": 81,
+  "base": "main",
+  "head": "fix/python-3.14-support",
+  "fork": "VedantMadane/summonpot",
+  "title": "fix: add tested Python 3.14 support",
+  "url": "https://github.com/tugrulguner/summonpot/pull/81",
+  "rebased": true
+}

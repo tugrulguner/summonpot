@@ -13,14 +13,11 @@ Pydantic request model
 
 The endpoint body is declarative and is never the handler. Request JSON carries business
 data, not an action selector. The same simple contract supports direct deterministic
-execution for the narrow complete path shipped below; admitted declarations with a direct
-semantic choice and bare legacy capabilities use the agent runtime. For the enforced single
-required `Exactly(1)` slice, Summonpot hides and injects application-owned arguments and
-leaves only declared `AgentChoice` values to the agent.
-Unsupported explicit contract shapes fail during registration until their full semantics
-ship. Bare `Depends(fn)` and `Required(fn)` declarations remain compatible with implicit
-marker bounds and no explicit `Operation` contract. The typed HTTP endpoint stays stable as
-that balance changes.
+execution for the narrow complete path shipped below; all other requests use the agent
+runtime. For the enforced single required `Exactly(1)` slice, Summonpot hides and injects
+application-owned arguments and leaves only declared `AgentChoice` values to the agent.
+Unsupported shapes retain legacy model-supplied argument behavior until their full semantics
+ship. The typed HTTP endpoint stays stable as that balance changes.
 
 ## Shipped foundation
 
@@ -55,11 +52,7 @@ The current release line provides:
   and non-finite values. An absent maximum (`None`) remains valid for unbounded calls;
   this count-type validation does not imply broader runtime call-bound enforcement.
 - Registration-time validation for complete bindings, request and result references, operation ordering, selectable collections, and provable type incompatibility.
-- Fail-closed runtime admission: binding sources must use the exact built-in source
-  vocabulary, and every explicit binding, ordering, call-bound, and output contract must fit
-  the one supported required `Exactly(1)` operation shape or registration rejects it. Adding
-  another capability cannot downgrade that contract to the legacy path.
-- Python 3.11–3.13 CI, package builds, and expanded runtime/CLI coverage.
+- Python 3.11-3.14 CI, package builds, and expanded runtime/CLI coverage.
 
 ### 0.5.0 boundary
 
@@ -98,8 +91,8 @@ matching the endpoint response model. It runs without resolving, constructing, o
 multi-operation deterministic compiler remains planned.
 
 Multi-operation graphs, `FromResult`, `FromContext`, `after`, broader call bounds, and
-broader no-model execution remain planned. Current source rejects those shapes when they are
-explicitly declared rather than routing them through an unenforced agent path.
+broader no-model execution remain planned. Those unsupported shapes remain on the agent
+runtime until their full semantics ship.
 
 ### 0.8.0 boundary
 
@@ -113,12 +106,6 @@ keeping unsupported values inert.
 This release does not broaden runtime enforcement to multi-operation graphs. The remaining
 enforce-or-reject, input/output, failure, and deadline semantics stay in milestone 1 below.
 
-Current source completes the admission portion of that milestone: only one required typed
-operation with `calls=Exactly(1)`, complete supported bindings, declared output, no ordering,
-and no second capability is admitted. `FromRequest` and direct `AgentChoice` are the only
-runtime-supported binding sources. All other explicit shapes fail before serving; bare
-callable dependencies retain their implicit marker behavior.
-
 ## Next milestones
 
 The ordering below prioritizes complete, enforceable contracts before expanding execution.
@@ -131,11 +118,15 @@ public graph, or handler body.
 
 Close the gaps in existing declarations before adding result chains:
 
-- The admission gate is shipped: exact built-in source types are required, unsupported
-  runtime bounds fail before serving, and every explicit binding, ordering, bound, and output
-  contract is either fully enforced by the single-operation slice or rejected. Bare callable
-  dependencies remain the only legacy model-supplied argument path; there is no strict-mode
-  switch.
+- Reject binding sources outside the closed `FromRequest`, `FromResult`, `FromContext`,
+  and `AgentChoice` vocabulary at registration.
+- Reject unsupported runtime call-bound shapes before serving; broader runtime enforcement
+  follows in milestone 5. Construction-time count-type validation is already shipped.
+- Enforce every explicitly declared binding, ordering constraint, call bound, and operation
+  output contract, or reject the unsupported declaration before serving. Adding a second
+  capability must not remove enforcement from an existing operation. Preserve legacy
+  model-supplied arguments only for bare capabilities without unsupported explicit constraints;
+  do not add a strict-mode switch.
 - Define how receiving operation constraints are checked before application code runs,
   without silently transforming canonical bound values or unexpectedly rerunning application
   validators. Request validation alone must not imply compatibility with a narrower operation
@@ -268,7 +259,7 @@ prepared SQLAlchemy statement or fixed SQLite specification
 → typed callable schema visible to the executor
 ```
 
-Target declarations will pass the bounded operation object into the endpoint—not a session,
+Target declarations will pass the bounded operation object into the endpoint-not a session,
 connection, or arbitrary query function:
 
 ```python
@@ -317,7 +308,7 @@ workflow persistence:
 - Workspace execution for files, planning, long context, or subagents.
 - Durable execution for background, resumable, or long-running work.
 
-Summonpot—not the caller or model—will choose the smallest eligible harness. Changing the harness must never grant additional capabilities.
+Summonpot-not the caller or model-will choose the smallest eligible harness. Changing the harness must never grant additional capabilities.
 
 ## Agent execution and context track
 
@@ -336,7 +327,7 @@ establish compatibility with our pinned dependencies or authority guarantees.
 #### A1. Basic budgeting and context isolation
 
 After milestone 1's boundary hardening, improve the existing agent path without waiting for
-milestones 2–3, a general graph, or a durable executor. This early slice does not require
+milestones 2-3, a general graph, or a durable executor. This early slice does not require
 result-chain retrieval or producer-constrained choices:
 
 - Keep canonical request state and the invocation ledger separate from model-visible working
@@ -357,7 +348,7 @@ result-chain retrieval or producer-constrained choices:
 
 #### A2. Result-backed context and compaction
 
-Only after validated result chains and producer-constrained choices (milestones 2–3),
+Only after validated result chains and producer-constrained choices (milestones 2-3),
 extend A1 with result-backed context:
 
 - Keep canonical request/result state separate from model-visible working context and
@@ -378,7 +369,7 @@ extend A1 with result-backed context:
 
 ### B. Readiness-aware tool discovery and evidence selection
 
-Build on validated result chains and producer-constrained choices (milestones 2–3):
+Build on validated result chains and producer-constrained choices (milestones 2-3):
 
 - Expose or progressively discover only operations already declared and currently legal to
   invoke. Search does not add capabilities, select providers, or authorize an invocation.

@@ -8,9 +8,8 @@ request model, the goal, the exact capabilities, and the response model.
 One fully resolved `Exactly(1)` operation path executes without a model when the endpoint
 uses a Pydantic request model and it has at least
 one `FromRequest` binding, uses only `FromRequest` or immutable identity-stable callable
-defaults, and the operation output is exactly the endpoint response model. Bare legacy
-capabilities still use the provider-neutral agent runtime. Unsupported explicit contracts
-are rejected before serving. Broader multi-operation deterministic execution remains planned. The framework
+defaults, and the operation output is exactly the endpoint response model. All other declarations still use the provider-neutral agent
+runtime. Broader multi-operation deterministic execution remains planned. The framework
 owns execution, including any agent loop. **The ellipsis is a complete declaration body**,
 not an implementation waiting to be written. Calling the decorated declaration directly is
 rejected; execution goes through the served endpoint.
@@ -92,7 +91,7 @@ these is a hard error:
   function name and HTTP method. Two routes that would produce the same ID are rejected
   during registration.
 - **Annotations must resolve at runtime.** Under `from __future__ import annotations`,
-  or with a quoted annotation, the name is looked up when the endpoint registers — so a
+  or with a quoted annotation, the name is looked up when the endpoint registers - so a
   `TYPE_CHECKING`-only import, or a model defined in a function scope that is no longer
   reachable, is rejected rather than silently degraded to an untyped body. A live class
   object passed directly as the annotation resolves fine. Declaring models at module
@@ -111,16 +110,17 @@ these is a hard error:
 ## Typed operation contracts
 
 Use `Operation` when the source of each capability argument is part of the endpoint
-contract. The currently admitted shape is one required operation with `calls=Exactly(1)`,
-a declared output, no ordering, and complete `FromRequest` or direct `AgentChoice` bindings:
+contract. Keep these declarations beside the application operations, then reference the
+complete contracts through `Depends` or `Required`:
 
 ```python
-from my_service.models import Customer, OrderRequest, OrderResponse
-from my_service.operations import load_customer
+from my_service.models import Customer, OrderOption, OrderRequest, OrderResponse
+from my_service.operations import find_options, load_customer, place_order
 from summonpot import (
     AgentChoice,
-    Exactly,
+    FromContext,
     FromRequest,
+    FromResult,
     Operation,
     Required,
     Summon,
@@ -129,11 +129,23 @@ from summonpot import (
 
 customer = Operation(
     load_customer,
-    bind={
-        "customer_id": FromRequest("customer_id"),
-        "format": AgentChoice(),
-    },
+    bind={"customer_id": FromRequest("customer_id")},
     output=Customer,
+)
+options = Operation(
+    find_options,
+    bind={"sku": FromRequest("sku")},
+    output=list[OrderOption],
+)
+order = Operation(
+    place_order,
+    bind={
+        "customer_id": FromResult(customer, "customer_id"),
+        "option": AgentChoice(from_result=options, item_type=OrderOption),
+        "actor_id": FromContext("actor_id"),
+    },
+    output=OrderResponse,
+    after=(customer, options),
 )
 
 summon = Summon("order-api")
@@ -142,9 +154,11 @@ summon = Summon("order-api")
 @summon("/orders")
 def create_order(
     request: OrderRequest,
-    customer_result=Required(customer, calls=Exactly(1)),
+    customer_result=Required(customer),
+    available_options=Required(options),
+    order_result=Required(order),
 ) -> OrderResponse:
-    """Load the customer and return the approved response."""
+    """Place an order using one approved option."""
     ...
 ```
 
@@ -157,10 +171,7 @@ The argument sources mean:
 | framework-owned context | `FromContext("key")` |
 | direct or collection-backed model selection | `AgentChoice(...)` |
 
-`FromResult`, `FromContext`, collection-backed `AgentChoice`, and `after=` remain public
-declaration vocabulary for future execution slices, but those explicit shapes are rejected
-during registration today. Binding sources must be exact built-in source types; subclasses
-are rejected. Once `bind=` is present, bind every argument that has no default. Registration rejects
+Once `bind=` is present, bind every argument that has no default. Registration rejects
 unknown arguments, missing request or result fields, undeclared producers, unreadable
 outputs, invalid `after=` references, and unsupported selectable collection shapes.
 Dependency cycles are structurally unrepresentable through the immutable public
@@ -172,16 +183,16 @@ relationships that cannot be established remain unknown. An unknown branch does 
 erase a known contradiction.
 
 `output=` is required before another operation can use `FromResult` or collection-backed
-`AgentChoice`. Bare callable dependencies without an explicit contract remain valid and use
-the legacy model-chosen argument path. `Operation(fn)` is still an explicit contract. It and
-any other incomplete or unsupported `Operation` are rejected rather than silently downgraded.
+`AgentChoice`. Bare callables and `Operation` declarations without `bind` remain valid;
+in those cases the model chooses the arguments as before.
 
 Call-bound helpers can refine a marker declaratively:
 
 ```python
-from summonpot import Exactly, Required
+from summonpot import AtMost, Depends, Exactly, Required
 
-lookup = Required(customer, calls=Exactly(1))
+lookup = Depends(customer, calls=AtMost(2))
+write = Required(order, calls=Exactly(1))
 ```
 
 For one required typed operation with `calls=Exactly(1)`, the runtime enforces bindings
@@ -192,9 +203,8 @@ Pydantic request model, has at least one `FromRequest` binding, uses only `FromR
 or supported immutable callable defaults, and `output=` is exactly the endpoint response model, Summonpot executes it directly
 without resolving or constructing a model. There is no model fallback after direct
 execution begins. Multi-operation chains, `FromResult`, `FromContext`, `after`,
-collection-backed choices, and broader call bounds are rejected during registration until
-their runtime semantics ship. Bare `Depends(fn)` and `Required(fn)` calls keep their implicit
-legacy bounds; explicit unsupported call bounds are not admitted.
+collection-backed choices, and broader call bounds remain registration-only. Unsupported
+shapes keep the existing model-supplied argument behavior.
 
 Runtime-enforced output schemas must not define a custom model `__init__`, including
 nested models. Registration rejects that unsupported constructor path rather than
@@ -246,7 +256,7 @@ def list_tickets(
 ```
 
 Query parameters must be scalars or sequences of scalars. A mapping such as
-`dict[str, int]` has no query encoding and is rejected — use `POST` for that.
+`dict[str, int]` has no query encoding and is rejected - use `POST` for that.
 
 ## Path parameters
 
@@ -270,7 +280,7 @@ lives in exactly one place. The URL is its only authority: a body that also carr
 `customer_id` does not override the URL segment.
 
 When the URL owns *every* declared parameter, the route takes **no request body at
-all** — call it with nothing but the path:
+all** - call it with nothing but the path:
 
 ```python
 @summon("/items/{item_id}", method="POST")
@@ -287,7 +297,7 @@ These are rejected at registration, not at request time:
 
 - a placeholder that no parameter is named after;
 - the same placeholder named twice in one route;
-- a path parameter with a default — the URL always supplies it, so it is never optional;
+- a path parameter with a default - the URL always supplies it, so it is never optional;
 - a path parameter annotated with a non-scalar such as `list[int]` or a model. A
   structured value belongs in the body.
 
@@ -303,7 +313,7 @@ Anthropic:
 pip install "summonpot[serve,cli,anthropic]"
 ```
 
-Python 3.11 through 3.13 is supported.
+Python 3.11 through 3.14 is supported.
 
 `serve` installs FastAPI and uvicorn, `cli` installs the `summonpot` command, and the
 provider extra installs that provider's client. Replace `anthropic` with the provider
@@ -325,7 +335,7 @@ provider credit. Use `host="127.0.0.1"` for local development. Before deliberate
 exposing a service, put authentication in front of it and configure usage limits and a
 timeout.
 
-To run with no provider account at all — useful for checking routing, validation and
+To run with no provider account at all - useful for checking routing, validation and
 capability wiring before any key exists:
 
 ```bash
@@ -365,7 +375,7 @@ summon = Summon(
 because a supplied runtime already carries its own.
 
 The timeout releases the caller on the deadline, but it **cannot interrupt a
-synchronous capability already running in a worker thread** — a write started before
+synchronous capability already running in a worker thread** - a write started before
 the deadline still completes. Give such a capability its own internal deadline.
 
 ## Failure responses
@@ -382,7 +392,7 @@ Response bodies never carry model output or provider text; details go to the ser
 
 ## Writing capabilities
 
-A capability is an ordinary function. It runs for real — summonpot never replaces its
+A capability is an ordinary function. It runs for real - summonpot never replaces its
 implementation.
 
 ```python
@@ -400,7 +410,6 @@ Two things to know:
   resource such as a default SQLite connection; open one per call.
 - **Argument authority depends on the declaration shape.** The enforced single-operation
   form hides `FromRequest` and defaulted arguments and exposes only `AgentChoice`. Bare
-  callable capabilities still receive model-supplied arguments. A fully resolved
-  exact-response operation runs directly, and an admitted operation with direct
-  `AgentChoice` uses the agent path. Unsupported explicit operation shapes are rejected at
-  registration. Validate inputs and enforce authorization inside every capability.
+  capabilities and broader operation graphs still receive model-supplied arguments. A
+  fully resolved exact-response operation runs directly; all other declarations use the
+  agent path. Validate inputs and enforce authorization inside every capability.

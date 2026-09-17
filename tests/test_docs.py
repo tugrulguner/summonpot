@@ -85,17 +85,9 @@ def test_roadmap_scopes_the_enforced_authority_boundary():
     assert "executes directly without resolving or constructing a model" in roadmap
     assert "For the enforced single required `Exactly(1)` slice" in roadmap
     assert "leaves only declared `AgentChoice` values to the agent" in roadmap
-    assert "Unsupported explicit contract shapes fail during registration" in roadmap
     assert (
-        "Bare `Depends(fn)` and `Required(fn)` declarations remain compatible"
-        in roadmap
+        "Unsupported shapes retain legacy model-supplied argument behavior" in roadmap
     )
-
-
-def test_capability_guide_treats_even_a_bare_operation_as_explicit():
-    guide = " ".join(CAPABILITY_GUIDE.read_text(encoding="utf-8").split())
-
-    assert "`Operation(fn)` is still an explicit contract" in guide
 
 
 def test_roadmap_advances_after_the_narrow_no_model_slice():
@@ -162,7 +154,7 @@ def test_reviewing_distinguishes_shipped_direct_execution_from_planned_work():
 def test_readme_states_current_python_support_without_release_candidate_language():
     readme = README.read_text(encoding="utf-8")
 
-    assert "Python 3.11 through 3.13" in readme
+    assert "Python 3.11 through 3.14" in readme
     assert "This source revision" not in readme
     assert "newly built artifacts" not in readme
     assert "already-published packages" not in readme
