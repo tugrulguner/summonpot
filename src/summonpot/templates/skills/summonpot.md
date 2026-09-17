@@ -91,7 +91,7 @@ these is a hard error:
   function name and HTTP method. Two routes that would produce the same ID are rejected
   during registration.
 - **Annotations must resolve at runtime.** Under `from __future__ import annotations`,
-  or with a quoted annotation, the name is looked up when the endpoint registers — so a
+  or with a quoted annotation, the name is looked up when the endpoint registers - so a
   `TYPE_CHECKING`-only import, or a model defined in a function scope that is no longer
   reachable, is rejected rather than silently degraded to an untyped body. A live class
   object passed directly as the annotation resolves fine. Declaring models at module
@@ -256,7 +256,7 @@ def list_tickets(
 ```
 
 Query parameters must be scalars or sequences of scalars. A mapping such as
-`dict[str, int]` has no query encoding and is rejected — use `POST` for that.
+`dict[str, int]` has no query encoding and is rejected - use `POST` for that.
 
 ## Path parameters
 
@@ -280,7 +280,7 @@ lives in exactly one place. The URL is its only authority: a body that also carr
 `customer_id` does not override the URL segment.
 
 When the URL owns *every* declared parameter, the route takes **no request body at
-all** — call it with nothing but the path:
+all** - call it with nothing but the path:
 
 ```python
 @summon("/items/{item_id}", method="POST")
@@ -297,7 +297,7 @@ These are rejected at registration, not at request time:
 
 - a placeholder that no parameter is named after;
 - the same placeholder named twice in one route;
-- a path parameter with a default — the URL always supplies it, so it is never optional;
+- a path parameter with a default - the URL always supplies it, so it is never optional;
 - a path parameter annotated with a non-scalar such as `list[int]` or a model. A
   structured value belongs in the body.
 
@@ -335,7 +335,7 @@ provider credit. Use `host="127.0.0.1"` for local development. Before deliberate
 exposing a service, put authentication in front of it and configure usage limits and a
 timeout.
 
-To run with no provider account at all — useful for checking routing, validation and
+To run with no provider account at all - useful for checking routing, validation and
 capability wiring before any key exists:
 
 ```bash
@@ -375,7 +375,7 @@ summon = Summon(
 because a supplied runtime already carries its own.
 
 The timeout releases the caller on the deadline, but it **cannot interrupt a
-synchronous capability already running in a worker thread** — a write started before
+synchronous capability already running in a worker thread** - a write started before
 the deadline still completes. Give such a capability its own internal deadline.
 
 ## Failure responses
@@ -392,7 +392,7 @@ Response bodies never carry model output or provider text; details go to the ser
 
 ## Writing capabilities
 
-A capability is an ordinary function. It runs for real — summonpot never replaces its
+A capability is an ordinary function. It runs for real - summonpot never replaces its
 implementation.
 
 ```python

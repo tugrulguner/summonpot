@@ -52,7 +52,7 @@ The current release line provides:
   and non-finite values. An absent maximum (`None`) remains valid for unbounded calls;
   this count-type validation does not imply broader runtime call-bound enforcement.
 - Registration-time validation for complete bindings, request and result references, operation ordering, selectable collections, and provable type incompatibility.
-- Python 3.11–3.14 CI, package builds, and expanded runtime/CLI coverage.
+- Python 3.11-3.14 CI, package builds, and expanded runtime/CLI coverage.
 
 ### 0.5.0 boundary
 
@@ -259,7 +259,7 @@ prepared SQLAlchemy statement or fixed SQLite specification
 → typed callable schema visible to the executor
 ```
 
-Target declarations will pass the bounded operation object into the endpoint—not a session,
+Target declarations will pass the bounded operation object into the endpoint-not a session,
 connection, or arbitrary query function:
 
 ```python
@@ -308,7 +308,7 @@ workflow persistence:
 - Workspace execution for files, planning, long context, or subagents.
 - Durable execution for background, resumable, or long-running work.
 
-Summonpot—not the caller or model—will choose the smallest eligible harness. Changing the harness must never grant additional capabilities.
+Summonpot-not the caller or model-will choose the smallest eligible harness. Changing the harness must never grant additional capabilities.
 
 ## Agent execution and context track
 
@@ -327,7 +327,7 @@ establish compatibility with our pinned dependencies or authority guarantees.
 #### A1. Basic budgeting and context isolation
 
 After milestone 1's boundary hardening, improve the existing agent path without waiting for
-milestones 2–3, a general graph, or a durable executor. This early slice does not require
+milestones 2-3, a general graph, or a durable executor. This early slice does not require
 result-chain retrieval or producer-constrained choices:
 
 - Keep canonical request state and the invocation ledger separate from model-visible working
@@ -348,7 +348,7 @@ result-chain retrieval or producer-constrained choices:
 
 #### A2. Result-backed context and compaction
 
-Only after validated result chains and producer-constrained choices (milestones 2–3),
+Only after validated result chains and producer-constrained choices (milestones 2-3),
 extend A1 with result-backed context:
 
 - Keep canonical request/result state separate from model-visible working context and
@@ -369,7 +369,7 @@ extend A1 with result-backed context:
 
 ### B. Readiness-aware tool discovery and evidence selection
 
-Build on validated result chains and producer-constrained choices (milestones 2–3):
+Build on validated result chains and producer-constrained choices (milestones 2-3):
 
 - Expose or progressively discover only operations already declared and currently legal to
   invoke. Search does not add capabilities, select providers, or authorize an invocation.
