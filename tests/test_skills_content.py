@@ -77,9 +77,7 @@ def test_skill_states_the_current_binding_execution_boundary():
     assert "calls=Exactly(1)" in body
     assert "trusted and defaulted arguments are hidden from the model" in body
     assert "Multi-operation chains" in body
-    assert "rejected during registration" in body
-    assert "exact built-in source types" in body
-    assert "`Operation(fn)` is still an explicit contract" in body
+    assert "model-supplied argument behavior" in body
     assert "executes it directly without resolving or constructing a model" in body
     assert "no model fallback after direct execution begins" in body.lower()
     assert "uses a Pydantic request model" in body
@@ -89,18 +87,16 @@ def test_skill_states_the_current_binding_execution_boundary():
 
 def test_skill_uses_the_current_ai_api_positioning_and_direct_runtime_boundary():
     body = " ".join(skill_body().split())
-    body_lower = body.lower()
 
     assert "modernizes APIs for AI" in body
     assert "stable public abstraction" in body
     assert "exact application behavior" in body
     assert "explicitly bounded agentic decisions" in body
-    assert "one fully resolved `exactly(1)` operation path" in body_lower
+    assert "one fully resolved `exactly(1)` operation path" in body.lower()
     assert (
-        "bare legacy capabilities still use the provider-neutral agent runtime"
-        in body_lower
+        "all other declarations still use the provider-neutral agent runtime"
+        in body.lower()
     )
-    assert "unsupported explicit contracts are rejected before serving" in body_lower
     assert "Broader multi-operation deterministic execution remains planned" in body
 
 
@@ -130,7 +126,7 @@ def test_skill_documents_runtime_extras_and_safe_network_exposure():
 def test_skill_states_python_support_and_executor_neutral_contract_terms():
     body = " ".join(skill_body().split())
 
-    assert "Python 3.11 through 3.13" in body
+    assert "Python 3.11 through 3.14" in body
     assert "fixed execution goal" in body
     assert "available to execution" in body
     assert "On the agent-backed path" in body

@@ -50,10 +50,9 @@ clear error; serve the application or invoke its generated HTTP route instead.
 
 > [!IMPORTANT]
 > One fully resolved `Exactly(1)` operation path now executes directly without resolving
-> or constructing a model. Bare legacy capabilities still use Summonpot's provider-neutral
+> or constructing a model. All other declarations still use Summonpot's provider-neutral
 > agent runtime. Within the runtime-enforced binding slice, the agent controls only explicit
-> `AgentChoice()` arguments. Unsupported explicit contract shapes fail at registration
-> instead of falling back to unenforced model-supplied arguments.
+> `AgentChoice()` arguments; unsupported legacy binding shapes may remain model-supplied.
 > Broader multi-operation deterministic execution remains on the
 > [roadmap](ROADMAP.md), not shipped behavior.
 
@@ -176,10 +175,8 @@ routing, and OpenAPI under Summonpot.
   uses a Pydantic request model and has at least one `FromRequest` binding; every remaining argument comes from `FromRequest`
   or an immutable identity-stable callable default, and its output is exactly the endpoint
   response model. This path does not resolve, construct, or call a model.
-- **Typed `Operation` contracts** for the admitted single-operation slice, with exact
-  built-in `FromRequest` and direct `AgentChoice` sources. The broader public source
-  vocabulary remains available for future execution slices but is rejected at endpoint
-  registration when the runtime cannot enforce it.
+- **Typed `Operation` contracts** that declare request, prior-result, context, or
+  agent-chosen argument sources without expanding the endpoint API.
 - **Registration-time contract validation** that rejects missing sources, invalid result
   references, unsupported choices, and provably incompatible types before serving.
 - **Provider-neutral model selection** for OpenAI, Anthropic, Google, Groq, Mistral,
@@ -203,7 +200,7 @@ routing, and OpenAPI under Summonpot.
 pip install "summonpot[serve,cli]"
 ```
 
-Python 3.11 through 3.13 is supported. Summonpot requires Pydantic
+Python 3.11 through 3.14 is supported. Summonpot requires Pydantic
 `>=2.13.5,<2.14` and pydantic-core `>=2.46.5,<2.47`. Earlier Pydantic versions
 are no longer supported. Output
 revalidation uses a version-sensitive core option to avoid reusing validators that
@@ -317,8 +314,8 @@ def create_quote(
 | `Depends(operation)` | The operation is available to the endpoint and may be called. |
 | `Required(operation)` | Final output is rejected until the operation succeeds. |
 
-For bare callables, `Required(...)` proves only that the operation returned successfully at
-least once during that request. The narrow bound form
+For bare callables and broader operation graphs, `Required(...)` proves only that the
+operation returned successfully at least once during that request. The narrow bound form
 shown below additionally enforces trusted request injection, local operation-output
 validation, and `Exactly(1)`. Ordering, idempotency, and provenance-backed final claims
 remain separate concerns.
@@ -327,7 +324,7 @@ Capabilities do not become request-body fields or OpenAPI parameters. Their docs
 and annotations define the tool schema visible to the agent, while their implementations
 define the real application behavior.
 
-The capability set is closed. For one required typed operation with explicit `Exactly(1)`, the
+The capability set is closed. For one required typed operation with `Exactly(1)`, the
 runtime injects `FromRequest` values, removes them and callable defaults from any
 model-visible tool schema, validates the declared operation output, and rejects a second
 start. If the endpoint uses a Pydantic request model, has at least one `FromRequest`
@@ -335,10 +332,9 @@ binding, uses only `FromRequest` or supported immutable callable defaults, and t
 is exactly the endpoint response model,
 Summonpot executes the operation directly. Otherwise direct `AgentChoice` arguments remain
 visible to the agent. Request values on agentic paths still appear in the agent's user
-message; tool-schema hiding is not prompt secrecy. Unsupported explicit operation shapes are
-rejected before serving until their execution semantics ship. Bare `Depends(fn)` and
-`Required(fn)` declarations with implicit marker bounds keep their legacy agent behavior.
-Every operation must still enforce authorization.
+message; tool-schema hiding is not prompt secrecy. Other operation shapes remain on the
+legacy agent-supplied path until their execution semantics ship. Every operation must still
+enforce authorization.
 Pass exact operations, never raw database sessions, engines, connections, cursors,
 arbitrary SQL, shell access, or ambient filesystem authority.
 
@@ -402,11 +398,7 @@ subclass, and Python's numeric widening permits `int` or `bool` to feed `float`.
 > defaults. When every required value is application-owned and the operation output exactly
 > matches the endpoint response model, that operation executes without a model. `FromResult`,
 > `FromContext`, `after`, broader call bounds, and multi-operation direct paths remain
-> planned and are rejected before serving when explicitly declared. Binding sources must be
-> exact built-in vocabulary types; user-defined subclasses are rejected too. Bare callable
-> dependencies without an explicit `Operation` contract remain compatible. `Operation(fn)`
-> is still an explicit contract, so it is rejected unless the declaration supplies the
-> complete enforced shape.
+> planned; unsupported shapes keep their existing agent-supplied argument behavior.
 
 ## How it works today
 
@@ -452,9 +444,8 @@ Summonpot chooses its current execution path without adding a second endpoint AP
 | Contract state | Current execution |
 |---|---|
 | Pydantic request model, one required `Exactly(1)` operation, at least one `FromRequest` binding, only `FromRequest` or immutable identity-stable defaults, exact response-model output | Execute directly without a model |
-| A direct `AgentChoice` remains in the admitted single-operation shape | Use the agent runtime with the enforced operation contract |
-| Bare callable capabilities with implicit marker bounds | Use the legacy agent runtime |
-| Unsupported explicit binding, ordering, bound, output, or multi-operation shape | Reject during registration |
+| A bounded semantic choice remains | Use the agent runtime with declared capabilities |
+| Unsupported or broader operation graph | Keep the existing agent path until its full semantics ship |
 
 Broader graph execution and ordering, multi-operation deterministic execution,
 SQLAlchemy/SQLite operation adapters, write receipts, streaming, and built-in
@@ -619,7 +610,7 @@ The [`examples/`](examples/) directory grows from one endpoint to a multi-file s
 | 3 | [`03_agentic_order.py`](examples/03_agentic_order.py) | Bounded choice plus a required write |
 | 4 | [`04_http_methods.py`](examples/04_http_methods.py) | GET/POST routing and query parameters |
 | 5 | [`05_bounded_runtime.py`](examples/05_bounded_runtime.py) | Limits, timeout, and model override |
-| 6 | [`06_support_service/`](examples/06_support_service/) | Multi-file legacy capabilities and persisted ticket |
+| 6 | [`06_support_service/`](examples/06_support_service/) | Multi-file typed operation chain and persisted ticket |
 | 7 | [`07_bound_operation.py`](examples/07_bound_operation.py) | Enforced `FromRequest` + `AgentChoice` with `Exactly(1)` |
 | 8 | [`08_direct_execution.py`](examples/08_direct_execution.py) | Credential-free single-operation deterministic execution |
 
