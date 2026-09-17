@@ -154,7 +154,14 @@ def test_projection_does_not_serialize_nested_models():
 
     hooks = []
 
-    class Value(BaseModel):
+    class HostileModelMeta(type(BaseModel)):
+        def __getattribute__(cls, name):
+            if name == "model_fields":
+                hooks.append("metaclass getattribute")
+                raise RuntimeError("metaclass getattribute")
+            return super().__getattribute__(name)
+
+    class Value(BaseModel, metaclass=HostileModelMeta):
         items: list[int]
 
         @field_serializer("items")
@@ -167,11 +174,68 @@ def test_projection_does_not_serialize_nested_models():
     summon = query_service(int, [])
     plan = _registered_plan(summon.endpoints[0])
     assert plan is not None
-    prompt, typed = _public_transport_views(
-        plan, {"value": [value]}, {"value": [value]}
-    )
-    assert prompt == typed == {"value": ["<unavailable>"]}
+    nested = {"list": [value], "tuple": (value,), "dict": {"item": value}}
+    prompt, typed = _public_transport_views(plan, {"value": nested}, {"value": nested})
+    expected = {
+        "list": [{"items": [3]}],
+        "tuple": [{"items": [3]}],
+        "dict": {"item": {"items": [3]}},
+    }
+    assert prompt == {"value": expected}
+    assert typed == {"value": {**expected, "tuple": ({"items": [3]},)}}
     assert value.items == [3]
+    assert hooks == []
+
+
+@pytest.mark.parametrize("container_type", [set, frozenset])
+def test_native_hashed_container_projection_falls_back_without_model_hooks(
+    container_type,
+):
+    from pydantic import field_serializer
+
+    from summonpot._execution import _public_transport_views
+
+    hooks = []
+
+    class Value(BaseModel):
+        model_config = {"frozen": True}
+
+        x: int
+
+        @field_serializer("x")
+        def serialize(self, value):
+            hooks.append("serializer")
+            raise RuntimeError("serializer")
+
+        def __getattribute__(self, name):
+            hooks.append("getattribute")
+            raise RuntimeError("getattribute")
+
+        def __repr__(self):
+            hooks.append("repr")
+            raise RuntimeError("repr")
+
+        def __eq__(self, other):
+            hooks.append("eq")
+            raise RuntimeError("eq")
+
+        def __hash__(self):
+            hooks.append("hash")
+            return 0
+
+    value = Value.model_construct(x=3)
+    container = container_type([value])
+    hooks.clear()
+    summon = query_service(int, [])
+    plan = _registered_plan(summon.endpoints[0])
+    assert plan is not None
+
+    prompt, typed = _public_transport_views(
+        plan, {"value": container}, {"value": container}
+    )
+
+    assert prompt == {"value": [{"x": 3}]}
+    assert typed == {"value": "<unavailable>"}
     assert hooks == []
 
 

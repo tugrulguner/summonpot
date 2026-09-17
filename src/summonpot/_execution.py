@@ -6,19 +6,21 @@ import asyncio
 import inspect
 import math
 from collections.abc import Mapping, Sequence
-from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from types import MappingProxyType
-from typing import Any
+from typing import Any, LiteralString
 from uuid import UUID
 from weakref import ReferenceType, ref
 
-from pydantic import TypeAdapter
-from pydantic_core import SchemaValidator, TzInfo
+from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError, create_model
+from pydantic_core import PydanticCustomError, SchemaValidator, TzInfo
 
-from summonpot._output_validation import _compile_output_validator
+from summonpot._output_validation import (
+    _compile_input_validator,
+    _compile_output_validator,
+)
 from summonpot._validation import _enforced_contract_tool_index
 from summonpot.contracts import AgentChoice, FromRequest
 from summonpot.models import EndpointDef, ParamDef, ToolDef
@@ -59,7 +61,6 @@ class _CompiledParameter:
     required: bool
     default: Any
     annotation: Any
-    adapter: TypeAdapter[Any] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,7 +107,8 @@ class _CompiledEndpoint:
     return_type: str
     parameters: tuple[_CompiledParameter, ...]
     input_model: Any
-    input_adapter: TypeAdapter[Any] | None
+    input_adapter: TypeAdapter[Any]
+    input_validator: SchemaValidator
     output_model: Any
     model: str | None
     method: str
@@ -140,6 +142,61 @@ class _ConsumedTransport:
 
 _TRANSPORT_SNAPSHOTS: dict[int, _TransportSnapshot | _ConsumedTransport] = {}
 _UNAVAILABLE = "<unavailable>"
+_BASE_MODEL_DICT_DESCRIPTOR = BaseModel.__dict__["__dict__"]
+_BASE_MODEL_EXTRA_DESCRIPTOR = BaseModel.__dict__["__pydantic_extra__"]
+
+
+def _pydantic_fields(value: BaseModel) -> dict[str, Any]:
+    """Read Pydantic's field table without dispatching the model metaclass."""
+    return type.__getattribute__(type(value), "__pydantic_fields__")
+
+
+def _prompt_field_name(name: str, field: Any) -> str:
+    """Read one declared prompt name directly from Pydantic field metadata."""
+    serialization_alias = object.__getattribute__(field, "serialization_alias")
+    if serialization_alias is not None:
+        return serialization_alias
+    alias = object.__getattribute__(field, "alias")
+    return alias if alias is not None else name
+
+
+def _field_is_statically_excluded(field: Any) -> bool:
+    """Read static Field(exclude=True) metadata without application dispatch."""
+    return object.__getattribute__(field, "exclude") is True
+
+
+def _unsupported_raw_request(
+    error_type: LiteralString, message: LiteralString
+) -> ValidationError:
+    """Build a stable admission error without rendering application-owned input."""
+    error = PydanticCustomError(error_type, message)
+    return ValidationError.from_exception_data(
+        "request input",
+        [{"type": error, "loc": (), "input": "<unsupported raw value>"}],
+    )
+
+
+def _inert_hashable(value: Any) -> bool:
+    """Return whether a projected value can be hashed without application code."""
+    kind = type(value)
+    if kind in (
+        type(None),
+        bool,
+        int,
+        float,
+        str,
+        bytes,
+        date,
+        datetime,
+        time,
+        timedelta,
+        Decimal,
+        UUID,
+    ):
+        return True
+    if kind is tuple or kind is frozenset:
+        return all(_inert_hashable(item) for item in value)
+    return False
 
 
 def _inert_transport_value(
@@ -166,6 +223,33 @@ def _inert_transport_value(
         return value
     if kind is float:
         return value if math.isfinite(value) else _UNAVAILABLE
+    if isinstance(value, BaseModel):
+        if id(value) in ancestors or len(ancestors) >= 64:
+            return _UNAVAILABLE
+        ancestors = ancestors | {id(value)}
+        # Read Pydantic's storage directly: model_dump, getattr, repr, copy and
+        # equality can all dispatch application code.  Declared aliases and
+        # exact built-in descendants are enough for the model-facing view.
+        storage = _BASE_MODEL_DICT_DESCRIPTOR.__get__(value, kind)
+        if type(storage) is not dict:
+            return _UNAVAILABLE
+        projected = {
+            _prompt_field_name(name, field): _inert_transport_value(
+                storage[name], ancestors, native=native
+            )
+            for name, field in _pydantic_fields(value).items()
+            if name in storage and not _field_is_statically_excluded(field)
+        }
+        extras = _BASE_MODEL_EXTRA_DESCRIPTOR.__get__(value, kind)
+        if type(extras) is dict:
+            projected.update(
+                {
+                    key: _inert_transport_value(item, ancestors, native=native)
+                    for key, item in extras.items()
+                    if type(key) is str and key not in projected
+                }
+            )
+        return projected
     if (
         (
             kind is not dict
@@ -187,6 +271,10 @@ def _inert_transport_value(
             if type(key) is str
         }
     items = [_inert_transport_value(item, ancestors, native=native) for item in value]
+    if native and kind in (set, frozenset):
+        if not all(_inert_hashable(item) for item in items):
+            return _UNAVAILABLE
+        return kind(items)
     return kind(items) if native else items
 
 
@@ -294,6 +382,7 @@ def _compile_endpoint(
         )
         for index, tool in enumerate(source_tools)
     )
+    input_adapter = _compile_input_adapter(endpoint)
     return _CompiledEndpoint(
         path=endpoint.path,
         name=endpoint.name,
@@ -301,11 +390,8 @@ def _compile_endpoint(
         return_type=endpoint.return_type,
         parameters=tuple(_compile_parameter(param) for param in endpoint.parameters),
         input_model=endpoint.input_model,
-        input_adapter=(
-            TypeAdapter(endpoint.input_model)
-            if endpoint.input_model is not None
-            else None
-        ),
+        input_adapter=input_adapter,
+        input_validator=_compile_input_validator(input_adapter),
         output_model=endpoint.output_model,
         model=endpoint.model,
         method=endpoint.method,
@@ -314,6 +400,33 @@ def _compile_endpoint(
         tools=tools,
         direct_tool=direct_index,
     )
+
+
+def _compile_input_adapter(endpoint: EndpointDef) -> TypeAdapter[Any]:
+    """Compile the request contract used by raw runtime callers."""
+    if endpoint.input_model is not None:
+        return TypeAdapter(endpoint.input_model)
+    if not endpoint.parameters:
+        empty_model = create_model(
+            f"{endpoint.name}RuntimeRequest",
+            __config__=ConfigDict(extra="forbid"),
+        )
+        return TypeAdapter(empty_model)
+    fields: dict[str, tuple[Any, Any]] = {
+        parameter.name: (
+            parameter.annotation
+            if parameter.annotation is not None
+            and not isinstance(parameter.annotation, str)
+            else Any,
+            ... if parameter.required else parameter.default,
+        )
+        for parameter in endpoint.parameters
+    }
+    request_model = create_model(
+        f"{endpoint.name}RuntimeRequest",
+        **fields,  # pyright: ignore[reportArgumentType, reportCallIssue]
+    )
+    return TypeAdapter(request_model)
 
 
 def _direct_tool_index(
@@ -415,11 +528,6 @@ def _compile_parameter(param: ParamDef) -> _CompiledParameter:
         required=param.required,
         default=param.default,
         annotation=param.annotation,
-        adapter=(
-            TypeAdapter(param.annotation)
-            if param.annotation is not None and not isinstance(param.annotation, str)
-            else None
-        ),
     )
 
 
@@ -456,26 +564,39 @@ def _prepare_request(
         _TRANSPORT_SNAPSHOTS[id(params)] = _ConsumedTransport(snapshot.reference)
         return _RequestValues(snapshot.prompt, typed=snapshot.typed)
 
-    if plan.input_adapter is not None:
-        validated = plan.input_adapter.validate_python(deepcopy(dict(params)))
-        prompt = validated.model_dump(mode="json", by_alias=True)
-        typed = {
-            name: getattr(validated, name) for name in type(validated).model_fields
-        }
-        return _RequestValues(prompt, typed=typed)
+    if type(params) is dict or type(params) is _RequestValues:
+        # The exact compatibility carrier has no overridable mapping hooks. Its
+        # typed view is still untrusted; validate only a built-in copy of the
+        # public values, preserving caller isolation and provenance semantics.
+        raw_params = dict.copy(params)
+    else:
+        raise _unsupported_raw_request(
+            "outer_mapping_type",
+            "raw request input must be an exact dictionary",
+        )
 
-    prompt = deepcopy(dict(params))
-    typed_source = params
-    typed: dict[str, Any] = {}
-    for parameter in plan.parameters:
-        if parameter.name not in typed_source and parameter.name not in prompt:
-            continue
-        value = typed_source.get(parameter.name, prompt.get(parameter.name))
-        detached = deepcopy(value)
-        typed[parameter.name] = (
-            parameter.adapter.validate_python(detached)
-            if parameter.adapter is not None
-            else detached
+    validated = plan.input_validator.validate_python(raw_params)
+    fields = _pydantic_fields(validated)
+    storage = _BASE_MODEL_DICT_DESCRIPTOR.__get__(validated, type(validated))
+    if type(storage) is not dict:
+        raise _unsupported_raw_request(
+            "canonical_storage_type",
+            "validated request has unsupported canonical storage",
+        )
+    typed = {name: storage[name] for name in fields if name in storage}
+    prompt = {
+        _prompt_field_name(name, field): _inert_transport_value(typed[name])
+        for name, field in fields.items()
+        if not _field_is_statically_excluded(field)
+    }
+    extras = _BASE_MODEL_EXTRA_DESCRIPTOR.__get__(validated, type(validated))
+    if type(extras) is dict:
+        prompt.update(
+            {
+                key: _inert_transport_value(value)
+                for key, value in extras.items()
+                if type(key) is str and key not in prompt
+            }
         )
     return _RequestValues(prompt, typed=typed)
 
