@@ -23,7 +23,7 @@ class Result(BaseModel):
 
 
 def query_service(annotation: Any, received: list[Any]) -> Summon:
-    def apply(value: int) -> Result:
+    def apply(value: Any) -> Result:
         received.append(value)
         return Result(value=3)
 

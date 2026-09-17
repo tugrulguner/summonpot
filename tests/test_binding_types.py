@@ -371,8 +371,8 @@ def test_an_uncheckable_relation_is_unknown_not_a_crash():
     assert is_compatible(int, Plain) is True
 
 
-def test_a_protocol_argument_registers():
-    """The crash reached registration, so the regression belongs there too."""
+def test_an_unresolved_local_protocol_argument_is_rejected():
+    """A receiving contract that cannot be compiled must fail closed."""
 
     class Plain(Protocol):
         def go(self) -> None: ...
@@ -383,16 +383,21 @@ def test_a_protocol_argument_registers():
 
     summon = Summon("svc")
 
-    _register(
-        summon,
-        Operation(
-            wants_protocol,
-            bind={"customer_id": FromRequest("customer_id")},
-            output=Customer,
+    with pytest.raises(
+        TypeError,
+        match=(
+            r"^Unsupported receiving parameter contract: annotation for parameter "
+            r"'customer_id' could not be resolved\.$"
         ),
-    )
-
-    assert summon.endpoints[0].tools[0].contract is not None
+    ):
+        _register(
+            summon,
+            Operation(
+                wants_protocol,
+                bind={"customer_id": FromRequest("customer_id")},
+                output=Customer,
+            ),
+        )
 
 
 @pytest.mark.parametrize(

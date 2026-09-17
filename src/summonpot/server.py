@@ -207,8 +207,19 @@ async def _run_endpoint(summon: Any, endpoint: Any, params: dict[str, Any]) -> A
         UserError,
     )
 
+    from summonpot.runtime import _OperationInputError
+
     try:
         return await summon._runtime.call(endpoint, params)
+    except _OperationInputError:
+        logger.warning(
+            "Endpoint %s rejected an injected value at its receiving operation contract",
+            endpoint.path,
+        )
+        raise HTTPException(
+            status_code=422,
+            detail="Request data did not satisfy a receiving operation contract.",
+        ) from None
     except UsageLimitExceeded as exc:
         # Details are logged, never returned: an exception raised inside the agent
         # loop can carry rejected model output or tool-call context, and the HTTP
