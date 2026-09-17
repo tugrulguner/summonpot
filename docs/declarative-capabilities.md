@@ -149,11 +149,20 @@ invoking serializers. Custom model `__init__` methods in these output schemas (i
 nested models) are rejected at registration: core's custom-constructor path can leave the
 compiled validator and trust unchecked nested instances. Use Pydantic model validators
 rather than a custom initializer for supported output validation.
-When an existing model instance allows extras, a colliding extra cannot overwrite a
-canonical field. During this revalidation, model `before` validators receive canonical
-fields plus noncolliding extras; colliding extras are validated separately and restored
-before model `after` and outer `wrap` validators observe the result. Caller-owned model
-storage is not rewritten. Raw mapping outputs retain their declared alias policy.
+Validation and serialization namespaces are checked separately. Enabled direct validation
+aliases cannot claim the same input key under the model's configured validation policy, while
+declared fields, serialization aliases, and computed
+fields must produce distinct emitted JSON object keys. This structural admission runs at
+registration for every endpoint response model and every declared operation `output=` shape,
+including nested models, dataclasses, typed dictionaries, multi-operation declarations, and
+operation shapes outside the currently enforced runtime slice. It does not claim runtime
+structural validation for those broader operation graphs; their execution remains unsupported.
+For runtime-enforced models with `extra="allow"`, both existing instances and raw mappings are
+rejected after model construction if an extra shadows either a canonical field name or an
+emitted alias. Noncolliding extras remain supported and typed extras are still validated.
+These checks do not serialize, copy, stringify, or take the representation of application
+values, and caller-owned model storage is not rewritten. Raw mappings retain their declared
+validation-alias policy.
 
 The endpoint agent receives its declared dependencies and no ambient application access. An operation can contain deterministic business logic or a safe database adapter. Raw database sessions, connections, cursors, ORM registries, shells, and arbitrary SQL execution should not be exposed.
 

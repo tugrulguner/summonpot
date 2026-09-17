@@ -18,11 +18,24 @@ def test_hardening_is_planned_and_precedes_execution_expansion():
     for requirement in (
         "receiving operation constraints",
         "render model input only when agent execution needs it",
-        "duplicate JSON keys",
         "sensitive validation inputs, provider bodies, or exception chains",
         "a copy-hook fix alone is not completion of the transport boundary",
     ):
         assert requirement in hardening
+
+
+def test_output_namespace_hardening_is_shipped_not_planned():
+    text = " ".join(ROADMAP.read_text(encoding="utf-8").split())
+    shipped, planned = text.split("## Next milestones", 1)
+
+    for requirement in (
+        "Structural output-namespace validation",
+        "duplicate field, alias, serialization-alias, and computed-field JSON keys",
+        "allowed extras that shadow canonical field names or emitted aliases",
+        "retaining noncolliding validated extras",
+    ):
+        assert requirement in shipped
+        assert requirement not in planned
 
 
 def test_count_type_validation_is_shipped_not_future_runtime_enforcement():

@@ -440,6 +440,13 @@ The endpoint docstring becomes the fixed execution goal. Request data becomes va
 execution input. Capabilities become the complete set of operations available to execution.
 The response model is always the final local validator; on the agent-backed path, it also
 becomes the structured-output schema and validated request data becomes the user message.
+Every endpoint response model and every declared operation `output=` shape is checked before
+serving, including operation shapes outside the currently enforced runtime slice. Enabled direct
+validation aliases cannot claim the same input key under the model's configured validation
+policy, and declared fields plus serialization aliases cannot emit duplicate JSON keys.
+Runtime-enforced model output also rejects allowed extras from instances or raw mappings that
+shadow a canonical field or emitted alias, while retaining noncolliding validated extras. This namespace admission does not imply runtime
+structural validation for broader operation graphs, whose execution remains unsupported.
 
 Pydantic AI is an internal runtime dependency. Applications use `Summon`, `@summon`,
 Pydantic models, and declarative capabilities; they do not construct provider clients or

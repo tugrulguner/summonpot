@@ -59,6 +59,10 @@ The current release line provides:
   vocabulary, and every explicit binding, ordering, call-bound, and output contract must fit
   the one supported required `Exactly(1)` operation shape or registration rejects it. Adding
   another capability cannot downgrade that contract to the legacy path.
+- Structural output-namespace validation rejects duplicate field, alias, serialization-alias,
+  and computed-field JSON keys at registration, including nested model, dataclass, and typed
+  dictionary shapes. Runtime output validation rejects allowed extras that shadow canonical
+  field names or emitted aliases while retaining noncolliding validated extras.
 - Python 3.11–3.13 CI, package builds, and expanded runtime/CLI coverage.
 
 ### 0.5.0 boundary
@@ -108,10 +112,11 @@ validates call-bound count types when declarations are constructed, and hardens 
 validated HTTP request handoff so compatibility views cannot invoke application copy,
 serialization, string, representation, or container hooks against canonical operation
 inputs. It preserves safe native query values for agent prompts and custom runtimes while
-keeping unsupported values inert.
+keeping unsupported values inert. Runtime-enforced output schemas also reject ambiguous
+declared or extra-owned JSON keys without serializing application values.
 
 This release does not broaden runtime enforcement to multi-operation graphs. The remaining
-enforce-or-reject, input/output, failure, and deadline semantics stay in milestone 1 below.
+enforce-or-reject, input, failure, and deadline semantics stay in milestone 1 below.
 
 Current source completes the admission portion of that milestone: only one required typed
 operation with `calls=Exactly(1)`, complete supported bindings, declared output, no ordering,
@@ -146,10 +151,6 @@ Close the gaps in existing declarations before adding result chains:
   runtime compatibility, and the validate-once boundary through explicit tests.
 - Align raw runtime input validation with HTTP required-field, default, and canonical-value
   semantics, including scalar declarations.
-- Prevent output extras and serialization aliases from shadowing validated fields or producing
-  duplicate JSON keys. Unsupported output shapes should fail explicitly rather than weakening
-  validation. Keep private Pydantic integration isolated and dependency upgrades gated by the
-  adversarial suite; do not replace it with a lossy serialization round trip.
 - Map operation contract failures to stable redacted HTTP errors. Normal logs must not include
   sensitive validation inputs, provider bodies, or exception chains.
 - Define the deadline across request preparation, execution, and finalization; check it before
@@ -159,7 +160,7 @@ Close the gaps in existing declarations before adding result chains:
 Acceptance requires registration checks and real HTTP probes for the relevant boundaries,
 including a second-capability regression, invalid source rejection, unsupported runtime
 call-bound rejection, narrower receiving
-constraints, mutating serializers, output alias collisions, and sensitive failure logging.
+constraints, mutating serializers, and sensitive failure logging.
 Keep fixes independently reviewable; a copy-hook fix alone is not completion of the transport
 boundary.
 

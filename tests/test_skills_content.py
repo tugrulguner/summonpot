@@ -136,6 +136,20 @@ def test_skill_states_python_support_and_executor_neutral_contract_terms():
     assert "On the agent-backed path" in body
 
 
+def test_skill_documents_output_namespace_enforcement():
+    body = " ".join(skill_body().split())
+
+    for requirement in (
+        "Output object keys must be unambiguous",
+        "aliases, serialization aliases, or computed fields",
+        "nested models, dataclasses, and typed dictionaries",
+        'model with `extra="allow"`',
+        "shadows a canonical field name or emitted alias",
+        "application serializers, copy hooks, `repr`, or `str`",
+    ):
+        assert requirement in body
+
+
 def test_skill_python_examples_compile():
     blocks = re.findall(r"```python\n(.*?)```", skill_body(), re.DOTALL)
 

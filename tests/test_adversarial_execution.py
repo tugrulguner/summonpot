@@ -218,7 +218,7 @@ class NestedResponse(BaseModel):
 
 
 class CollisionResponse(BaseModel):
-    x: int = Field(alias="y")
+    x: int = Field(validation_alias="external")
     y: int
 
 
@@ -395,7 +395,7 @@ def test_each_nested_model_selects_its_own_alias_policy(
             {"x": 1, "y": 2}, by_alias=False, by_name=True
         )
         if inner_instance
-        else {"y": 2},
+        else {"external": 1, "y": 2},
     }
     result = MixedAliases.model_construct(**fields) if outer_instance else fields
     endpoint = _output_endpoint(MixedAliases, result)
@@ -404,10 +404,7 @@ def test_each_nested_model_selects_its_own_alias_policy(
     )
     assert validated.path.value == 7
     assert validated.choice.value == 8
-    assert (validated.collision.x, validated.collision.y) == (
-        1 if inner_instance else 2,
-        2,
-    )
+    assert (validated.collision.x, validated.collision.y) == (1, 2)
 
 
 @pytest.mark.parametrize(

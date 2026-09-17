@@ -28,8 +28,9 @@ from typing import (
     get_origin,
 )
 
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
+from summonpot._output_validation import _reject_ambiguous_object_namespaces
 from summonpot.contracts import (
     AgentChoice,
     FromContext,
@@ -318,6 +319,10 @@ def validate_contracts(
         contract = tool.contract
         if contract is None:
             continue
+        if contract.output is not None:
+            _reject_ambiguous_object_namespaces(
+                TypeAdapter(contract.output).core_schema
+            )
         # `after` states an ordering against another operation, so that operation has
         # to be one this endpoint declares. Checked even without bindings, because
         # ordering is part of the capability graph in its own right.
