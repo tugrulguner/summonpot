@@ -354,7 +354,7 @@ Anthropic:
 pip install "summonpot[serve,cli,anthropic]"
 ```
 
-Python 3.11 through 3.13 is supported.
+Python 3.11 through 3.14 is supported.
 
 `serve` installs FastAPI and uvicorn, `cli` installs the `summonpot` command, and the
 provider extra installs that provider's client. Replace `anthropic` with the provider
