@@ -1,0 +1,52 @@
+---
+title: Summonpot
+description: Modernize APIs for the AI era with one simple contract.
+template: splash
+hero:
+  title: APIs for the AI era, one simple contract.
+  tagline: Combine deterministic, application-owned operations with agent-owned decisions under bounded authority. Keep one typed endpoint contract from request to response.
+  image:
+    html: '<img src="/summonpot.png" alt="Summonpot — a simple contract for deterministic operations and bounded agent-owned decisions" width="520" />'
+  actions:
+    - text: Quick start
+      link: /quick-start/
+      variant: primary
+    - text: Read the architecture
+      link: /architecture/
+      variant: minimal
+    - text: View on GitHub
+      link: https://github.com/tugrulguner/summonpot
+      variant: minimal
+      attrs: { target: _blank, rel: noopener }
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+Summonpot modernizes APIs for the AI era. Instead of splitting application endpoints and agent workflows across separate abstractions, declare a typed endpoint whose contract states what callers may send, what the application may execute, where the agent may decide, and what the endpoint may return.
+
+The agent's authority is bounded by the endpoint declaration. Exact application behavior stays application-owned; semantic choices are agent-owned only where the contract explicitly allows them.
+
+<CardGrid stagger>
+  <Card title="One endpoint contract" icon="seti:config">
+    Typed requests, a declared goal, an explicit capability set, validation, HTTP routes, and OpenAPI stay together.
+  </Card>
+  <Card title="Bounded authority" icon="seti:lock">
+    The agent can make only declared choices. Required operations and locally validated output constrain execution.
+  </Card>
+  <Card title="Start without a provider key" icon="seti:rocket">
+    Install the serving extras and use the keyless test model to wire a harmless endpoint.
+  </Card>
+</CardGrid>
+
+## Shipped today
+
+- Typed contract-first endpoints and generated HTTP/OpenAPI contracts.
+- Closed sets of application-owned callables; optional or required operations.
+- Bounded agent runtime with locally validated response models and limits.
+- A narrow, fully resolved single `Exactly(1)` operation path that executes without resolving or constructing a model.
+
+Broader multi-operation deterministic execution is **planned**, not shipped. See the [project roadmap](https://github.com/tugrulguner/summonpot/blob/main/ROADMAP.md) and [changelog](https://github.com/tugrulguner/summonpot/blob/main/CHANGELOG.md) for current boundaries.
+
+## Part of ModePot
+
+Summonpot is an open-source ModePot project. Join the [ModePot Discord](https://discord.gg/u3AANZr6RG), explore the [source on GitHub](https://github.com/tugrulguner/summonpot), or read the [README](https://github.com/tugrulguner/summonpot#readme).

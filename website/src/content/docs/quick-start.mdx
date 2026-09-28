@@ -1,0 +1,61 @@
+---
+title: Quick start
+description: Install Summonpot and serve your first typed endpoint.
+---
+
+## Install
+
+```bash
+pip install "summonpot[serve,cli]"
+```
+
+Summonpot supports Python 3.11–3.13. To wire an endpoint without a provider account, select the built-in test model:
+
+```bash
+export SUMMONPOT_MODEL=test
+```
+
+The test model is keyless, **not** side-effect-free: it can call capabilities with generated placeholder arguments. Use harmless capabilities only; this is not a dry-run sandbox.
+
+## Declare a typed endpoint
+
+Save as `app.py`:
+
+```python
+from typing import Literal
+
+from pydantic import BaseModel, Field
+from summonpot import Summon
+
+class ReviewRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2_000)
+
+class ReviewResponse(BaseModel):
+    sentiment: Literal["positive", "negative", "neutral"]
+    summary: str
+
+summon = Summon("review-api")
+
+@summon("/review")
+def review(request: ReviewRequest) -> ReviewResponse:
+    """Classify the text's sentiment and summarize it in one short sentence."""
+    ...
+```
+
+The declaration is the endpoint contract; Summonpot owns orchestration. The ellipsis is intentional, and calling the decorated function directly is rejected. See the [runnable quick-start example](https://github.com/tugrulguner/summonpot/tree/main/examples/01_quickstart).
+
+## Serve and call
+
+```bash
+summonpot serve app.py --host 127.0.0.1 --port 8000
+```
+
+Visit [interactive API docs](http://127.0.0.1:8000/docs). Submit JSON with:
+
+```bash
+curl -X POST http://127.0.0.1:8000/review \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"The setup was clear and quick."}'
+```
+
+For production, configure a supported provider and retain bounded request/usage limits. Review each capability as application authority: the keyless model can still execute it.

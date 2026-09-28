@@ -1,0 +1,11 @@
+# Summonpot
+
+> Summonpot modernizes APIs for the AI era with one simple contract: deterministic, application-owned operations and bounded agent-owned decisions.
+
+- [Overview](https://summonpot.modepot.io/): product position, shipped capabilities, and ModePot attribution.
+- [Quick start](https://summonpot.modepot.io/quick-start/): install, declare, serve, and call a typed endpoint.
+- [Architecture and safety](https://summonpot.modepot.io/architecture/): contract boundaries, authority, runtime behavior, and limitations.
+- [Capabilities](https://summonpot.modepot.io/capabilities/): exact operations and explicit agent choices.
+- [GitHub](https://github.com/tugrulguner/summonpot): source, README, roadmap, and release history.
+
+Only a narrow, fully resolved single-operation deterministic slice is shipped; broader multi-operation deterministic execution is planned.

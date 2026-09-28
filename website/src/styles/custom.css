@@ -1,0 +1,3 @@
+:root { --sl-color-accent-low: #12382f; --sl-color-accent: #37b58b; --sl-color-accent-high: #a5f3d6; --sl-color-white: #f4f7f5; --sl-color-gray-1: #e7eeea; --sl-color-gray-2: #c2cec7; --sl-color-gray-3: #87968e; --sl-color-gray-4: #53635b; --sl-color-gray-5: #303e37; --sl-color-gray-6: #202b26; --sl-color-black: #141c18; }
+.hero { background: radial-gradient(ellipse at 75% 20%, #24674c40, transparent 55%); border-radius: 1rem; }
+.hero img { display: block; width: 100%; max-width: 32.5rem; height: auto; max-height: 22rem; object-fit: contain; }

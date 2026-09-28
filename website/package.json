@@ -1,0 +1,1 @@
+{"name":"summonpot-site","version":"1.0.0","private":true,"type":"module","scripts":{"dev":"astro dev","check":"astro check","build":"astro build"},"dependencies":{"@astrojs/starlight":"^0.37.6","astro":"^5.7.0"},"devDependencies":{"@astrojs/check":"^0.9.4","typescript":"^5.8.3"}}
