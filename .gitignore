@@ -20,6 +20,11 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# Website
+website/node_modules/
+website/.astro/
+website/dist/
+
 # OS
 .DS_Store
 
