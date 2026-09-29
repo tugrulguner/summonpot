@@ -162,7 +162,7 @@ def test_reviewing_distinguishes_shipped_direct_execution_from_planned_work():
 def test_readme_states_current_python_support_without_release_candidate_language():
     readme = README.read_text(encoding="utf-8")
 
-    assert "Python 3.11 through 3.13" in readme
+    assert "Python 3.11 through 3.14" in readme
     assert "This source revision" not in readme
     assert "newly built artifacts" not in readme
     assert "already-published packages" not in readme

@@ -70,7 +70,7 @@ The current release line provides:
   and computed-field JSON keys at registration, including nested model, dataclass, and typed
   dictionary shapes. Runtime output validation rejects allowed extras that shadow canonical
   field names or emitted aliases while retaining noncolliding validated extras.
-- Python 3.11–3.13 CI, package builds, and expanded runtime/CLI coverage.
+- Python 3.11-3.14 CI, package builds, and expanded runtime/CLI coverage.
 
 ### 0.5.0 boundary
 
