@@ -7,5 +7,6 @@
 - [Architecture and safety](https://summonpot.modepot.io/architecture/): contract boundaries, authority, runtime behavior, and limitations.
 - [Capabilities](https://summonpot.modepot.io/capabilities/): exact operations and explicit agent choices.
 - [GitHub](https://github.com/tugrulguner/summonpot): source, README, roadmap, and release history.
+- [ModePot](https://modepot.io/): return to the open-source project family.
 
 Only a narrow, fully resolved single-operation deterministic slice is shipped; broader multi-operation deterministic execution is planned.
