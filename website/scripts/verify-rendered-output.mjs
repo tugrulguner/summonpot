@@ -27,6 +27,7 @@ let htmlCount = 0;
 for await (const path of htmlFiles(distRoot)) {
   htmlCount += 1;
   const html = await readFile(path, 'utf8');
+  const outputPath = relative(distRoot, path);
   for (const setting of requiredPosthogConfig) {
     if (!html.includes(setting)) failures.push(`${relative(distRoot, path)}: missing ${setting}`);
   }
@@ -38,15 +39,39 @@ for await (const path of htmlFiles(distRoot)) {
   }
   if (html.includes('modepot.com')) failures.push(`${relative(distRoot, path)}: stale ModePot domain`);
   if (html.includes('examples/01_quickstart')) failures.push(`${relative(distRoot, path)}: stale quick-start example URL`);
+  if (!html.includes('rel="alternate" type="text/plain" href="/llms.txt"')) {
+    failures.push(`${outputPath}: missing llms.txt discovery link`);
+  }
+  const jsonLd = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1];
+  if (!jsonLd) {
+    failures.push(`${outputPath}: missing JSON-LD`);
+  } else {
+    try {
+      const data = JSON.parse(jsonLd);
+      const types = new Set((data['@graph'] ?? [data]).map((node) => node['@type']));
+      for (const type of ['SoftwareApplication', 'WebSite']) {
+        if (!types.has(type)) failures.push(`${outputPath}: missing ${type} structured data`);
+      }
+    } catch (error) {
+      failures.push(`${outputPath}: invalid JSON-LD (${error.message})`);
+    }
+  }
 }
 
 const llms = await readFile(join(distRoot, 'llms.txt'), 'utf8');
 if (!llms.includes('https://modepot.io/')) failures.push('llms.txt: missing canonical ModePot URL');
 if (llms.includes('modepot.com')) failures.push('llms.txt: stale ModePot domain');
+for (const token of ['## Install', '## Quick start', '## Boundaries and license', 'https://pypi.org/project/summonpot/', 'License: MIT']) {
+  if (!llms.includes(token)) failures.push(`llms.txt: missing ${token}`);
+}
+const quickStart = await readFile(join(distRoot, 'quick-start', 'index.html'), 'utf8');
+if (!quickStart.includes('Python 3.11–3.14')) {
+  failures.push('quick-start/index.html: Python support range is stale');
+}
 if (htmlCount === 0) failures.push('no rendered HTML files found');
 if (failures.length) {
   console.error(failures.join('\n'));
   process.exitCode = 1;
 } else {
-  console.log(`Verified PostHog configuration in ${htmlCount} rendered HTML files.`);
+  console.log(`Verified analytics and discovery metadata in ${htmlCount} rendered HTML files.`);
 }
