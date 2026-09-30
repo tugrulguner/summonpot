@@ -26,6 +26,7 @@ export default defineConfig({
     sidebar: [
       { label: 'Start here', items: [{ label: 'Quick start', link: '/quick-start/' }] },
       { label: 'Guides', items: [{ label: 'Architecture & safety', link: '/architecture/' }, { label: 'Capabilities', link: '/capabilities/' }] },
+      { label: 'ModePot', link: 'https://modepot.io/' },
     ],
   })],
 });
