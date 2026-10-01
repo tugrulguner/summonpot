@@ -1,5 +1,6 @@
 """Presentation guards for the repository's primary adoption surface."""
 
+import re
 import struct
 from pathlib import Path
 
@@ -16,7 +17,9 @@ def test_readme_preserves_signature_hero_and_unified_framework_value():
     introduction = readme.split("## Why summonpot?", 1)[0]
     normalized_introduction = _normalize(introduction)
 
-    assert '<img src="summonpot.png" alt="Summonpot" width="600">' in introduction
+    assert (
+        '<img src="summonpot-lockup.png" alt="Summonpot" width="600">' in introduction
+    )
     assert (
         "declare deterministic operations and agentic decisions through one framework"
         in normalized_introduction
@@ -38,6 +41,19 @@ def test_readme_preserves_signature_hero_and_unified_framework_value():
     assert "model-owned" not in normalized_introduction
     assert "request/response validation" in normalized_introduction
     assert "openapi" in normalized_introduction
+
+
+def test_minimal_lockup_preserves_the_canonical_compact_mark():
+    image = ROOT / "summonpot-lockup.png"
+    mark = (ROOT / "assets" / "summonpot-mark.svg").read_text(encoding="utf-8")
+    lockup = (ROOT / "assets" / "summonpot-lockup.svg").read_text(encoding="utf-8")
+    geometry = re.findall(r"<(?:path|circle|rect)\b[^>]*?/>", mark)
+
+    data = image.read_bytes()
+    assert data[:8] == b"\x89PNG\r\n\x1a\n"
+    assert struct.unpack(">II", data[16:24]) == (1200, 900)
+    assert geometry
+    assert all(shape in lockup for shape in geometry)
 
 
 def test_readme_states_the_current_runtime_boundary_before_positioning():

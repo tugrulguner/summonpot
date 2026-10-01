@@ -1,7 +1,7 @@
 # summonpot
 
 <p align="center">
-  <img src="summonpot.png" alt="Summonpot" width="600">
+  <img src="summonpot-lockup.png" alt="Summonpot" width="600">
 </p>
 
 <p align="center">

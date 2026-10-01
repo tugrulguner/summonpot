@@ -42,6 +42,12 @@ for await (const path of htmlFiles(distRoot)) {
   if (!html.includes('rel="alternate" type="text/plain" href="/llms.txt"')) {
     failures.push(`${outputPath}: missing llms.txt discovery link`);
   }
+  for (const token of [
+    'property="og:image" content="https://summonpot.modepot.io/social-card-v2.png"',
+    'name="twitter:image" content="https://summonpot.modepot.io/social-card-v2.png"',
+  ]) {
+    if (!html.includes(token)) failures.push(`${outputPath}: missing discovery metadata ${token}`);
+  }
   const jsonLd = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1];
   if (!jsonLd) {
     failures.push(`${outputPath}: missing JSON-LD`);
@@ -67,6 +73,10 @@ for (const token of ['## Install', '## Quick start', '## Boundaries and license'
 const quickStart = await readFile(join(distRoot, 'quick-start', 'index.html'), 'utf8');
 if (!quickStart.includes('Python 3.11–3.14')) {
   failures.push('quick-start/index.html: Python support range is stale');
+}
+const socialCard = await readFile(join(distRoot, 'social-card-v2.png'));
+if (socialCard.readUInt32BE(16) !== 1200 || socialCard.readUInt32BE(20) !== 630) {
+  failures.push('social-card-v2.png: expected 1200x630 PNG');
 }
 if (htmlCount === 0) failures.push('no rendered HTML files found');
 if (failures.length) {
