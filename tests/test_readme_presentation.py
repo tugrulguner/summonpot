@@ -17,7 +17,9 @@ def test_readme_preserves_signature_hero_and_unified_framework_value():
     introduction = readme.split("## Why summonpot?", 1)[0]
     normalized_introduction = _normalize(introduction)
 
-    assert '<img src="summonpot-lockup.png" alt="Summonpot" width="600">' in introduction
+    assert (
+        '<img src="summonpot-lockup.png" alt="Summonpot" width="600">' in introduction
+    )
     assert (
         "declare deterministic operations and agentic decisions through one framework"
         in normalized_introduction
