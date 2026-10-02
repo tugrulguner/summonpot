@@ -94,7 +94,7 @@
     form.addEventListener('input', () => { cancelRun(); clearPresentation(); });
     document.querySelector<HTMLButtonElement>('#reset')!.addEventListener('click', () => {
       cancelRun();
-      form.reset();
+      HTMLFormElement.prototype.reset.call(form);
       clearPresentation();
     });
   </script>
