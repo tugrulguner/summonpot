@@ -19,9 +19,11 @@
     format: Literal[<span class="str">"summary"</span>, <span class="str">"detailed"</span>]
 
 <span class="comment"># Exact app-owned operation; fixed local records</span>
-<span class="kw">def</span> <span class="fn">load_customer</span>(customer_id, format) -&gt; CustomerRecord:
+<span class="kw">def</span> <span class="fn">load_customer</span>(customer_id: str,
+                  format: Literal[<span class="str">"summary"</span>, <span class="str">"detailed"</span>]) -&gt; CustomerRecord:
     record = _CUSTOMERS[customer_id]
-    <span class="kw">return</span> CustomerRecord(customer_id=customer_id, **record, format=format)
+    <span class="kw">return</span> CustomerRecord(customer_id=customer_id,
+        name=record[<span class="str">"name"</span>], status=record[<span class="str">"status"</span>], format=format)
 
 <span class="comment"># Request owns ID; agent may choose only format</span>
 customer_lookup = Operation(load_customer,
@@ -43,7 +45,7 @@ customer_lookup = Operation(load_customer,
         <section class="result" aria-live="polite" aria-atomic="true"><div class="result-top"><h2 id="result-title">Ready to run</h2><span id="status">BROWSER PREVIEW</span></div><p id="result-copy">The operation result will appear here.</p><dl><div><dt>Customer</dt><dd id="customer-name">—</dd></div><div><dt>Status</dt><dd id="customer-status">—</dd></div><div><dt>Selected format</dt><dd id="customer-format">—</dd></div></dl><details open><summary>Execution detail</summary><ol class="steps"><li data-step="request">Validate request</li><li data-step="choice">Bound format choice</li><li data-step="operation">Required lookup × 1</li><li data-step="response">Typed operation result</li></ol><p id="trace-input">Request · —</p><p id="trace-choice">AgentChoice · —</p><p id="trace-result">Operation result · —</p></details></section>
       </div>
     </section>
-    <p class="boundary">No model, server, network call, arbitrary code, or extra capability runs in this browser preview. <a href="https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py">Read and run the shipped bound-operation example</a> · <a href="/architecture/">Authority and safety</a></p>
+    <p class="boundary">No model, server, network call, arbitrary code, or extra capability runs in this browser preview. <a href="https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py">Read and run the shipped bound-operation example</a> · <a href="/architecture/">Authority and safety</a> · <a href="https://modepot.io/">ModePot ↗</a></p>
   </main>
   <script>
     const form = document.querySelector<HTMLFormElement>('#customer-form')!;

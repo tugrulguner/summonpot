@@ -47,7 +47,9 @@ if (server) {
 }
 const browser = await chromium.launch({ headless: true });
 const failures = [];
+let checks = 0;
 const check = (condition, message) => {
+  checks++;
   if (!condition) failures.push(message);
 };
 const cleared = async (page) =>
@@ -76,6 +78,8 @@ try {
     "bounded authority heading missing",
   );
   const code = await page.locator(".code-panel pre").innerText();
+  check(/def load_customer\(customer_id: str,\s*format: Literal\["summary", "detailed"\]\)/.test(code), "operation input annotations must preserve the shipped bounded choice");
+  check(await page.getByRole("link", { name: "ModePot ↗", exact: true }).getAttribute("href") === "https://modepot.io/", "canonical family return link missing");
   check(
     (await page.locator(".code-panel .panel-heading").innerText()).includes(
       "examples/07_bound_operation.py",
@@ -311,7 +315,7 @@ try {
     JSON.stringify(
       {
         url,
-        checks: 27,
+        checks,
         contrast: { light: lightContrast, dark: darkContrast },
         screenshots: [
           "1280-light",
