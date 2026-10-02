@@ -28,6 +28,12 @@ for await (const path of htmlFiles(distRoot)) {
   htmlCount += 1;
   const html = await readFile(path, "utf8");
   const outputPath = relative(distRoot, path);
+  if (outputPath === "index.html" || outputPath === "quick-start/index.html") {
+    for (const stale of ["restricted quote playground", "browser-local quote playground", "one fixed quote operation"]) {
+      if (html.includes(stale)) failures.push(`${outputPath}: stale playground description ${stale}`);
+    }
+    if (!html.includes("examples/07_bound_operation.py")) failures.push(`${outputPath}: missing current bound-operation source`);
+  }
   if (outputPath === "playground/index.html") {
     for (const token of [
       "Summonpot playground",
