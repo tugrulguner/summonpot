@@ -17,7 +17,11 @@ export SUMMONPOT_MODEL=test
 
 The test model is keyless, **not** side-effect-free: it can call capabilities with generated placeholder arguments. Use harmless capabilities only; this is not a dry-run sandbox.
 
-## Try the curated keyless demo
+## Explore the restricted playground
+
+The [browser-local quote playground](/playground/) lets you change bounded quote inputs and choose a fixed display format. It does not make a model call or execute the Python framework. The output is calculated by a small illustrative operation in the browser.
+
+## Run the actual keyless HTTP example
 
 The repository's [direct quote example](https://github.com/tugrulguner/summonpot/blob/main/examples/08_direct_execution.py) is the recommended no-credentials demo. It accepts one validated request and invokes exactly one declared operation using only request-bound values. It does not use the test model or any AI provider. The response is application-calculated—not an AI-generated quote.
 
@@ -28,7 +32,7 @@ curl -sS -X POST http://127.0.0.1:8000/quotes/direct \\
   -d '{"unit_price_cents":1299,"quantity":3,"tax_rate_percent":"8.25"}'
 ```
 
-Recorded execution trace (`examples/08_direct_execution.trace.json`, source SHA-256 `0edd11041620fb7504b1219fb9f70fd3e16a1d560460e01d965c63feda5bb4e1`) for that input: `unit_price_cents=1299`, `quantity=3`, `tax_rate_percent=8.25` → `subtotal_cents=3897`, `tax_cents=322`, `total_cents=4219`. These are deterministic outputs, not an AI response. Invalid request values are rejected with HTTP 422 before execution. The test suite replays the recorded request through the actual HTTP app and checks the response and source hash.
+For this input the actual HTTP app returns subtotal 3897 cents, tax 322 cents, and total 4219 cents. These are deterministic outputs, not an AI response. Invalid request values are rejected with HTTP 422 before execution. The test suite exercises the actual HTTP app.
 
 ## Declare a typed endpoint
 

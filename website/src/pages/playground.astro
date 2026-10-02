@@ -1,0 +1,74 @@
+---
+---
+
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="description" content="A restricted browser-local quote contract explorer. No model calls or arbitrary code." /><title>Restricted playground · Summonpot</title></head>
+<body>
+  <main>
+    <a href="/">← Summonpot</a>
+    <p class="eyebrow">RESTRICTED PLAYGROUND · BROWSER-LOCAL</p>
+    <h1>Build a quote. See the contract hold.</h1>
+    <p class="intro">Change validated request values and the one allowed output format. The format is visitor-selected, not an AI decision. The browser example deliberately uses a smaller input range than the framework's HTTP example; it runs locally in this static page and does not call that endpoint.</p>
+
+    <section class="play" aria-label="Quote playground">
+      <div class="trace" aria-label="Authority trace"><h2>One request, bounded authority</h2><div class="trace-head"><span>Request-owned</span><span>Bounded choice</span><span>Application-owned</span></div><div class="trace-row"><span id="trace-input">Waiting for request</span><span id="trace-choice">Summary / detailed</span><span id="trace-result">Fixed quote operation</span></div><div class="attempts"><button type="button" class="secondary" data-forbidden="price">Try overriding price</button><button type="button" class="secondary" data-forbidden="format">Try unsupported format</button></div><p id="rejection" aria-live="polite"></p></div>
+      <form id="quote-form">
+        <label>Unit price <span>cents · 1–100000</span><input name="price" type="number" min="1" max="100000" value="1299" required /></label>
+        <label>Quantity <span>1–20</span><input name="quantity" type="number" min="1" max="20" value="3" required /></label>
+        <label>Tax rate <span>percent · 0–25</span><input name="tax" type="number" min="0" max="25" step="0.01" value="8.25" required /></label>
+        <label>Allowed display format <span>bounded choice</span><select name="format"><option value="summary">Summary</option><option value="detailed">Detailed</option></select></label>
+        <button type="submit">Run quote</button>
+        <button class="secondary" type="button" id="reset">Reset example</button>
+      </form>
+      <div class="result" aria-live="polite" aria-atomic="true">
+        <p class="eyebrow">APPLICATION-CALCULATED RESULT</p><h2 id="result-title">Quote ready</h2>
+        <p id="result-copy">Run the fixed quote operation to see validated inputs and application output.</p>
+        <dl><div><dt>Subtotal</dt><dd id="subtotal">—</dd></div><div><dt>Tax</dt><dd id="tax-result">—</dd></div><div><dt>Total</dt><dd id="total">—</dd></div></dl>
+        <ol class="steps" aria-label="Execution steps"><li data-step="request">Validate request</li><li data-step="choice">Select allowed format</li><li data-step="operation">Calculate quote</li><li data-step="response">Validate response</li></ol>
+      </div>
+    </section>
+    <aside><strong>Authority boundary</strong> The request supplies price, quantity, and tax rate. Only summary/detailed is selectable. The fixed operation computes money; no model, network call, arbitrary code, or outside capability runs here. This interactive is an illustrative browser-local contract explorer, not the Python framework executing inside this static site.</aside>
+    <p><a href="https://github.com/tugrulguner/summonpot/blob/main/examples/08_direct_execution.py">Run the actual framework's keyless HTTP example</a> · <a href="/architecture/">Read authority and safety boundaries</a></p>
+  </main>
+  <script>
+    const form = document.querySelector<HTMLFormElement>('#quote-form')!;
+    const output = (id: string) => document.getElementById(id)!;
+    const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+    function resetSteps() { document.querySelectorAll('[data-step]').forEach((el) => el.classList.remove('active')); }
+    const reject = (message: string) => { output('rejection').textContent = message; output('rejection').classList.remove('reject'); void output('rejection').offsetWidth; output('rejection').classList.add('reject'); };
+    document.querySelectorAll<HTMLButtonElement>('[data-forbidden]').forEach((button) => button.addEventListener('click', () => {
+      const kind = button.dataset.forbidden;
+      reject(kind === 'price' ? 'Rejected: price belongs to the request; the operation cannot override it. Request values are unchanged.' : 'Rejected: only summary or detailed is allowed. Unsupported formats do not reach the operation.');
+    }));
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault(); resetSteps(); output('rejection').textContent = '';
+      const data = new FormData(form);
+      const price = Number(data.get('price')), quantity = Number(data.get('quantity')), taxRaw = String(data.get('tax'));
+      const taxRate = Number(taxRaw);
+      if (!Number.isInteger(price) || price < 1 || price > 100000 || !Number.isInteger(quantity) || quantity < 1 || quantity > 20 || !Number.isFinite(taxRate) || taxRate < 0 || taxRate > 25 || !/^\d{1,2}(?:\.\d{1,2})?$/.test(taxRaw)) { form.reportValidity(); reject('Rejected: enter a valid price, quantity, and tax rate within the stated limits.'); return; }
+      const format = data.get('format'); if (format !== 'summary' && format !== 'detailed') { reject('Rejected: unsupported display format.'); return; }
+      const subtotal = BigInt(price) * BigInt(quantity), rateHundredths = BigInt(Math.round(taxRate * 100));
+      const tax = (subtotal * rateHundredths + 5000n) / 10000n, total = subtotal + tax;
+      const money = (n: bigint) => fmt.format(Number(n) / 100);
+      output('trace-input').textContent = `${price}¢ × ${quantity} · ${taxRaw}% tax`;
+      output('trace-choice').textContent = format;
+      output('trace-result').textContent = 'Calculating…';
+      const labels = ['request','choice','operation','response'];
+      for (let i = 0; i < labels.length; i++) {
+        document.querySelector(`[data-step="${labels[i]}"]`)?.classList.add('active');
+        if (i === 2) output('trace-result').textContent = 'Application computes cents';
+        await new Promise((resolve) => setTimeout(resolve, 240));
+      }
+      output('trace-result').textContent = `${money(total)} · app-calculated`;
+      output('result-title').textContent = format === 'summary' ? 'Summary quote' : 'Detailed quote';
+      output('result-copy').textContent = format === 'summary' ? `${quantity} item${quantity === 1 ? '' : 's'} · ${money(total)} total` : `${quantity} × ${money(BigInt(price))} at ${taxRate}% tax. Tax is rounded half-up to the nearest cent.`;
+      output('subtotal').textContent = money(subtotal); output('tax-result').textContent = money(tax); output('total').textContent = money(total);
+    });
+    document.querySelector<HTMLButtonElement>('#reset')!.addEventListener('click', () => { form.reset(); resetSteps(); output('result-title').textContent = 'Quote ready'; output('result-copy').textContent = 'Run the fixed quote operation to see validated inputs and application output.'; for (const id of ['subtotal','tax-result','total']) output(id).textContent = '—'; });
+  </script>
+  <style>
+    :global(body) { margin:0; background:#101b19; color:#edf6f1; font:16px/1.55 system-ui,sans-serif; } main { max-width:1100px; margin:auto; padding:clamp(1.2rem,5vw,4rem); } a { color:#75e0b7; } h1 { max-width:800px; margin:.4rem 0; font-size:clamp(2.2rem,6vw,4.5rem); line-height:1.05; letter-spacing:-.04em; } .intro { max-width:750px; color:#bfcec7; } .eyebrow { color:#75e0b7; font-size:.76rem; font-weight:750; letter-spacing:.12em; } .play { display:grid; grid-template-columns:minmax(260px,.8fr) minmax(0,1.2fr); gap:1rem; margin:2rem 0; } form,.result,.trace,aside { border:1px solid #354941; border-radius:16px; padding:clamp(1rem,3vw,1.6rem); background:#172421; } .trace { grid-column:1/-1; } .trace-head,.trace-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.7rem; } .trace-head { color:#75e0b7; font-size:.85rem; font-weight:700; } .trace-row span { min-width:0; overflow-wrap:anywhere; padding:.8rem; border:1px solid #354941; border-radius:8px; } .attempts { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.7rem; } .attempts button { width:auto; } #rejection { color:#ffb6a9; min-height:1.5em; } .reject { animation:reject .35s ease-out; } @keyframes reject { 50% { transform:translateX(5px); } } label { display:block; margin:0 0 1rem; font-weight:650; } label span { display:block; color:#aabbb2; font-size:.85rem; font-weight:400; } input,select,button { box-sizing:border-box; width:100%; min-height:46px; margin-top:.35rem; border-radius:8px; border:1px solid #536c60; padding:.65rem; font:inherit; } input,select { background:#0e1815; color:#f5faf7; } button { background:#75e0b7; color:#102019; border:0; font-weight:750; cursor:pointer; } button.secondary { margin-top:.5rem; background:transparent; border:1px solid #536c60; color:#edf6f1; } .result h2 { font-size:1.7rem; margin:.2rem 0; } .result > p:not(.eyebrow) { color:#bfcec7; } dl { border-top:1px solid #354941; } dl div { display:flex; justify-content:space-between; gap:1rem; padding:.35rem 0; } dd { margin:0; font-weight:700; font-variant-numeric:tabular-nums; } .steps { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; padding:0; list-style:none; counter-reset:step; } .steps li { padding:.55rem; border:1px solid #354941; border-radius:8px; color:#aabbb2; } .steps li::before { counter-increment:step; content:counter(step) ' · '; } .steps li.active { color:#75e0b7; border-color:#75e0b7; } aside { color:#bfcec7; margin:1.5rem 0; } aside strong { display:block; color:#edf6f1; } @media(max-width:680px) { .play { grid-template-columns:minmax(0,1fr); } .steps { grid-template-columns:minmax(0,1fr); } }
+  </style>
+</body>
+</html>
