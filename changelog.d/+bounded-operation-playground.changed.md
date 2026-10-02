@@ -1,0 +1,1 @@
+Replace the quote-form demo with a browser-local preview of Summonpot's shipped bound-operation contract: `FromRequest`, bounded `AgentChoice`, and an exactly-once required operation.

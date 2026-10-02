@@ -287,20 +287,27 @@ def test_ci_and_release_verify_runnable_sdist_assets():
         assert '"/.venv" not in name' in workflow
 
 
-def test_recorded_demo_surface_is_replaced_by_restricted_playground():
+def test_playground_teaches_the_shipped_bounded_operation_contract():
     page = (ROOT / "website/src/pages/playground.astro").read_text(encoding="utf-8")
     home = (ROOT / "website/src/content/docs/index.mdx").read_text(encoding="utf-8")
+    example = (ROOT / "examples/07_bound_operation.py").read_text(encoding="utf-8")
 
-    assert 'name="price" type="number" min="1" max="100000"' in page
-    assert 'name="quantity" type="number" min="1" max="20"' in page
-    assert 'name="tax" type="number" min="0" max="25"' in page
-    assert "no model, network call, arbitrary code" in page
-    assert "not an AI decision" in page
-    assert "Request-owned" in page and "Application-owned" in page
-    assert 'data-forbidden="price"' in page
-    assert "Unsupported formats do not reach the operation" in page
-    assert "ROUND_HALF_UP" in (ROOT / "examples/08_direct_execution.py").read_text(
-        encoding="utf-8"
+    assert "examples/07_bound_operation.py" in page
+    assert (
+        "FromRequest" in page
+        and 'FromRequest(<span class="str">"customer_id"</span>)' in page
     )
+    assert (
+        "AgentChoice()" in page and "Required(customer_lookup, calls=Exactly(" in page
+    )
+    assert "output=CustomerRecord" in page
+    assert 'name="customer_id" type="text"' in page
+    assert "customer-7" in page and "customer-9" in page
+    assert "Run lookup" in page
+    assert "No model, server, network call, arbitrary code" in page
+    assert "browser preview" in page and "not Python/model execution" in page
+    assert "operation override cannot replace request-owned data" in page
+    assert '"customer-7": {"name": "Ada", "status": "active"}' in example
+    assert '"customer-9": {"name": "Grace", "status": "paused"}' in example
     assert "/playground/" in home
     assert not (ROOT / "website/src/components/AgentDemo.astro").exists()
