@@ -55,6 +55,7 @@ const check = (condition, message) => {
 const cleared = async (page) =>
   (await page.locator("#result-title").textContent()) === "Ready to run" &&
   (await page.locator("#customer-name").textContent()) === "—" &&
+  (await page.locator("#bound-customer-id").textContent()) === "—" &&
   (await page.locator("#trace-result").textContent()) ===
     "Operation result · —" &&
   (await page.locator("[data-step].active").count()) === 0 &&
@@ -77,8 +78,17 @@ try {
     (await page.locator("h1").textContent()).includes("bounded choice"),
     "bounded authority heading missing",
   );
-  const code = await page.locator(".code-panel pre").innerText();
-  check(/def load_customer\(customer_id: str,\s*format: Literal\["summary", "detailed"\]\)/.test(code), "operation input annotations must preserve the shipped bounded choice");
+  await page.evaluate(async () => { await document.fonts.ready; await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); });
+  const composition = await page.evaluate(() => {
+    const rect = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return {top:r.top,bottom:r.bottom,height:r.height,width:r.width}; };
+    return { run:rect('.actions button[type="submit"]'), reset:rect('#reset'), code:rect('.code-panel'), controls:rect('.controls-panel'), result:rect('.result'), flow:document.querySelectorAll('.contract-flow li').length, closed:[...document.querySelectorAll('.full-source,.execution-detail')].every(d => !d.open) };
+  });
+  check(composition.run.height === 44 && composition.reset.height === 44 && composition.run.top === composition.reset.top, 'primary actions must share a 44px height and baseline');
+  check(Math.abs(composition.code.top - composition.controls.top) <= 1 && composition.result.bottom <= composition.controls.bottom, 'code and interactive result must form one aligned workbench');
+  check(composition.flow === 3 && composition.closed, 'authority flow must be visible and secondary details initially closed');
+  check((await page.locator('.intro').innerText()).includes('The request owns the customer ID'), 'the defining request/choice distinction must lead the playground');
+  const code = await page.locator(".primary-code pre").innerText();
+  check(/def load_customer\(\s*customer_id: str,\s*format: Literal\["summary", "detailed"\],?\s*\)/.test(code), "operation input annotations must preserve the shipped bounded choice");
   check(await page.getByRole("link", { name: "ModePot ↗", exact: true }).getAttribute("href") === "https://modepot.io/", "canonical family return link missing");
   check(
     (await page.locator(".code-panel .panel-heading").innerText()).includes(
@@ -146,6 +156,7 @@ try {
       ),
     "request/choice/operation trace incorrect",
   );
+  check((await page.locator("#bound-customer-id").textContent()) === "customer-7", "the operation result must visibly preserve the request-owned ID");
   await page.locator("#try-override").click();
   check(
     (await page.locator("#rejection").textContent()).includes("FromRequest") &&
@@ -165,6 +176,7 @@ try {
   await page.locator('[name="format"]').selectOption("detailed");
   await run();
   await waitDone();
+  check((await page.locator("#bound-customer-id").textContent()) === "customer-9", "a different allowed format must preserve the changed request-owned ID");
   check(
     (await page.locator("#trace-choice").textContent()).includes(
       "AgentChoice · detailed",
@@ -253,7 +265,7 @@ try {
       };
       const root = getComputedStyle(document.documentElement),
         bg = root.getPropertyValue("--bg").trim(),
-        codeBg = root.getPropertyValue("--code").trim();
+        codeBg = getComputedStyle(document.querySelector(".primary-code pre")).backgroundColor;
       const button = getComputedStyle(
         document.querySelector('button[type="submit"]'),
       );
@@ -264,7 +276,7 @@ try {
         button: ratio(button.color, button.backgroundColor),
         codeTokens: [
           ...document.querySelectorAll(
-            ".comment,.kw,.type,.fn,.num,.str,.decorator",
+            ".primary-code span[style]",
           ),
         ].map((e) => ratio(getComputedStyle(e).color, codeBg)),
       };
@@ -298,7 +310,7 @@ try {
         c.muted >= 4.5 &&
         c.accent >= 4.5 &&
         c.button >= 4.5 &&
-        c.codeTokens.every((x) => x >= 4.5),
+        c.codeTokens.length > 0 && c.codeTokens.every((x) => x >= 4.5),
       `${theme} text contrast below WCAG AA: ${JSON.stringify(c)}`,
     );
   await page.locator('[name="customer_id"]').fill("customer-8");
