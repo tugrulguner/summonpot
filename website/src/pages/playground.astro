@@ -3,103 +3,112 @@
 
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="description" content="A restricted browser-local quote contract explorer. No model calls or arbitrary code." /><title>Restricted playground · Summonpot</title></head>
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="description" content="Explore Summonpot's shipped bounded-operation contract in a browser-local preview." /><title>Summonpot playground</title></head>
 <body>
   <main>
-    <a href="/">← Summonpot</a>
-    <p class="eyebrow">RESTRICTED PLAYGROUND · BROWSER-LOCAL</p>
-    <h1>Build a quote. See the contract hold.</h1>
-    <p class="intro">Change validated request values and the one allowed output format. The format is visitor-selected, not an AI decision. The browser example deliberately uses a smaller input range than the framework's HTTP example; it runs locally in this static page and does not call that endpoint.</p>
+    <nav><a href="/">← Summonpot</a><span>PLAYGROUND · BROWSER-LOCAL</span></nav>
+    <header><p class="eyebrow">A contract, with bounded authority</p><h1>One request. One bounded choice.</h1><p class="intro">See how a validated request and one declared operation divide authority. Choose what the agent may choose; the browser preview demonstrates the contract, not an agent runtime.</p></header>
+    <section class="workbench" aria-label="Bounded customer operation workbench">
+      <div class="code-panel"><div class="panel-heading"><span>examples/07_bound_operation.py</span><a href="https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py">View source ↗</a></div><pre aria-label="Shipped Python bound operation example"><code><span class="kw">class</span> <span class="type">CustomerRequest</span>(BaseModel):
+    customer_id: str
 
-    <section class="play" aria-label="Quote playground">
-      <div class="trace" aria-label="Authority trace"><h2>One request, bounded authority</h2><div class="trace-head"><span>Request-owned</span><span>Bounded choice</span><span>Application-owned</span></div><div class="trace-row"><span id="trace-input">Waiting for request</span><span id="trace-choice">Summary / detailed</span><span id="trace-result">Fixed quote operation</span></div><div class="attempts"><button type="button" class="secondary" data-forbidden="price">Try overriding price</button><button type="button" class="secondary" data-forbidden="format">Try unsupported format</button></div><p id="rejection" aria-live="polite"></p></div>
-      <form id="quote-form">
-        <label>Unit price <span>cents · 1–100000</span><input name="price" type="number" min="1" max="100000" value="1299" required /></label>
-        <label>Quantity <span>1–20</span><input name="quantity" type="number" min="1" max="20" value="3" required /></label>
-        <label>Tax rate <span>percent · 0–25</span><input name="tax" type="number" min="0" max="25" step="0.01" value="8.25" required /></label>
-        <label>Allowed display format <span>bounded choice</span><select name="format"><option value="summary">Summary</option><option value="detailed">Detailed</option></select></label>
-        <button type="submit">Run quote</button>
-        <button class="secondary" type="button" id="reset">Reset example</button>
-      </form>
-      <div class="result" aria-live="polite" aria-atomic="true">
-        <p class="eyebrow">APPLICATION-CALCULATED RESULT</p><h2 id="result-title">Quote ready</h2>
-        <p id="result-copy">Run the fixed quote operation to see validated inputs and application output.</p>
-        <dl><div><dt>Subtotal</dt><dd id="subtotal">—</dd></div><div><dt>Tax</dt><dd id="tax-result">—</dd></div><div><dt>Total</dt><dd id="total">—</dd></div></dl>
-        <ol class="steps" aria-label="Execution steps"><li data-step="request">Validate request</li><li data-step="choice">Select allowed format</li><li data-step="operation">Calculate quote</li><li data-step="response">Validate response</li></ol>
+<span class="kw">class</span> <span class="type">CustomerRecord</span>(BaseModel):
+    customer_id: str
+    name: str
+    status: Literal[<span class="str">"active"</span>, <span class="str">"paused"</span>]
+    format: Literal[<span class="str">"summary"</span>, <span class="str">"detailed"</span>]
+
+<span class="comment"># Exact app-owned operation; fixed local records</span>
+<span class="kw">def</span> <span class="fn">load_customer</span>(customer_id, format) -&gt; CustomerRecord:
+    record = _CUSTOMERS[customer_id]
+    <span class="kw">return</span> CustomerRecord(customer_id=customer_id, **record, format=format)
+
+<span class="comment"># Request owns ID; agent may choose only format</span>
+customer_lookup = Operation(load_customer,
+    bind=&#123;<span class="str">"customer_id"</span>: FromRequest(<span class="str">"customer_id"</span>),
+          <span class="str">"format"</span>: AgentChoice()&#125;, output=CustomerRecord)
+
+<span class="decorator">@summon</span>(<span class="str">"/customers/view"</span>)
+<span class="kw">def</span> <span class="fn">customer_view</span>(request: CustomerRequest,
+    customer=Required(customer_lookup, calls=Exactly(<span class="num">1</span>)),
+) -&gt; CustomerView:
+    ...</code></pre><p class="source-note">Shipped example excerpt · shown as a browser-local contract preview, not Python/model execution.</p></div>
+      <div class="controls-panel"><div class="panel-heading"><span>Explore the boundary</span></div>
+        <div class="authority"><strong>Request</strong><span>Customer ID from your input</span><strong>Choice</strong><span>Format you select to preview the bounded value available to the agent</span><strong>Application</strong><span>One exact lookup operation</span></div>
+        <form id="customer-form" novalidate>
+          <label>Customer ID <span>customer-7 or customer-9</span><input name="customer_id" type="text" value="customer-7" required /></label>
+          <label>Allowed format <span>Pick the value in this preview</span><select name="format"><option value="summary">Summary</option><option value="detailed">Detailed</option></select></label>
+          <p id="rejection" role="alert" aria-live="assertive"></p><button type="submit">Run lookup</button><button class="secondary" type="button" id="reset">Reset</button><button class="secondary" type="button" id="try-override">Try operation override</button>
+        </form>
+        <section class="result" aria-live="polite" aria-atomic="true"><div class="result-top"><h2 id="result-title">Ready to run</h2><span id="status">BROWSER PREVIEW</span></div><p id="result-copy">The operation result will appear here.</p><dl><div><dt>Customer</dt><dd id="customer-name">—</dd></div><div><dt>Status</dt><dd id="customer-status">—</dd></div><div><dt>Selected format</dt><dd id="customer-format">—</dd></div></dl><details open><summary>Execution detail</summary><ol class="steps"><li data-step="request">Validate request</li><li data-step="choice">Bound format choice</li><li data-step="operation">Required lookup × 1</li><li data-step="response">Typed operation result</li></ol><p id="trace-input">Request · —</p><p id="trace-choice">AgentChoice · —</p><p id="trace-result">Operation result · —</p></details></section>
       </div>
     </section>
-    <aside><strong>Authority boundary</strong> The request supplies price, quantity, and tax rate. Only summary/detailed is selectable. The fixed operation computes money; no model, network call, arbitrary code, or outside capability runs here. This interactive is an illustrative browser-local contract explorer, not the Python framework executing inside this static site.</aside>
-    <p><a href="https://github.com/tugrulguner/summonpot/blob/main/examples/08_direct_execution.py">Run the actual framework's keyless HTTP example</a> · <a href="/architecture/">Read authority and safety boundaries</a></p>
+    <p class="boundary">No model, server, network call, arbitrary code, or extra capability runs in this browser preview. <a href="https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py">Read and run the shipped bound-operation example</a> · <a href="/architecture/">Authority and safety</a></p>
   </main>
   <script>
-    const form = document.querySelector<HTMLFormElement>('#quote-form')!;
+    const form = document.querySelector<HTMLFormElement>('#customer-form')!;
     const output = (id: string) => document.getElementById(id)!;
-    const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
     function resetSteps() { document.querySelectorAll('[data-step]').forEach((el) => el.classList.remove('active')); }
     let runVersion = 0;
     let pendingTimers: Array<{ timer: number; cancel: () => void }> = [];
-    function cancelRun() {
-      runVersion++;
-      pendingTimers.forEach(({ timer, cancel }) => { clearTimeout(timer); cancel(); });
-      pendingTimers = [];
-    }
+    function cancelRun() { runVersion++; pendingTimers.forEach(({ timer, cancel }) => { clearTimeout(timer); cancel(); }); pendingTimers = []; }
     function clearPresentation() {
-      resetSteps();
-      output('result-title').textContent = 'Quote ready';
-      output('result-copy').textContent = 'Run the fixed quote operation to see validated inputs and application output.';
-      for (const id of ['subtotal','tax-result','total']) output(id).textContent = '—';
-      output('trace-input').textContent = 'Waiting for request';
-      output('trace-choice').textContent = 'Summary / detailed';
-      output('trace-result').textContent = 'Fixed quote operation';
-      output('rejection').textContent = '';
-      output('rejection').classList.remove('reject');
+      resetSteps(); output('result-title').textContent = 'Ready to run'; output('status').textContent = 'BROWSER PREVIEW'; output('result-copy').textContent = 'The operation result will appear here.';
+      for (const id of ['customer-name','customer-status','customer-format']) output(id).textContent = '—';
+      output('trace-input').textContent = 'Request · —'; output('trace-choice').textContent = 'AgentChoice · —'; output('trace-result').textContent = 'Operation result · —';
+      output('rejection').textContent = ''; output('rejection').classList.remove('reject');
     }
     const reject = (message: string) => { output('rejection').textContent = message; output('rejection').classList.remove('reject'); void output('rejection').offsetWidth; output('rejection').classList.add('reject'); };
-    document.querySelectorAll<HTMLButtonElement>('[data-forbidden]').forEach((button) => button.addEventListener('click', () => {
-      const kind = button.dataset.forbidden;
-      reject(kind === 'price' ? 'Rejected: price belongs to the request; the operation cannot override it. Request values are unchanged.' : 'Rejected: only summary or detailed is allowed. Unsupported formats do not reach the operation.');
-    }));
     form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      cancelRun();
-      clearPresentation();
-      const version = runVersion;
-      const data = new FormData(form);
-      const price = Number(data.get('price')), quantity = Number(data.get('quantity')), taxRaw = String(data.get('tax'));
-      const taxRate = Number(taxRaw);
-      if (!Number.isInteger(price) || price < 1 || price > 100000 || !Number.isInteger(quantity) || quantity < 1 || quantity > 20 || !Number.isFinite(taxRate) || taxRate < 0 || taxRate > 25 || !/^\d{1,2}(?:\.\d{1,2})?$/.test(taxRaw)) { form.reportValidity(); reject('Rejected: enter a valid price, quantity, and tax rate within the stated limits.'); return; }
-      const format = data.get('format'); if (format !== 'summary' && format !== 'detailed') { reject('Rejected: unsupported display format.'); return; }
-      const subtotal = BigInt(price) * BigInt(quantity), rateHundredths = BigInt(Math.round(taxRate * 100));
-      const tax = (subtotal * rateHundredths + 5000n) / 10000n, total = subtotal + tax;
-      const money = (n: bigint) => fmt.format(Number(n) / 100);
-      output('trace-input').textContent = `${price}¢ × ${quantity} · ${taxRaw}% tax`;
-      output('trace-choice').textContent = format;
-      output('trace-result').textContent = 'Calculating…';
+      event.preventDefault(); cancelRun(); clearPresentation(); const version = runVersion;
+      const data = new FormData(form); const customerId = String(data.get('customer_id')); const format = data.get('format');
+      if (!/^customer-(7|9)$/.test(customerId)) { reject('Rejected: choose an approved customer ID (customer-7 or customer-9). The request owns this ID.'); return; }
+      if (format !== 'summary' && format !== 'detailed') { reject('Rejected: format is outside the declared AgentChoice values.'); return; }
+      output('trace-input').textContent = `FromRequest · customer_id=${customerId}`;
+      output('trace-choice').textContent = `AgentChoice · ${format} (visitor-selected preview)`; output('trace-result').textContent = 'Operation result · running';
       const labels = ['request','choice','operation','response'];
-      for (let i = 0; i < labels.length; i++) {
-        document.querySelector(`[data-step="${labels[i]}"]`)?.classList.add('active');
-        if (i === 2) output('trace-result').textContent = 'Application computes cents';
-        await new Promise<void>((resolve) => {
-          const timer = window.setTimeout(resolve, 240);
-          pendingTimers.push({ timer, cancel: resolve });
-        });
-        if (version !== runVersion) return;
-      }
-      if (version !== runVersion) return;
-      output('trace-result').textContent = `${money(total)} · app-calculated`;
-      output('result-title').textContent = format === 'summary' ? 'Summary quote' : 'Detailed quote';
-      output('result-copy').textContent = format === 'summary' ? `${quantity} item${quantity === 1 ? '' : 's'} · ${money(total)} total` : `${quantity} × ${money(BigInt(price))} at ${taxRate}% tax. Tax is rounded half-up to the nearest cent.`;
-      output('subtotal').textContent = money(subtotal); output('tax-result').textContent = money(tax); output('total').textContent = money(total);
+      for (let i = 0; i < labels.length; i++) { document.querySelector(`[data-step="${labels[i]}"]`)?.classList.add('active'); await new Promise<void>((resolve) => { const timer = window.setTimeout(resolve, 240); pendingTimers.push({ timer, cancel: resolve }); }); if (version !== runVersion) return; }
+      const record = customerId === 'customer-7' ? { name: 'Ada', status: 'active' } : { name: 'Grace', status: 'paused' };
+      output('customer-name').textContent = record.name; output('customer-status').textContent = record.status; output('customer-format').textContent = String(format);
+      output('trace-result').textContent = `Operation result · ${customerId} / ${record.name} / ${record.status} / ${format}`;
+      output('result-title').textContent = `${record.name} · ${record.status}`; output('status').textContent = 'LOCAL CONTRACT PREVIEW';
+      output('result-copy').textContent = format === 'summary' ? `${record.name} is ${record.status}.` : `${record.name} (${customerId}) — status: ${record.status}; format: detailed.`;
     });
     form.addEventListener('input', () => { cancelRun(); clearPresentation(); });
-    document.querySelector<HTMLButtonElement>('#reset')!.addEventListener('click', () => {
-      cancelRun();
-      HTMLFormElement.prototype.reset.call(form);
-      clearPresentation();
-    });
+    document.querySelector<HTMLButtonElement>('#reset')!.addEventListener('click', () => { cancelRun(); HTMLFormElement.prototype.reset.call(form); clearPresentation(); });
+    document.querySelector<HTMLButtonElement>('#try-override')!.addEventListener('click', () => reject('Rejected: customer_id is bound to FromRequest; an operation override cannot replace request-owned data.'));
   </script>
   <style>
-    :global(body) { margin:0; background:#101b19; color:#edf6f1; font:16px/1.55 system-ui,sans-serif; } main { max-width:1100px; margin:auto; padding:clamp(1.2rem,5vw,4rem); } a { color:#75e0b7; } h1 { max-width:800px; margin:.4rem 0; font-size:clamp(2.2rem,6vw,4.5rem); line-height:1.05; letter-spacing:-.04em; } .intro { max-width:750px; color:#bfcec7; } .eyebrow { color:#75e0b7; font-size:.76rem; font-weight:750; letter-spacing:.12em; } .play { display:grid; grid-template-columns:minmax(260px,.8fr) minmax(0,1.2fr); gap:1rem; margin:2rem 0; } form,.result,.trace,aside { border:1px solid #354941; border-radius:16px; padding:clamp(1rem,3vw,1.6rem); background:#172421; } .trace { grid-column:1/-1; } .trace-head,.trace-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.7rem; } .trace-head { color:#75e0b7; font-size:.85rem; font-weight:700; } .trace-row span { min-width:0; overflow-wrap:anywhere; padding:.8rem; border:1px solid #354941; border-radius:8px; } .attempts { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.7rem; } .attempts button { width:auto; } #rejection { color:#ffb6a9; min-height:1.5em; } .reject { animation:reject .35s ease-out; } @keyframes reject { 50% { transform:translateX(5px); } } label { display:block; margin:0 0 1rem; font-weight:650; } label span { display:block; color:#aabbb2; font-size:.85rem; font-weight:400; } input,select,button { box-sizing:border-box; width:100%; min-height:46px; margin-top:.35rem; border-radius:8px; border:1px solid #536c60; padding:.65rem; font:inherit; } input,select { background:#0e1815; color:#f5faf7; } button { background:#75e0b7; color:#102019; border:0; font-weight:750; cursor:pointer; } button.secondary { margin-top:.5rem; background:transparent; border:1px solid #536c60; color:#edf6f1; } .result h2 { font-size:1.7rem; margin:.2rem 0; } .result > p:not(.eyebrow) { color:#bfcec7; } dl { border-top:1px solid #354941; } dl div { display:flex; justify-content:space-between; gap:1rem; padding:.35rem 0; } dd { margin:0; font-weight:700; font-variant-numeric:tabular-nums; } .steps { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; padding:0; list-style:none; counter-reset:step; } .steps li { padding:.55rem; border:1px solid #354941; border-radius:8px; color:#aabbb2; } .steps li::before { counter-increment:step; content:counter(step) ' · '; } .steps li.active { color:#75e0b7; border-color:#75e0b7; } aside { color:#bfcec7; margin:1.5rem 0; } aside strong { display:block; color:#edf6f1; } @media(max-width:680px) { .play { grid-template-columns:minmax(0,1fr); } .steps { grid-template-columns:minmax(0,1fr); } }
+    :global(*) { box-sizing:border-box; }
+    :global(body) { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif; }
+    :global(:root) { color-scheme:light dark; --bg:#f5f6f4; --surface:#fff; --ink:#202522; --muted:#515b55; --border:#d5dad6; --accent:#08704e; --code:#f0f2ef; --comment:#53645a; --token:#174eb5; --green:#116a38; --red:#9f2828; }
+    @media(prefers-color-scheme:dark) { :global(:root) { --bg:#171b19; --surface:#202623; --ink:#f0f3f1; --muted:#c0cac3; --border:#424d46; --accent:#64d4a6; --code:#171c19; --comment:#b0c0b5; --token:#9ebaff; --green:#92e4a8; --red:#ffaaa3; } }
+    main { max-width:1180px; padding:28px clamp(16px,4vw,52px) 40px; margin:auto; }
+    nav { display:flex; justify-content:space-between; gap:12px; font-size:13px; color:var(--muted); } a { color:var(--accent); text-underline-offset:3px; }
+    nav a { font-weight:650; } nav span,.eyebrow { font-size:11px; letter-spacing:.09em; font-weight:750; }
+    header { margin:26px 0 21px; } .eyebrow { color:var(--accent); text-transform:uppercase; margin:0 0 6px; }
+    h1 { font-size:clamp(27px,4vw,42px); line-height:1.1; letter-spacing:-.035em; margin:0 0 8px; } .intro { color:var(--muted); margin:0; max-width:720px; }
+    .workbench { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(350px,.95fr); border:1px solid var(--border); border-radius:10px; background:var(--surface); overflow:hidden; }
+    .code-panel,.controls-panel { min-width:0; } .code-panel { border-right:1px solid var(--border); background:var(--code); }
+    .panel-heading { min-height:46px; padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:8px; font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .panel-heading a { font:600 12px/1.4 ui-sans-serif,system-ui,sans-serif; white-space:nowrap; }
+    pre { margin:0; padding:18px 17px; overflow-x:auto; color:var(--ink); font:12px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace; tab-size:4; } code { font:inherit; }
+    .comment { color:var(--comment); } .kw,.decorator { color:var(--token); font-weight:700; } .type,.fn { color:var(--green); font-weight:650; } .num,.str { color:var(--red); }
+    .source-note { margin:0; padding:0 17px 15px; color:var(--muted); font-size:11px; }
+    .controls-panel { padding:0 18px 17px; } .controls-panel .panel-heading { margin:0 -18px 10px; }
+    .authority { display:grid; grid-template-columns:auto 1fr; gap:4px 10px; padding:9px 11px; background:var(--code); border:1px solid var(--border); border-radius:6px; font-size:12px; margin-bottom:12px; }
+    .authority strong { color:var(--accent); } .authority span { color:var(--muted); }
+    label { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 8px; margin:9px 0; font-weight:650; font-size:13px; } label span { color:var(--muted); text-align:right; font-weight:400; font-size:11px; align-self:center; }
+    input,select,button { font:inherit; min-height:40px; border:1px solid var(--border); border-radius:5px; } input,select { grid-column:1/-1; width:100%; padding:7px 9px; background:var(--bg); color:var(--ink); } input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible,summary:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+    button { padding:8px 13px; cursor:pointer; font-weight:700; color:#fff; background:#086747; border-color:#086747; } @media(prefers-color-scheme:dark) { button { color:#101d17; background:#7de0b5; border-color:#7de0b5; } }
+    button.secondary { margin-left:7px; color:var(--ink); background:var(--surface); border-color:var(--border); }
+    #rejection { color:var(--red); font-size:13px; font-weight:650; margin:8px 0; min-height:0; } #rejection:empty { display:none; } .reject { animation:reject .3s ease-out; } @keyframes reject { 50% { transform:translateX(4px); } } @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; scroll-behavior:auto!important; } }
+    .result { margin-top:13px; border:1px solid var(--border); border-radius:6px; padding:12px; background:var(--bg); } .result-top { display:flex; align-items:center; justify-content:space-between; gap:8px; } .result h2 { margin:0; font-size:17px; } #status { font-size:10px; color:var(--accent); font-weight:750; letter-spacing:.06em; } #result-copy { color:var(--muted); margin:4px 0 10px; font-size:13px; }
+    dl { border-top:1px solid var(--border); margin:0; } dl div { display:flex; justify-content:space-between; gap:10px; padding:5px 0; border-bottom:1px solid var(--border); } dt { color:var(--muted); } dd { margin:0; font-variant-numeric:tabular-nums; font-weight:650; } dl div:last-child dd { color:var(--accent); }
+    details { margin-top:9px; font-size:12px; } summary { cursor:pointer; font-weight:650; } details p { overflow-wrap:anywhere; color:var(--muted); margin:4px 0; } .steps { display:flex; flex-wrap:wrap; gap:5px 19px; padding-left:20px; color:var(--muted); } .steps li.active { color:var(--accent); }
+    .boundary { color:var(--muted); font-size:12px; margin-top:14px; }
+    @media(max-width:760px) { main { padding:18px 14px 30px; } header { margin:22px 0 16px; } .workbench { grid-template-columns:minmax(0,1fr); } .code-panel { border-right:0; border-bottom:1px solid var(--border); } pre { font-size:11px; } }
+    @media(max-width:360px) { main { padding:14px 10px 24px; } nav span { font-size:9px; } .controls-panel { padding-inline:12px; } .controls-panel .panel-heading { margin-inline:-12px; } label { grid-template-columns:1fr; } label span { text-align:left; } .panel-heading { padding-inline:11px; font-size:10px; } .panel-heading a { font-size:10px; } pre { padding-inline:11px; } }
   </style>
 </body>
 </html>
