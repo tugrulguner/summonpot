@@ -21,6 +21,7 @@ hero:
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
+import AgentDemo from '../../components/AgentDemo.astro';
 
 Summonpot modernizes APIs for the AI era. Instead of splitting application endpoints and agent workflows across separate abstractions, declare a typed endpoint whose contract states what callers may send, what the application may execute, where the agent may decide, and what the endpoint may return.
 
@@ -37,6 +38,10 @@ The agent's authority is bounded by the endpoint declaration. Exact application 
     Install the serving extras and use the keyless test model to wire a harmless endpoint.
   </Card>
 </CardGrid>
+
+## Try the recorded bounded choice
+
+<AgentDemo />
 
 ## Try a complete endpoint
 

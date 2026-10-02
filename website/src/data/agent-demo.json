@@ -1,0 +1,66 @@
+{
+  "kind": "scripted-test-model-recording",
+  "source": "examples/07_bound_operation.py",
+  "source_sha256": "346137ef8e638340573cd5e1dd3d6e495276ed16f6e6c7cf1521762f76153436",
+  "provenance": "Keyless FunctionModel test fixture selects each legal format; not an LLM-generated choice.",
+  "recordings": [
+    {
+      "format": "summary",
+      "request": {
+        "customer_id": "customer-7"
+      },
+      "response": {
+        "customer_id": "customer-7",
+        "display": "Ada — active"
+      },
+      "tool": {
+        "tool": "load_customer",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "enum": [
+                "summary",
+                "detailed"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "format"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    {
+      "format": "detailed",
+      "request": {
+        "customer_id": "customer-7"
+      },
+      "response": {
+        "customer_id": "customer-7",
+        "display": "Ada Lovelace — active customer"
+      },
+      "tool": {
+        "tool": "load_customer",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "enum": [
+                "summary",
+                "detailed"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "format"
+          ],
+          "type": "object"
+        }
+      }
+    }
+  ]
+}
