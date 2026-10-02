@@ -28,6 +28,12 @@ for await (const path of htmlFiles(distRoot)) {
   htmlCount += 1;
   const html = await readFile(path, 'utf8');
   const outputPath = relative(distRoot, path);
+  if (outputPath === 'playground/index.html') {
+    for (const token of ['Restricted playground', 'browser-local', 'https://github.com/tugrulguner/summonpot/blob/main/examples/08_direct_execution.py', 'no model, network call, arbitrary code', 'name="viewport"']) {
+      if (!html.toLowerCase().includes(token.toLowerCase())) failures.push(`${outputPath}: missing playground contract ${token}`);
+    }
+    continue;
+  }
   for (const setting of requiredPosthogConfig) {
     if (!html.includes(setting)) failures.push(`${relative(distRoot, path)}: missing ${setting}`);
   }
