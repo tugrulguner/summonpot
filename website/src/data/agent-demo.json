@@ -1,0 +1,93 @@
+{
+  "kind": "scripted-test-model-recording",
+  "source": "examples/07_bound_operation.py",
+  "source_sha256": "346137ef8e638340573cd5e1dd3d6e495276ed16f6e6c7cf1521762f76153436",
+  "recorder_version": 2,
+  "provenance": "Keyless FunctionModel fixture selects each legal format; tool returns are actual validated application results; final display is scripted model output derived from that result, not an LLM-generated response.",
+  "recordings": [
+    {
+      "format": "summary",
+      "request": {
+        "customer_id": "customer-7"
+      },
+      "response": {
+        "customer_id": "customer-7",
+        "display": "Ada — active"
+      },
+      "tool": {
+        "tool": "load_customer",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "enum": [
+                "summary",
+                "detailed"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "format"
+          ],
+          "type": "object"
+        }
+      },
+      "tool_call": {
+        "tool": "load_customer",
+        "arguments": {
+          "format": "summary"
+        }
+      },
+      "tool_return": {
+        "customer_id": "customer-7",
+        "name": "Ada",
+        "status": "active",
+        "format": "summary"
+      },
+      "outcome_provenance": "display is scripted model output derived from the validated application tool return"
+    },
+    {
+      "format": "detailed",
+      "request": {
+        "customer_id": "customer-7"
+      },
+      "response": {
+        "customer_id": "customer-7",
+        "display": "Ada — active customer"
+      },
+      "tool": {
+        "tool": "load_customer",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "enum": [
+                "summary",
+                "detailed"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "format"
+          ],
+          "type": "object"
+        }
+      },
+      "tool_call": {
+        "tool": "load_customer",
+        "arguments": {
+          "format": "detailed"
+        }
+      },
+      "tool_return": {
+        "customer_id": "customer-7",
+        "name": "Ada",
+        "status": "active",
+        "format": "detailed"
+      },
+      "outcome_provenance": "display is scripted model output derived from the validated application tool return"
+    }
+  ]
+}

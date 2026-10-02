@@ -1,0 +1,28 @@
+---
+import recording from '../data/agent-demo.json';
+const demos = recording.recordings;
+---
+<section class="agent-demo" aria-labelledby="agent-demo-title">
+  <h2 id="agent-demo-title">See the agent-owned choice</h2>
+  <p>The request fixes the customer; the scripted test model chooses only the approved format. This is a reproducible keyless recording, not an LLM-generated decision or response. The actual application tool return is shown separately from the scripted model response.</p>
+  <label for="agent-demo-format">Recorded choice</label>
+  <select id="agent-demo-format">
+    {demos.map((demo) => <option value={demo.format}>{demo.format}</option>)}
+  </select>
+  {demos.map((demo) => <pre data-demo={demo.format} hidden={demo.format !== 'summary'}><code>{JSON.stringify({request: demo.request, tool_schema: demo.tool.schema, tool_call: demo.tool_call, actual_tool_return: demo.tool_return, scripted_model_response: demo.response}, null, 2)}</code></pre>)}
+  <p>Recorder v{recording.recorder_version} · source SHA-256: <code>{recording.source_sha256}</code></p>
+  <p><a href="https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py">Example source</a> · <a href="https://github.com/tugrulguner/summonpot/blob/main/scripts/record_agent_demo.py">Recording script</a></p>
+</section>
+<script>
+  const selector = document.querySelector<HTMLSelectElement>('#agent-demo-format');
+  selector?.addEventListener('change', () => {
+    document.querySelectorAll<HTMLElement>('[data-demo]').forEach((panel) => {
+      panel.hidden = panel.dataset.demo !== selector.value;
+    });
+  });
+</script>
+<style>
+  .agent-demo { border: 1px solid var(--sl-color-gray-5); border-radius: .75rem; padding: 1.25rem; margin: 2rem 0; }
+  .agent-demo pre { overflow: auto; padding: 1rem; border-radius: .5rem; }
+  .agent-demo label { margin-right: .5rem; }
+</style>

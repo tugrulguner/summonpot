@@ -132,6 +132,38 @@ def test_direct_example_runs_without_resolving_a_model(monkeypatch):
     assert summon._runtime._agents == {}
 
 
+def test_curated_direct_demo_trace_is_reproducible_from_recorded_source(monkeypatch):
+    import hashlib
+    import json
+
+    trace = json.loads((ROOT / "examples/08_direct_execution.trace.json").read_text())
+    source = (ROOT / trace["source"]).read_bytes()
+    assert hashlib.sha256(source).hexdigest() == trace["source_sha256"]
+    monkeypatch.setenv("SUMMONPOT_MODEL", "invalid-provider:no-model")
+    summon = _load_example("08_direct_execution.py", monkeypatch)
+    response = TestClient(build_app(summon)).post(
+        "/quotes/direct", json=trace["request"]
+    )
+    assert response.status_code == 200
+    assert response.json() == trace["response"]
+    assert summon._runtime._agents == {}
+
+
+def test_curated_direct_demo_rejects_invalid_request_without_running_operation(
+    monkeypatch,
+):
+    monkeypatch.setenv("SUMMONPOT_MODEL", "invalid-provider:no-model")
+    summon = _load_example("08_direct_execution.py", monkeypatch)
+
+    response = TestClient(build_app(summon)).post(
+        "/quotes/direct",
+        json={"unit_price_cents": 1299, "quantity": 0, "tax_rate_percent": "8.25"},
+    )
+
+    assert response.status_code == 422
+    assert summon._runtime._agents == {}
+
+
 def test_contract_boundary_example_runs_all_release_checks(monkeypatch):
     checks = ROOT / "examples" / "09_contract_boundaries" / "checks.py"
     monkeypatch.syspath_prepend(str(checks.parent))
@@ -270,3 +302,44 @@ def test_ci_and_release_verify_runnable_sdist_assets():
         assert '/scripts/release_smoke.py"' in workflow
         assert '/examples/09_contract_boundaries/app.py"' in workflow
         assert '"/.venv" not in name' in workflow
+
+
+def test_agent_demo_recording_captures_real_operation_return_and_rejects_bad_choice(
+    tmp_path,
+):
+    namespace = runpy.run_path(
+        str(ROOT / "scripts/record_agent_demo.py"), run_name="record_agent_demo"
+    )
+    record = namespace["record"]
+
+    for selected in ("summary", "detailed"):
+        trace = record(selected)
+        assert trace["format"] == selected
+        assert trace["tool_call"] == {
+            "tool": "load_customer",
+            "arguments": {"format": selected},
+        }
+        assert trace["tool_return"] == {
+            "customer_id": "customer-7",
+            "name": "Ada",
+            "status": "active",
+            "format": selected,
+        }
+        assert trace["response"]["display"] == (
+            "Ada — active" if selected == "summary" else "Ada — active customer"
+        )
+        assert "Lovelace" not in str(trace)
+
+    with pytest.raises(ValueError, match="unsupported display format"):
+        record("invented")
+
+
+def test_agent_demo_component_selects_recorded_format_and_shows_provenance():
+    component = (ROOT / "website/src/components/AgentDemo.astro").read_text(
+        encoding="utf-8"
+    )
+
+    assert "#agent-demo-format" in component
+    assert "panel.dataset.demo !== selector.value" in component
+    assert "scripted test model" in component
+    assert "source_sha256" in component
