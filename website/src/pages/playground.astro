@@ -36,13 +36,34 @@
     const output = (id: string) => document.getElementById(id)!;
     const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
     function resetSteps() { document.querySelectorAll('[data-step]').forEach((el) => el.classList.remove('active')); }
+    let runVersion = 0;
+    let pendingTimers: Array<{ timer: number; cancel: () => void }> = [];
+    function cancelRun() {
+      runVersion++;
+      pendingTimers.forEach(({ timer, cancel }) => { clearTimeout(timer); cancel(); });
+      pendingTimers = [];
+    }
+    function clearPresentation() {
+      resetSteps();
+      output('result-title').textContent = 'Quote ready';
+      output('result-copy').textContent = 'Run the fixed quote operation to see validated inputs and application output.';
+      for (const id of ['subtotal','tax-result','total']) output(id).textContent = '—';
+      output('trace-input').textContent = 'Waiting for request';
+      output('trace-choice').textContent = 'Summary / detailed';
+      output('trace-result').textContent = 'Fixed quote operation';
+      output('rejection').textContent = '';
+      output('rejection').classList.remove('reject');
+    }
     const reject = (message: string) => { output('rejection').textContent = message; output('rejection').classList.remove('reject'); void output('rejection').offsetWidth; output('rejection').classList.add('reject'); };
     document.querySelectorAll<HTMLButtonElement>('[data-forbidden]').forEach((button) => button.addEventListener('click', () => {
       const kind = button.dataset.forbidden;
       reject(kind === 'price' ? 'Rejected: price belongs to the request; the operation cannot override it. Request values are unchanged.' : 'Rejected: only summary or detailed is allowed. Unsupported formats do not reach the operation.');
     }));
     form.addEventListener('submit', async (event) => {
-      event.preventDefault(); resetSteps(); output('rejection').textContent = '';
+      event.preventDefault();
+      cancelRun();
+      clearPresentation();
+      const version = runVersion;
       const data = new FormData(form);
       const price = Number(data.get('price')), quantity = Number(data.get('quantity')), taxRaw = String(data.get('tax'));
       const taxRate = Number(taxRaw);
@@ -58,14 +79,24 @@
       for (let i = 0; i < labels.length; i++) {
         document.querySelector(`[data-step="${labels[i]}"]`)?.classList.add('active');
         if (i === 2) output('trace-result').textContent = 'Application computes cents';
-        await new Promise((resolve) => setTimeout(resolve, 240));
+        await new Promise<void>((resolve) => {
+          const timer = window.setTimeout(resolve, 240);
+          pendingTimers.push({ timer, cancel: resolve });
+        });
+        if (version !== runVersion) return;
       }
+      if (version !== runVersion) return;
       output('trace-result').textContent = `${money(total)} · app-calculated`;
       output('result-title').textContent = format === 'summary' ? 'Summary quote' : 'Detailed quote';
       output('result-copy').textContent = format === 'summary' ? `${quantity} item${quantity === 1 ? '' : 's'} · ${money(total)} total` : `${quantity} × ${money(BigInt(price))} at ${taxRate}% tax. Tax is rounded half-up to the nearest cent.`;
       output('subtotal').textContent = money(subtotal); output('tax-result').textContent = money(tax); output('total').textContent = money(total);
     });
-    document.querySelector<HTMLButtonElement>('#reset')!.addEventListener('click', () => { form.reset(); resetSteps(); output('result-title').textContent = 'Quote ready'; output('result-copy').textContent = 'Run the fixed quote operation to see validated inputs and application output.'; for (const id of ['subtotal','tax-result','total']) output(id).textContent = '—'; });
+    form.addEventListener('input', () => { cancelRun(); clearPresentation(); });
+    document.querySelector<HTMLButtonElement>('#reset')!.addEventListener('click', () => {
+      cancelRun();
+      form.reset();
+      clearPresentation();
+    });
   </script>
   <style>
     :global(body) { margin:0; background:#101b19; color:#edf6f1; font:16px/1.55 system-ui,sans-serif; } main { max-width:1100px; margin:auto; padding:clamp(1.2rem,5vw,4rem); } a { color:#75e0b7; } h1 { max-width:800px; margin:.4rem 0; font-size:clamp(2.2rem,6vw,4.5rem); line-height:1.05; letter-spacing:-.04em; } .intro { max-width:750px; color:#bfcec7; } .eyebrow { color:#75e0b7; font-size:.76rem; font-weight:750; letter-spacing:.12em; } .play { display:grid; grid-template-columns:minmax(260px,.8fr) minmax(0,1.2fr); gap:1rem; margin:2rem 0; } form,.result,.trace,aside { border:1px solid #354941; border-radius:16px; padding:clamp(1rem,3vw,1.6rem); background:#172421; } .trace { grid-column:1/-1; } .trace-head,.trace-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.7rem; } .trace-head { color:#75e0b7; font-size:.85rem; font-weight:700; } .trace-row span { min-width:0; overflow-wrap:anywhere; padding:.8rem; border:1px solid #354941; border-radius:8px; } .attempts { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.7rem; } .attempts button { width:auto; } #rejection { color:#ffb6a9; min-height:1.5em; } .reject { animation:reject .35s ease-out; } @keyframes reject { 50% { transform:translateX(5px); } } label { display:block; margin:0 0 1rem; font-weight:650; } label span { display:block; color:#aabbb2; font-size:.85rem; font-weight:400; } input,select,button { box-sizing:border-box; width:100%; min-height:46px; margin-top:.35rem; border-radius:8px; border:1px solid #536c60; padding:.65rem; font:inherit; } input,select { background:#0e1815; color:#f5faf7; } button { background:#75e0b7; color:#102019; border:0; font-weight:750; cursor:pointer; } button.secondary { margin-top:.5rem; background:transparent; border:1px solid #536c60; color:#edf6f1; } .result h2 { font-size:1.7rem; margin:.2rem 0; } .result > p:not(.eyebrow) { color:#bfcec7; } dl { border-top:1px solid #354941; } dl div { display:flex; justify-content:space-between; gap:1rem; padding:.35rem 0; } dd { margin:0; font-weight:700; font-variant-numeric:tabular-nums; } .steps { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; padding:0; list-style:none; counter-reset:step; } .steps li { padding:.55rem; border:1px solid #354941; border-radius:8px; color:#aabbb2; } .steps li::before { counter-increment:step; content:counter(step) ' · '; } .steps li.active { color:#75e0b7; border-color:#75e0b7; } aside { color:#bfcec7; margin:1.5rem 0; } aside strong { display:block; color:#edf6f1; } @media(max-width:680px) { .play { grid-template-columns:minmax(0,1fr); } .steps { grid-template-columns:minmax(0,1fr); } }
