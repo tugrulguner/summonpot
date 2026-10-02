@@ -61,6 +61,20 @@ ${endpoint}`;
     <p class="boundary">No model, server, network call, arbitrary code, or extra capability runs in this browser preview. This shows the operation result, not an agent-authored final response. <a href="https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py">Run the real example</a> · <a href="https://modepot.io/">ModePot ↗</a></p>
   </main>
   <script>
+    // Same-origin embeds follow the site's explicit theme, not just system media.
+    if (window.parent !== window) {
+      try {
+        const parentRoot = window.parent.document.documentElement;
+        const syncTheme = () => {
+          const theme = parentRoot.dataset.theme;
+          if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+        };
+        syncTheme();
+        const themeObserver = new MutationObserver(syncTheme);
+        themeObserver.observe(parentRoot, { attributes: true, attributeFilter: ['data-theme'] });
+        window.addEventListener('pagehide', () => themeObserver.disconnect(), { once: true });
+      } catch { /* Cross-origin embeds retain their system theme. */ }
+    }
     const form = document.querySelector<HTMLFormElement>('#customer-form')!;
     const output = (id: string) => document.getElementById(id)!;
     function resetSteps() { document.querySelectorAll('[data-step]').forEach((el) => el.classList.remove('active')); }
@@ -97,7 +111,9 @@ ${endpoint}`;
   <style>
     :global(*) { box-sizing:border-box; }
     :global(:root) { color-scheme:light dark; --bg:#f8f7f4; --surface:#fff; --ink:#181a1d; --muted:#575d66; --border:#d8dadd; --accent:#285e47; --code:#f1f2f2; --comment:#575d66; --token:#181a1d; --green:#181a1d; --red:#a03838; --button:#24292e; --button-text:#fff; }
-    @media(prefers-color-scheme:dark) { :global(:root) { --bg:#16181b; --surface:#202226; --ink:#edeff2; --muted:#afb4bc; --border:#3c4047; --accent:#b8d3c5; --code:#1b1d21; --comment:#afb4bc; --token:#edeff2; --green:#edeff2; --red:#edaaaa; --button:#e2e6ea; --button-text:#181a1d; } }
+    @media(prefers-color-scheme:dark) { :global(:root:not([data-theme='light'])) { --bg:#16181b; --surface:#202226; --ink:#edeff2; --muted:#afb4bc; --border:#3c4047; --accent:#b8d3c5; --code:#1b1d21; --comment:#afb4bc; --token:#edeff2; --green:#edeff2; --red:#edaaaa; --button:#e2e6ea; --button-text:#181a1d; } }
+    :global(:root[data-theme='light']) { color-scheme:light; }
+    :global(:root[data-theme='dark']) { color-scheme:dark; --bg:#16181b; --surface:#202226; --ink:#edeff2; --muted:#afb4bc; --border:#3c4047; --accent:#b8d3c5; --code:#1b1d21; --comment:#afb4bc; --token:#edeff2; --green:#edeff2; --red:#edaaaa; --button:#e2e6ea; --button-text:#181a1d; }
     :global(body) { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif; }
     main { max-width:1220px; padding:24px 32px 32px; margin:auto; }
     nav { display:flex; justify-content:space-between; gap:16px; font-size:13px; }
