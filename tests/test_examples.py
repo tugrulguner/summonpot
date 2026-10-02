@@ -302,3 +302,44 @@ def test_ci_and_release_verify_runnable_sdist_assets():
         assert '/scripts/release_smoke.py"' in workflow
         assert '/examples/09_contract_boundaries/app.py"' in workflow
         assert '"/.venv" not in name' in workflow
+
+
+def test_agent_demo_recording_captures_real_operation_return_and_rejects_bad_choice(
+    tmp_path,
+):
+    namespace = runpy.run_path(
+        str(ROOT / "scripts/record_agent_demo.py"), run_name="record_agent_demo"
+    )
+    record = namespace["record"]
+
+    for selected in ("summary", "detailed"):
+        trace = record(selected)
+        assert trace["format"] == selected
+        assert trace["tool_call"] == {
+            "tool": "load_customer",
+            "arguments": {"format": selected},
+        }
+        assert trace["tool_return"] == {
+            "customer_id": "customer-7",
+            "name": "Ada",
+            "status": "active",
+            "format": selected,
+        }
+        assert trace["response"]["display"] == (
+            "Ada — active" if selected == "summary" else "Ada — active customer"
+        )
+        assert "Lovelace" not in str(trace)
+
+    with pytest.raises(ValueError, match="unsupported display format"):
+        record("invented")
+
+
+def test_agent_demo_component_selects_recorded_format_and_shows_provenance():
+    component = (ROOT / "website/src/components/AgentDemo.astro").read_text(
+        encoding="utf-8"
+    )
+
+    assert "#agent-demo-format" in component
+    assert "panel.dataset.demo !== selector.value" in component
+    assert "scripted test model" in component
+    assert "source_sha256" in component
