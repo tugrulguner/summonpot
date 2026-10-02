@@ -1,4 +1,16 @@
 ---
+import { readFile } from 'node:fs/promises';
+import { Code } from 'astro:components';
+const example = await readFile(new URL('../../../examples/07_bound_operation.py', import.meta.url), 'utf8');
+const signature = example.slice(example.indexOf('def load_customer('), example.indexOf('    """Load one approved')).trimEnd();
+const binding = example.slice(example.indexOf('customer_lookup = Operation('), example.indexOf('summon = Summon(')).trimEnd();
+const endpoint = example.slice(example.indexOf('@summon('), example.indexOf('if __name__')).trimEnd();
+const contract = `${signature}
+    ...
+
+${binding}
+
+${endpoint}`;
 ---
 
 <!doctype html>
@@ -6,46 +18,47 @@
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="description" content="Explore Summonpot's shipped bounded-operation contract in a browser-local preview." /><title>Summonpot playground</title></head>
 <body>
   <main>
-    <nav><a href="/">← Summonpot</a><span>PLAYGROUND · BROWSER-LOCAL</span></nav>
-    <header><p class="eyebrow">A contract, with bounded authority</p><h1>One request. One bounded choice.</h1><p class="intro">See how a validated request and one declared operation divide authority. Choose what the agent may choose; the browser preview demonstrates the contract, not an agent runtime.</p></header>
+    <nav><a href="/">← Summonpot</a><a href="/architecture/">Read the architecture ↗</a></nav>
+    <header>
+      <p class="eyebrow">Contract playground</p>
+      <h1>A fixed request. A bounded choice.</h1>
+      <p class="intro">The request owns the customer ID. Only the display format is available for an agent to choose.</p>
+      <p class="preview-note">Here, you select that allowed choice yourself. No agent or Python server runs.</p>
+    </header>
+    <ol class="contract-flow" aria-label="Declared authority flow">
+      <li><span>01</span><div><strong>Request fixes the ID</strong><code>FromRequest</code></div></li>
+      <li><span>02</span><div><strong>Choice stays within two formats</strong><code>AgentChoice</code></div></li>
+      <li><span>03</span><div><strong>Application runs one lookup</strong><code>Exactly(1)</code></div></li>
+    </ol>
     <section class="workbench" aria-label="Bounded customer operation workbench">
-      <div class="code-panel"><div class="panel-heading"><span>examples/07_bound_operation.py</span><a href="https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py">View source ↗</a></div><pre aria-label="Shipped Python bound operation example"><code><span class="kw">class</span> <span class="type">CustomerRequest</span>(BaseModel):
-    customer_id: str
-
-<span class="kw">class</span> <span class="type">CustomerRecord</span>(BaseModel):
-    customer_id: str
-    name: str
-    status: Literal[<span class="str">"active"</span>, <span class="str">"paused"</span>]
-    format: Literal[<span class="str">"summary"</span>, <span class="str">"detailed"</span>]
-
-<span class="comment"># Exact app-owned operation; fixed local records</span>
-<span class="kw">def</span> <span class="fn">load_customer</span>(customer_id: str,
-                  format: Literal[<span class="str">"summary"</span>, <span class="str">"detailed"</span>]) -&gt; CustomerRecord:
-    record = _CUSTOMERS[customer_id]
-    <span class="kw">return</span> CustomerRecord(customer_id=customer_id,
-        name=record[<span class="str">"name"</span>], status=record[<span class="str">"status"</span>], format=format)
-
-<span class="comment"># Request owns ID; agent may choose only format</span>
-customer_lookup = Operation(load_customer,
-    bind=&#123;<span class="str">"customer_id"</span>: FromRequest(<span class="str">"customer_id"</span>),
-          <span class="str">"format"</span>: AgentChoice()&#125;, output=CustomerRecord)
-
-<span class="decorator">@summon</span>(<span class="str">"/customers/view"</span>)
-<span class="kw">def</span> <span class="fn">customer_view</span>(request: CustomerRequest,
-    customer=Required(customer_lookup, calls=Exactly(<span class="num">1</span>)),
-) -&gt; CustomerView:
-    ...</code></pre><p class="source-note">Shipped example excerpt · shown as a browser-local contract preview, not Python/model execution.</p></div>
-      <div class="controls-panel"><div class="panel-heading"><span>Explore the boundary</span></div>
-        <div class="authority"><strong>Request</strong><span>Customer ID from your input</span><strong>Choice</strong><span>Format you select to preview the bounded value available to the agent</span><strong>Application</strong><span>One exact lookup operation</span></div>
+      <div class="code-panel">
+        <div class="panel-heading"><span>examples/07_bound_operation.py</span><a href="https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py">View source ↗</a></div>
+        <div class="primary-code"><Code code={contract} lang="python" /></div>
+        <p class="source-note">Shipped signature and declaration · lookup body omitted.</p>
+        <details class="full-source"><summary>Complete shipped example</summary><Code code={example} lang="python" /></details>
+      </div>
+      <div class="controls-panel">
+        <div class="panel-heading"><span>Try the declared boundary</span></div>
         <form id="customer-form" novalidate>
-          <label>Customer ID <span>customer-7 or customer-9</span><input name="customer_id" type="text" value="customer-7" required /></label>
-          <label>Allowed format <span>Pick the value in this preview</span><select name="format"><option value="summary">Summary</option><option value="detailed">Detailed</option></select></label>
-          <p id="rejection" role="alert" aria-live="assertive"></p><button type="submit">Run lookup</button><button class="secondary" type="button" id="reset">Reset</button><button class="secondary" type="button" id="try-override">Try operation override</button>
+          <label>Customer ID <span>Request-owned · FromRequest</span><input name="customer_id" type="text" value="customer-7" required /><small>Approved IDs: customer-7 and customer-9</small></label>
+          <label>Display format <span>Agent-owned · bounded choice</span><select name="format"><option value="summary">Summary</option><option value="detailed">Detailed</option></select><small>You select the permitted value in this preview.</small></label>
+          <div class="actions"><button type="submit">Run contract</button><button class="secondary" type="button" id="reset">Reset</button></div>
+          <button class="boundary-test" type="button" id="try-override">Try overriding the request-owned ID ↗</button>
+          <p id="rejection" role="alert" aria-live="assertive"></p>
         </form>
-        <section class="result" aria-live="polite" aria-atomic="true"><div class="result-top"><h2 id="result-title">Ready to run</h2><span id="status">BROWSER PREVIEW</span></div><p id="result-copy">The operation result will appear here.</p><dl><div><dt>Customer</dt><dd id="customer-name">—</dd></div><div><dt>Status</dt><dd id="customer-status">—</dd></div><div><dt>Selected format</dt><dd id="customer-format">—</dd></div></dl><details open><summary>Execution detail</summary><ol class="steps"><li data-step="request">Validate request</li><li data-step="choice">Bound format choice</li><li data-step="operation">Required lookup × 1</li><li data-step="response">Typed operation result</li></ol><p id="trace-input">Request · —</p><p id="trace-choice">AgentChoice · —</p><p id="trace-result">Operation result · —</p></details></section>
+        <section class="result" aria-live="polite" aria-atomic="true">
+          <p class="result-label">Application-owned operation result</p>
+          <div class="result-top"><h2 id="result-title">Ready to run</h2><span id="status">BROWSER PREVIEW</span></div>
+          <p id="result-copy">The operation result will appear here.</p>
+          <dl><div><dt>Customer ID</dt><dd id="bound-customer-id">—</dd></div><div><dt>Customer</dt><dd id="customer-name">—</dd></div><div><dt>Status</dt><dd id="customer-status">—</dd></div><div><dt>Chosen format</dt><dd id="customer-format">—</dd></div></dl>
+          <details class="execution-detail"><summary>Inspect the bound arguments</summary>
+            <ol class="steps"><li data-step="request">Validate request</li><li data-step="choice">Bound format choice</li><li data-step="operation">Required lookup × 1</li><li data-step="response">Typed operation result</li></ol>
+            <p id="trace-input">Request · —</p><p id="trace-choice">AgentChoice · —</p><p id="trace-result">Operation result · —</p>
+          </details>
+        </section>
       </div>
     </section>
-    <p class="boundary">No model, server, network call, arbitrary code, or extra capability runs in this browser preview. <a href="https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py">Read and run the shipped bound-operation example</a> · <a href="/architecture/">Authority and safety</a> · <a href="https://modepot.io/">ModePot ↗</a></p>
+    <p class="boundary">No model, server, network call, arbitrary code, or extra capability runs in this browser preview. This shows the operation result, not an agent-authored final response. <a href="https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py">Run the real example</a> · <a href="https://modepot.io/">ModePot ↗</a></p>
   </main>
   <script>
     const form = document.querySelector<HTMLFormElement>('#customer-form')!;
@@ -56,7 +69,7 @@ customer_lookup = Operation(load_customer,
     function cancelRun() { runVersion++; pendingTimers.forEach(({ timer, cancel }) => { clearTimeout(timer); cancel(); }); pendingTimers = []; }
     function clearPresentation() {
       resetSteps(); output('result-title').textContent = 'Ready to run'; output('status').textContent = 'BROWSER PREVIEW'; output('result-copy').textContent = 'The operation result will appear here.';
-      for (const id of ['customer-name','customer-status','customer-format']) output(id).textContent = '—';
+      for (const id of ['bound-customer-id','customer-name','customer-status','customer-format']) output(id).textContent = '—';
       output('trace-input').textContent = 'Request · —'; output('trace-choice').textContent = 'AgentChoice · —'; output('trace-result').textContent = 'Operation result · —';
       output('rejection').textContent = ''; output('rejection').classList.remove('reject');
     }
@@ -71,6 +84,7 @@ customer_lookup = Operation(load_customer,
       const labels = ['request','choice','operation','response'];
       for (let i = 0; i < labels.length; i++) { document.querySelector(`[data-step="${labels[i]}"]`)?.classList.add('active'); await new Promise<void>((resolve) => { const timer = window.setTimeout(resolve, 240); pendingTimers.push({ timer, cancel: resolve }); }); if (version !== runVersion) return; }
       const record = customerId === 'customer-7' ? { name: 'Ada', status: 'active' } : { name: 'Grace', status: 'paused' };
+      output('bound-customer-id').textContent = customerId;
       output('customer-name').textContent = record.name; output('customer-status').textContent = record.status; output('customer-format').textContent = String(format);
       output('trace-result').textContent = `Operation result · ${customerId} / ${record.name} / ${record.status} / ${format}`;
       output('result-title').textContent = `${record.name} · ${record.status}`; output('status').textContent = 'LOCAL CONTRACT PREVIEW';
@@ -82,35 +96,58 @@ customer_lookup = Operation(load_customer,
   </script>
   <style>
     :global(*) { box-sizing:border-box; }
-    :global(body) { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif; }
-    :global(:root) { color-scheme:light dark; --bg:#f5f6f4; --surface:#fff; --ink:#202522; --muted:#515b55; --border:#d5dad6; --accent:#08704e; --code:#f0f2ef; --comment:#53645a; --token:#174eb5; --green:#116a38; --red:#9f2828; }
-    @media(prefers-color-scheme:dark) { :global(:root) { --bg:#171b19; --surface:#202623; --ink:#f0f3f1; --muted:#c0cac3; --border:#424d46; --accent:#64d4a6; --code:#171c19; --comment:#b0c0b5; --token:#9ebaff; --green:#92e4a8; --red:#ffaaa3; } }
-    main { max-width:1180px; padding:28px clamp(16px,4vw,52px) 40px; margin:auto; }
-    nav { display:flex; justify-content:space-between; gap:12px; font-size:13px; color:var(--muted); } a { color:var(--accent); text-underline-offset:3px; }
-    nav a { font-weight:650; } nav span,.eyebrow { font-size:11px; letter-spacing:.09em; font-weight:750; }
-    header { margin:26px 0 21px; } .eyebrow { color:var(--accent); text-transform:uppercase; margin:0 0 6px; }
-    h1 { font-size:clamp(27px,4vw,42px); line-height:1.1; letter-spacing:-.035em; margin:0 0 8px; } .intro { color:var(--muted); margin:0; max-width:720px; }
-    .workbench { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(350px,.95fr); border:1px solid var(--border); border-radius:10px; background:var(--surface); overflow:hidden; }
-    .code-panel,.controls-panel { min-width:0; } .code-panel { border-right:1px solid var(--border); background:var(--code); }
-    .panel-heading { min-height:46px; padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:8px; font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; }
-    .panel-heading a { font:600 12px/1.4 ui-sans-serif,system-ui,sans-serif; white-space:nowrap; }
-    pre { margin:0; padding:18px 17px; overflow-x:auto; color:var(--ink); font:12px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace; tab-size:4; } code { font:inherit; }
-    .comment { color:var(--comment); } .kw,.decorator { color:var(--token); font-weight:700; } .type,.fn { color:var(--green); font-weight:650; } .num,.str { color:var(--red); }
-    .source-note { margin:0; padding:0 17px 15px; color:var(--muted); font-size:11px; }
-    .controls-panel { padding:0 18px 17px; } .controls-panel .panel-heading { margin:0 -18px 10px; }
-    .authority { display:grid; grid-template-columns:auto 1fr; gap:4px 10px; padding:9px 11px; background:var(--code); border:1px solid var(--border); border-radius:6px; font-size:12px; margin-bottom:12px; }
-    .authority strong { color:var(--accent); } .authority span { color:var(--muted); }
-    label { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 8px; margin:9px 0; font-weight:650; font-size:13px; } label span { color:var(--muted); text-align:right; font-weight:400; font-size:11px; align-self:center; }
-    input,select,button { font:inherit; min-height:40px; border:1px solid var(--border); border-radius:5px; } input,select { grid-column:1/-1; width:100%; padding:7px 9px; background:var(--bg); color:var(--ink); } input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible,summary:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
-    button { padding:8px 13px; cursor:pointer; font-weight:700; color:#fff; background:#086747; border-color:#086747; } @media(prefers-color-scheme:dark) { button { color:#101d17; background:#7de0b5; border-color:#7de0b5; } }
-    button.secondary { margin-left:7px; color:var(--ink); background:var(--surface); border-color:var(--border); }
-    #rejection { color:var(--red); font-size:13px; font-weight:650; margin:8px 0; min-height:0; } #rejection:empty { display:none; } .reject { animation:reject .3s ease-out; } @keyframes reject { 50% { transform:translateX(4px); } } @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; scroll-behavior:auto!important; } }
-    .result { margin-top:13px; border:1px solid var(--border); border-radius:6px; padding:12px; background:var(--bg); } .result-top { display:flex; align-items:center; justify-content:space-between; gap:8px; } .result h2 { margin:0; font-size:17px; } #status { font-size:10px; color:var(--accent); font-weight:750; letter-spacing:.06em; } #result-copy { color:var(--muted); margin:4px 0 10px; font-size:13px; }
-    dl { border-top:1px solid var(--border); margin:0; } dl div { display:flex; justify-content:space-between; gap:10px; padding:5px 0; border-bottom:1px solid var(--border); } dt { color:var(--muted); } dd { margin:0; font-variant-numeric:tabular-nums; font-weight:650; } dl div:last-child dd { color:var(--accent); }
-    details { margin-top:9px; font-size:12px; } summary { cursor:pointer; font-weight:650; } details p { overflow-wrap:anywhere; color:var(--muted); margin:4px 0; } .steps { display:flex; flex-wrap:wrap; gap:5px 19px; padding-left:20px; color:var(--muted); } .steps li.active { color:var(--accent); }
-    .boundary { color:var(--muted); font-size:12px; margin-top:14px; }
-    @media(max-width:760px) { main { padding:18px 14px 30px; } header { margin:22px 0 16px; } .workbench { grid-template-columns:minmax(0,1fr); } .code-panel { border-right:0; border-bottom:1px solid var(--border); } pre { font-size:11px; } }
-    @media(max-width:360px) { main { padding:14px 10px 24px; } nav span { font-size:9px; } .controls-panel { padding-inline:12px; } .controls-panel .panel-heading { margin-inline:-12px; } label { grid-template-columns:1fr; } label span { text-align:left; } .panel-heading { padding-inline:11px; font-size:10px; } .panel-heading a { font-size:10px; } pre { padding-inline:11px; } }
+    :global(:root) { color-scheme:light dark; --bg:#f8f7f4; --surface:#fff; --ink:#181a1d; --muted:#575d66; --border:#d8dadd; --accent:#285e47; --code:#f1f2f2; --comment:#575d66; --token:#181a1d; --green:#181a1d; --red:#a03838; --button:#24292e; --button-text:#fff; }
+    @media(prefers-color-scheme:dark) { :global(:root) { --bg:#16181b; --surface:#202226; --ink:#edeff2; --muted:#afb4bc; --border:#3c4047; --accent:#b8d3c5; --code:#1b1d21; --comment:#afb4bc; --token:#edeff2; --green:#edeff2; --red:#edaaaa; --button:#e2e6ea; --button-text:#181a1d; } }
+    :global(body) { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif; }
+    main { max-width:1220px; padding:24px 32px 32px; margin:auto; }
+    nav { display:flex; justify-content:space-between; gap:16px; font-size:13px; }
+    a { color:var(--accent); text-underline-offset:3px; } nav a { text-decoration:none; }
+    header { margin:28px 0 20px; }
+    .eyebrow { margin:0 0 7px; color:var(--muted); font-size:13px; }
+    h1 { font-size:clamp(26px,3.4vw,36px); line-height:1.15; letter-spacing:-.025em; margin:0 0 10px; }
+    .intro { margin:0; max-width:850px; font-size:15px; }
+    .preview-note { margin:5px 0 0; color:var(--muted); font-size:13px; }
+    .contract-flow { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:0 0 22px; padding:16px 0; list-style:none; border-block:1px solid var(--border); }
+    .contract-flow li { display:flex; align-items:start; gap:10px; min-width:0; }
+    .contract-flow li>span { color:var(--muted); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .contract-flow strong { display:block; font-size:13px; font-weight:600; }
+    .contract-flow code { display:block; margin-top:3px; color:var(--muted); font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .workbench { display:grid; grid-template-columns:minmax(0,1.12fr) minmax(0,1fr); gap:24px; align-items:start; }
+    .code-panel,.controls-panel { min-width:0; border:1px solid var(--border); background:var(--surface); border-radius:7px; }
+    .panel-heading { min-height:45px; padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:13px; }
+    .panel-heading span { min-width:0; overflow-wrap:anywhere; }
+    .panel-heading a { flex:none; font-size:13px; }
+    :global(.primary-code pre), :global(.full-source pre) { margin:0; padding:16px; max-width:100%; overflow:auto; background:var(--surface)!important; color:var(--ink)!important; font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; tab-size:4; }
+    :global(.primary-code code), :global(.full-source code) { font:inherit; }
+    :global(.primary-code span), :global(.full-source span) { color:inherit!important; }
+    .source-note { margin:0; padding:0 16px 13px; color:var(--muted); font-size:12.5px; }
+    .full-source { border-top:1px solid var(--border); padding:12px 16px; font-size:13px; }
+    summary { cursor:pointer; color:var(--muted); }
+    .controls-panel>form { padding:14px 16px 0; }
+    label { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:5px 8px; margin:0 0 14px; font-weight:600; font-size:13px; }
+    label span, label small { color:var(--muted); font-weight:400; font-size:12.5px; } label span { text-align:right; }
+    label small { grid-column:1/-1; }
+    input,select,button { font:inherit; min-height:44px; border:1px solid var(--border); border-radius:5px; }
+    input,select { grid-column:1/-1; width:100%; padding:9px 10px; color:var(--ink); background:var(--surface); }
+    :is(input,select,button,a,summary):focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+    .actions { display:flex; gap:8px; align-items:center; }
+    .actions button { margin:0; height:44px; padding:0 16px; font-size:13px; font-weight:600; cursor:pointer; color:var(--button-text); background:var(--button); border-color:var(--button); }
+    .actions button.secondary { color:var(--ink); background:var(--surface); border-color:var(--border); }
+    .boundary-test { min-height:44px; margin:4px 0 0; padding:0; font-size:12.5px; border:0; background:none; color:var(--accent); cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+    #rejection { color:var(--red); font-size:13px; font-weight:500; margin:4px 0 14px; } #rejection:empty { display:none; }
+    .result { padding:14px 16px 16px; border-top:1px solid var(--border); }
+    .result-label { margin:0 0 9px; color:var(--muted); font-size:13px; }
+    .result-top { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
+    .result h2 { margin:0; font-size:19px; font-weight:600; }
+    #status { color:var(--muted); font-size:11.5px; }
+    #result-copy { margin:6px 0 13px; color:var(--muted); font-size:13px; }
+    dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 16px; margin:0; } dl div { min-width:0; padding-top:7px; border-top:1px solid var(--border); } dt { color:var(--muted); font-size:12.5px; } dd { margin:3px 0 0; font-size:13px; font-weight:600; overflow-wrap:anywhere; }
+    .execution-detail { margin-top:12px; font-size:12.5px; } .execution-detail p { color:var(--muted); overflow-wrap:anywhere; margin:6px 0; }
+    .steps { padding-left:18px; color:var(--muted); } .steps li.active { color:var(--ink); }
+    .boundary { max-width:1000px; margin:18px 0 0; color:var(--muted); font-size:12.5px; }
+    @media(max-width:850px) { main { padding:20px; } .workbench { gap:16px; grid-template-columns:minmax(0,1fr); } .contract-flow { gap:12px; } }
+    @media(max-width:500px) { main { padding:16px 12px 24px; } nav { font-size:12.5px; gap:10px; } header { margin-top:24px; } .contract-flow { grid-template-columns:1fr; gap:12px; padding-block:14px; } .contract-flow li>span { width:22px; flex:none; } .contract-flow li div { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; } .contract-flow code { margin:0; } label { grid-template-columns:1fr; } label span { text-align:left; } .panel-heading { padding-inline:12px; flex-wrap:wrap; } .controls-panel>form { padding-inline:12px; } .result { padding-inline:12px; } }
+    @media(prefers-reduced-motion:reduce) { :global(*) { scroll-behavior:auto!important; animation:none!important; } }
   </style>
 </body>
 </html>

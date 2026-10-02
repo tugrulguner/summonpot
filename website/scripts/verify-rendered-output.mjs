@@ -41,7 +41,8 @@ for await (const path of htmlFiles(distRoot)) {
       "https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py",
       "no model, server, network call, arbitrary code",
       'name="viewport"',
-      "One request. One bounded choice.",
+      "A fixed request. A bounded choice.",
+      "The request owns the customer ID.",
       "AgentChoice()",
       "FromRequest(",
     ]) {
