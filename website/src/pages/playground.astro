@@ -19,8 +19,27 @@ ${endpoint}`;
 <body>
   <div class="family-header">
     <a class="product-home" href="/" aria-label="Summonpot homepage"><img src="/favicon.svg" width="28" height="28" alt="" /> <span>Summonpot</span></a>
-    <a class="family-return" href="https://modepot.io/">ModePot</a>
-    <a class="project-source" href="https://github.com/tugrulguner/summonpot" aria-label="Summonpot on GitHub">GitHub</a>
+    <a class="family-home-mobile" href="https://modepot.io/">ModePot</a>
+    <button class="family-menu-button" type="button" aria-expanded="false" aria-controls="family-mobile-menu">Menu</button>
+    <nav class="family-links" aria-label="ModePot family">
+      <a href="https://modepot.io/">ModePot</a>
+      <a href="https://github.com/tugrulguner/summonpot">GitHub</a>
+      <a href="https://discord.gg/u3AANZr6RG">Community</a>
+      <a href="https://tugrul.modepot.io/">About Tugrul</a>
+    </nav>
+  </div>
+  <div id="family-mobile-menu" class="family-mobile-menu" role="region" aria-label="Menu" hidden>
+    <nav class="family-mobile-resources" aria-label="ModePot family">
+      <a href="https://github.com/tugrulguner/summonpot">GitHub</a>
+      <a href="https://discord.gg/u3AANZr6RG">Community</a>
+      <a href="https://tugrul.modepot.io/">About Tugrul</a>
+    </nav>
+    <nav class="family-mobile-docs" aria-label="Summonpot navigation">
+      <a href="/">Overview</a><a href="/quick-start/">Quick start</a><a href="/architecture/">Architecture &amp; safety</a>
+      <a href="/capabilities/">Capabilities</a><a href="/guides/operations/">Operations &amp; troubleshooting</a>
+      <a href="/build/direct-execution/">Model-free endpoint</a><a href="/build/agent-choice/">Agent-backed choice</a>
+      <a href="/reference/operations/">Operations &amp; bindings</a><a href="/internals/execution/">Execution flow</a><a href="/playground/">Contract playground</a>
+    </nav>
   </div>
   <main>
     <nav><a href="/architecture/">Read the architecture ↗</a></nav>
@@ -66,6 +85,24 @@ ${endpoint}`;
     <p class="boundary">No model, server, network call, arbitrary code, or extra capability runs in this browser preview. This shows the operation result, not an agent-authored final response. <a href="https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py">Run the real example</a> · <a href="https://modepot.io/">ModePot ↗</a></p>
   </main>
   <script>
+    const familyMenuButton = document.querySelector<HTMLButtonElement>('.family-menu-button');
+    const familyMenu = document.querySelector<HTMLElement>('#family-mobile-menu');
+    if (familyMenuButton && familyMenu) {
+      const closeMenu = (restoreFocus = false) => {
+        familyMenu.hidden = true;
+        familyMenuButton.setAttribute('aria-expanded', 'false');
+        if (restoreFocus) familyMenuButton.focus();
+      };
+      familyMenuButton.addEventListener('click', () => {
+        const opening = familyMenu.hidden;
+        familyMenu.hidden = !opening;
+        familyMenuButton.setAttribute('aria-expanded', String(opening));
+      });
+      document.addEventListener('keydown', event => { if (event.key === 'Escape' && !familyMenu.hidden) closeMenu(true); });
+      document.addEventListener('click', event => {
+        if (event.target instanceof Node && !familyMenu.contains(event.target) && !familyMenuButton.contains(event.target)) closeMenu();
+      });
+    }
     // Same-origin embeds follow the site's explicit theme, not just system media.
     if (window.parent !== window) {
       try {
@@ -126,9 +163,19 @@ ${endpoint}`;
     :global(:root[data-theme='light']) { color-scheme:light; }
     :global(:root[data-theme='dark']), :global(:root[data-theme='dark']:not([data-theme='light'])) { color-scheme:dark; --bg:var(--mp-canvas-dark); --surface:var(--mp-surface-dark); --raised:var(--mp-raised-dark); --ink:var(--mp-ink-dark); --muted:var(--mp-muted-dark); --border:var(--mp-border-dark); --control-border:var(--mp-control-border-dark); --error:var(--mp-error-dark); --accent:var(--mp-accent-dark); --code:#202226; --comment:#c8cbd1; --token:#edeff2; --green:#bba5f3; --button:#bba5f3; --button-text:#181a1d; --focus:#bba5f3; }
     :global(body) { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 var(--mp-font-sans); }
-    .family-header { height:64px; display:flex; align-items:center; gap:24px; padding-inline:24px; background:var(--raised); border-bottom:1px solid var(--border); font-size:14px; }
+    .family-header { height:64px; display:flex; align-items:center; gap:12px; padding-inline:24px; background:var(--raised); border-bottom:1px solid var(--border); font-size:14px; }
     .family-header>a { min-height:44px; display:inline-flex; align-items:center; gap:8px; color:var(--ink); text-decoration:none; }
     .family-header .product-home { font-size:16px; font-weight:650; margin-right:auto; }
+    .family-header .family-home-mobile,.family-header .family-menu-button { display:none; }
+    .family-links { display:flex; align-items:center; gap:2px; }
+    .family-links a { min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; padding-inline:8px; border-radius:6px; color:var(--ink); font-weight:600; text-decoration:none; white-space:nowrap; }
+    .family-links a:focus-visible,.family-menu-button:focus-visible,.family-mobile-menu a:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+    .family-mobile-menu,.family-mobile-menu[hidden] { display:none; }
+    .family-mobile-resources,.family-mobile-docs { display:grid; gap:4px; }
+    .family-mobile-resources { padding-bottom:12px; border-bottom:1px solid var(--border); }
+    .family-mobile-docs { padding-top:12px; }
+    .family-mobile-menu a { display:flex; align-items:center; min-height:44px; padding:8px 12px; border-radius:6px; color:var(--ink); font-weight:600; text-decoration:none; }
+    .family-mobile-menu a:hover { background:var(--surface); }
     .family-header img { object-fit:contain; }
     main { max-width:1248px; padding:24px 24px 32px; margin:auto; }
     nav { display:flex; justify-content:flex-end; gap:16px; font-size:14px; }
@@ -179,8 +226,16 @@ ${endpoint}`;
     .boundary { max-width:1000px; margin:18px 0 0; color:var(--muted); font-size:12.5px; }
     @media(max-width:850px) { main { padding:20px; } .workbench { gap:16px; grid-template-columns:minmax(0,1fr); } .contract-flow { gap:12px; } }
     :is(input,select,button,a,summary):focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+    @media(max-width:799px) {
+      .family-header { gap:0; padding-inline:16px; }
+      .family-header .product-home { margin-right:0; font-size:14px; }
+      .family-header .family-home-mobile { display:inline-flex; justify-content:center; min-width:44px; margin-left:4px; padding-inline:2px; font-size:12px; }
+      .family-header .family-menu-button { display:inline-flex; align-items:center; justify-content:center; min-width:48px; min-height:44px; margin-left:4px; padding:0 4px; border:1px solid var(--control-border); border-radius:6px; background:var(--raised); color:var(--ink); font:600 12px/1.4 var(--mp-font-sans); cursor:pointer; }
+      .family-links { display:none; }
+      .family-mobile-menu:not([hidden]) { position:fixed; z-index:100; inset:64px 0 auto; display:block; max-height:calc(100dvh - 64px); overflow:auto; padding:12px 16px 24px; border-block:1px solid var(--border); background:var(--raised); box-shadow:0 8px 16px rgb(0 0 0 / .16); }
+    }
     @media(max-width:768px) { main { padding-inline:16px; } .workbench { grid-template-columns:minmax(0,1fr); } }
-    @media(max-width:500px) { .family-header { gap:12px; padding-inline:16px; font-size:13px; } .family-header .product-home { font-size:14px; } main { padding:16px 16px 24px; } nav { font-size:14px; gap:10px; } header { margin-top:24px; } .contract-flow { grid-template-columns:1fr; gap:12px; padding-block:14px; } .contract-flow li>span { width:22px; flex:none; } .contract-flow li div { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; } .contract-flow code { margin:0; } label { grid-template-columns:1fr; } label span { text-align:left; } .panel-heading { padding-inline:12px; flex-wrap:wrap; } .controls-panel>form { padding-inline:12px; } .result { padding-inline:12px; } }
+    @media(max-width:500px) { .family-header { gap:0; padding-inline:16px; font-size:13px; } .family-header .product-home { font-size:14px; } main { padding:16px 16px 24px; } nav { font-size:14px; gap:10px; } header { margin-top:24px; } .contract-flow { grid-template-columns:1fr; gap:12px; padding-block:14px; } .contract-flow li>span { width:22px; flex:none; } .contract-flow li div { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; } .contract-flow code { margin:0; } label { grid-template-columns:1fr; } label span { text-align:left; } .panel-heading { padding-inline:12px; flex-wrap:wrap; } .controls-panel>form { padding-inline:12px; } .result { padding-inline:12px; } }
     @media(prefers-reduced-motion:reduce) { :global(*) { scroll-behavior:auto!important; animation:none!important; } }
   </style>
 </body>
