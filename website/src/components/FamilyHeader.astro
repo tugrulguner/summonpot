@@ -19,11 +19,19 @@ const shouldRenderSearch = config.pagefind || config.components.Search !== '@ast
 <style>
   @layer starlight.core {
     .header { display:flex; gap:var(--sl-nav-gap); justify-content:space-between; align-items:center; height:100%; }
-    .title-wrapper { overflow:clip; padding:.25rem; margin:-.25rem; min-width:0; }
+    .title-wrapper { flex-shrink:0; overflow:clip; padding:.25rem; margin:-.25rem; min-width:0; }
     .header > div:nth-child(2) { margin-inline-start:auto; }
     .right-group,.social-icons { gap:1rem; align-items:center; }
     .social-icons::after { content:''; height:2rem; border-inline-end:1px solid var(--sl-color-gray-5); }
     .family-return { min-height:44px; display:inline-flex; align-items:center; color:var(--sl-color-white); text-decoration:none; font-size:14px; }
+    @media (max-width: 25rem) {
+      .header, .right-group, .social-icons { gap:4px; }
+      .social-icons::after { display:none; }
+      .social-icons :global(a:not(.family-return)) { display:none; }
+      .family-return { font-size:13px; }
+      :global(.site-title) { font-size:18px; }
+      :global(starlight-theme-select select) { width:36px; padding-inline-start:36px; padding-inline-end:0; }
+    }
 
   }
 </style>

@@ -88,6 +88,19 @@ try {
    await page.close();
   }
  }
+ for (const route of ['/', '/quick-start/']) for (const theme of ['light', 'dark']) {
+  const page = await browser.newPage({ viewport: { width: 320, height: 390 }, colorScheme: theme === 'light' ? 'dark' : 'light', reducedMotion: 'reduce' });
+  await page.goto(base + route, { waitUntil: 'networkidle' });
+  await page.locator('starlight-theme-select select').first().selectOption(theme);
+  await page.evaluate(async () => { await document.fonts.ready; await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); });
+  const identity = await page.locator('header .site-title').evaluate(n => ({ width: n.getBoundingClientRect().width, client: n.clientWidth, content: n.scrollWidth, text: n.textContent.trim() }));
+  check(identity.width >= 90 && identity.content <= identity.client + 1 && identity.text === 'Summonpot', `${route} ${theme}: narrow header clips product identity (${JSON.stringify(identity)})`);
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${route} ${theme}: narrow header causes overflow`);
+  const covered = await page.evaluate(() => [...document.querySelectorAll('header .family-return, header button[data-open-modal], header starlight-theme-select select')].filter(n => { const r = n.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return !r.width || !r.height || !hit || !n.contains(hit); }).map(n => n.tagName + ':' + (n.textContent?.trim() || n.getAttribute('aria-label'))));
+  check(covered.length === 0, `${route} ${theme}: narrow header controls are covered (${covered.join(', ')})`);
+  if (out) await page.screenshot({ path: resolve(out, `${route === '/' ? 'home' : 'docs'}-320-${theme}.png`) });
+  await page.close();
+ }
 }finally{await browser.close();await new Promise(r=>server.close(r));}
 console.log(JSON.stringify({checks,cases,failures},null,2));
 if(failures.length)process.exitCode=1;

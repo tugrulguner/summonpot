@@ -78,3 +78,10 @@ button, select, input, textarea { min-height: 44px; }
   .sidebar-pane { min-width: 0; }
   .hero h1 { font-size: clamp(32px, 7vw, 44px); }
 }
+
+@media (max-width: 25rem) {
+  header.header .social-icons a[href^='https://github.com/'] { display: none; }
+  header.header .right-group, header.header .social-icons { gap: 4px; }
+  header.header .social-icons::after { display: none; }
+  html[data-has-sidebar] header.header { padding-inline-end: 52px; }
+}
