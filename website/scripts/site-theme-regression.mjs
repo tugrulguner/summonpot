@@ -10,7 +10,7 @@ const server = createServer(async (req,res) => {
     const file = resolve(root, `.${path}`, path.endsWith('/') ? 'index.html' : '');
     if (!file.startsWith(root+sep)) throw new Error('outside build');
     res.writeHead(200,{'content-type':mime[extname(file)]||'application/octet-stream'});res.end(await readFile(file));
-  } catch {res.writeHead(404);res.end('Not found');}
+  } catch {if (!res.headersSent) {res.writeHead(404);res.end('Not found');}}
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const base=`http://127.0.0.1:${server.address().port}`;
@@ -20,7 +20,7 @@ const check=(ok,message)=>{checks++;if(!ok)failures.push(message)};
 const out=process.env.SITE_THEME_EVIDENCE;
 if(out)await mkdir(out,{recursive:true});
 try {
- for(const route of ['/','/quick-start/','/architecture/','/capabilities/']) {
+ for(const route of ['/','/quick-start/','/architecture/','/capabilities/','/guides/operations/','/internals/execution/','/reference/operations/','/build/agent-choice/','/build/direct-execution/']) {
   for(const theme of ['light','dark']) {
    const page=await browser.newPage({viewport:{width:1280,height:900},colorScheme:theme==='light'?'dark':'light',reducedMotion:'reduce'});
    page.on('pageerror',e=>failures.push(`${route} ${theme}: ${e.message}`));
@@ -41,7 +41,7 @@ try {
     const heading=document.querySelector('.content-panel h1'),sidebar=document.querySelector('.sidebar-pane');
     return {theme:document.documentElement.dataset.theme,bg:getComputedStyle(document.body).backgroundColor,bgLuminance:luminance(getComputedStyle(document.body).backgroundColor),font:getComputedStyle(document.body).fontFamily,headerHeight:getComputedStyle(document.querySelector('header.header')).height,primaryRadius:primaryLink&&getComputedStyle(primaryLink).borderRadius,modePot:[...document.querySelectorAll('header.header a')].some(a=>a.textContent.trim()==='ModePot'&&a.getAttribute('href')==='https://modepot.io/'),headingLeft:heading?.getBoundingClientRect().left,sidebarRight:sidebar?.getBoundingClientRect().right,colors,document:document.documentElement.scrollWidth,body:document.body.scrollWidth,viewport:innerWidth,heroImage:document.querySelector('.hero img')?.getAttribute('src'),heroBackground:document.querySelector('.hero')&&getComputedStyle(document.querySelector('.hero')).backgroundImage,frameDark:frame?.contentWindow.matchMedia('(prefers-color-scheme: dark)').matches};
    });
-   const state=await inspect();check(state.theme===theme,`${route}: theme control did not switch`);
+   const state=await inspect();check(state.theme===theme,`${route}: theme control did not switch`);check(state.modePot,`${route} ${theme}: visible ModePot return link missing from the header`);
    if(route==='/') {
     check(theme==='light'?state.bg==='rgb(248, 247, 244)':state.bg==='rgb(22, 24, 27)',`${theme}: rendered canvas is not the shared family canvas (${state.bg})`);
     check(state.font.startsWith('"Avenir Next", Avenir, "Segoe UI", sans-serif'),`${theme}: rendered body font does not resolve to the shared family stack (${state.font})`);
@@ -85,20 +85,22 @@ try {
     check(await page.locator('iframe').evaluate(frame=>frame.contentDocument.documentElement.dataset.theme)===opposite,`${theme}: embedded preview did not follow Auto`);
    }
    cases.push({route,theme,background:state.bg,minimumContrast:Math.min(...state.colors.map(c=>c.ratio))});
+   if(out && route!=='/') { await page.evaluate(() => scrollTo(0,0)); await page.screenshot({path:`${out}/docs-${route.replaceAll('/','-')}-${theme}.png`,fullPage:true}); }
    await page.close();
   }
  }
- for (const route of ['/', '/quick-start/']) for (const theme of ['light', 'dark']) {
-  const page = await browser.newPage({ viewport: { width: 320, height: 390 }, colorScheme: theme === 'light' ? 'dark' : 'light', reducedMotion: 'reduce' });
+ for (const route of ['/', '/quick-start/', '/guides/operations/', '/build/agent-choice/']) for (const theme of ['light', 'dark']) for (const width of [320,390,400,401]) {
+  const page = await browser.newPage({ viewport: { width, height: 768 }, colorScheme: theme === 'light' ? 'dark' : 'light', reducedMotion: 'reduce' });
   await page.goto(base + route, { waitUntil: 'networkidle' });
   await page.locator('starlight-theme-select select').first().selectOption(theme);
   await page.evaluate(async () => { await document.fonts.ready; await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); });
   const identity = await page.locator('header .site-title').evaluate(n => ({ width: n.getBoundingClientRect().width, client: n.clientWidth, content: n.scrollWidth, text: n.textContent.trim() }));
-  check(identity.width >= 90 && identity.content <= identity.client + 1 && identity.text === 'Summonpot', `${route} ${theme}: narrow header clips product identity (${JSON.stringify(identity)})`);
-  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${route} ${theme}: narrow header causes overflow`);
+  check(identity.width >= 90 && identity.content <= identity.client + 1 && identity.text === 'Summonpot', `${route} ${theme} ${width}: narrow header clips product identity (${JSON.stringify(identity)})`);
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.body.scrollWidth <= innerWidth), `${route} ${theme} ${width}: narrow header causes overflow`);
   const covered = await page.evaluate(() => [...document.querySelectorAll('header .family-return, header button[data-open-modal], header starlight-theme-select select')].filter(n => { const r = n.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return !r.width || !r.height || !hit || !n.contains(hit); }).map(n => n.tagName + ':' + (n.textContent?.trim() || n.getAttribute('aria-label'))));
-  check(covered.length === 0, `${route} ${theme}: narrow header controls are covered (${covered.join(', ')})`);
-  if (out) await page.screenshot({ path: resolve(out, `${route === '/' ? 'home' : 'docs'}-320-${theme}.png`) });
+  check(covered.length === 0, `${route} ${theme} ${width}: narrow header controls are covered (${covered.join(', ')})`);
+  if (out && width===320) await page.screenshot({ path: resolve(out, `${route === '/' ? 'home' : route.replaceAll('/','-')}-320-${theme}.png`) });
+  if (out && route==='/guides/operations/' && width!==320) await page.screenshot({path:resolve(out, `guides-operations-${width}-${theme}.png`)});
   await page.close();
  }
 }finally{await browser.close();await new Promise(r=>server.close(r));}
