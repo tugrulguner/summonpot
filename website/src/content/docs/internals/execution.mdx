@@ -1,0 +1,52 @@
+---
+title: Execution internals
+description: Trace registration, planning, request execution, validation, and provider runtime.
+---
+
+import { LinkButton } from '@astrojs/starlight/components';
+
+<LinkButton href="/internals/execution.md" variant="secondary">Download this internals guide as Markdown</LinkButton>
+
+This is an implementation map, not a promise of a general graph compiler. The runtime currently has a narrow direct executor and an agent-backed executor; registration chooses only a validated supported plan. Follow the source links at the exact ownership boundary when debugging.
+
+## Declaration to immutable plan
+
+1. `Summon.__call__` in [`summon.py`](https://github.com/tugrulguner/summonpot/blob/main/src/summonpot/summon.py) captures path, HTTP method, goal/docstring, request parameters, and output annotation. It rejects direct decorated-function calls and validates explicit declarations during registration.
+2. Contract types in [`contracts.py`](https://github.com/tugrulguner/summonpot/blob/main/src/summonpot/contracts.py) describe `Operation`, input bindings, and `CallBounds`. `Depends` / `Required` in [`dependencies.py`](https://github.com/tugrulguner/summonpot/blob/main/src/summonpot/dependencies.py) attach optional/mandatory semantics and combine markers with bounds.
+3. [`_execution.py`](https://github.com/tugrulguner/summonpot/blob/main/src/summonpot/_execution.py) compiles the endpoint to an internal plan. It resolves signatures and annotations, binding compatibility, output validators, operation identities, and the precise direct-eligibility predicate. Explicit unsupported graphs are rejected rather than silently widened.
+4. The compiled plan is registered with the endpoint. The runtime consults that plan; mutable public metadata is not a substitute for a validated contract.
+
+## HTTP request path
+
+[`server.py`](https://github.com/tugrulguner/summonpot/blob/main/src/summonpot/server.py) constructs FastAPI routes from registered endpoint definitions and creates a body model for request-model endpoints. Body-bearing POST/PUT/PATCH receive JSON; GET/DELETE/HEAD declarations use query parameters. FastAPI validates the transport input before `_run_endpoint` invokes `Runtime.call`.
+
+`Runtime.call` in [`runtime.py`](https://github.com/tugrulguner/summonpot/blob/main/src/summonpot/runtime.py) prepares the request once and creates per-request operation state. For direct-eligible contracts, it invokes the compiled operation without `model_for`, agent construction, or provider access. It does not fall back to an agent if that call fails.
+
+For agent-backed contracts, the runtime resolves endpoint model override or `SUMMONPOT_MODEL` (default `openai:gpt-4o-mini`), creates/caches the provider-neutral Pydantic AI agent for the compiled plan/model, and executes with per-run dependency state. A bound operation's model-visible signature includes explicit choices while trusted request values and application-owned defaults are supplied by runtime.
+
+## Operation execution and output checks
+
+For the enforced bound slice, `FromRequest` values are fetched from the validated request and checked against their receiving parameter contract without coercion. The runtime reserves the bounded start under per-request state before invoking application code. Sync callables run via `asyncio.to_thread`; async callables are awaited. The operation's output validator checks the returned object; only a valid result increments success state. An invalid result does not satisfy `Required` and is not automatically retried.
+
+Agent-backed final output is parsed/validated against the endpoint response schema and audited before returning. This checks model shape and configured validation invariants; it cannot prove natural-language claims are causally grounded in an operation result. The direct path returns its validated operation result according to the exact direct predicate.
+
+## Provider and runtime configuration
+
+`Runtime(model=None, retries=1, usage_limits=None, timeout=None)` accepts a model string or Pydantic AI `Model`; `None` defers to `SUMMONPOT_MODEL` at call time and then the default `openai:gpt-4o-mini`. Endpoint model overrides are resolved from the registered plan. Provider credentials and optional provider integrations follow Pydantic AI conventions and package extras; they are not needed for the direct slice. `SUMMONPOT_MODEL=test` selects the keyless test model for agent-backed testing. It is not a sandbox: operation code executes with placeholder model arguments.
+
+`retries` bounds model retry behavior, `usage_limits` is passed into the agent run, and `timeout` wraps either executor path. These settings do not undo side effects that occurred before an exception or timeout. Consult [`Runtime`](https://github.com/tugrulguner/summonpot/blob/main/src/summonpot/runtime.py) for current argument validation and model resolution.
+
+## HTTP error translation
+
+`_run_endpoint` keeps internal provider and capability details in logs, returning fixed public messages. Current mappings include invalid injected values → 422, usage limit exceeded → 429, timeout → 504, upstream provider throttling → 429, other provider HTTP error → 502, and operator/model configuration failures → fixed server error. Do not infer undocumented transport status for arbitrary application exceptions; inspect current server code and tests.
+
+## Authority and failure boundaries
+
+- Request schema validation is not authentication; application operations must check authorization.
+- Closed declared callables constrain available authority, but each callable's real implementation and side effects remain application-owned.
+- Required-use state is runtime enforced; a prompt is not enforcement.
+- Output validation proves contract conformance, not semantic correctness or provenance.
+- A permitted start is not successful completion, transaction rollback, distributed idempotency, or exactly-once execution.
+- Test-model execution can invoke real capability code.
+
+For source-level value-transfer/security details, read [`docs/declarative-capabilities.md`](https://github.com/tugrulguner/summonpot/blob/main/docs/declarative-capabilities.md). Multi-operation graphs, result/context injection, `after` ordering, and broad deterministic compilation remain planned; do not project them onto the current executor.

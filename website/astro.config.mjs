@@ -46,7 +46,10 @@ export default defineConfig({
     ],
     sidebar: [
       { label: 'Start here', items: [{ label: 'Quick start', link: '/quick-start/' }] },
-      { label: 'Guides', items: [{ label: 'Architecture & safety', link: '/architecture/' }, { label: 'Capabilities', link: '/capabilities/' }] },
+      { label: 'Build', items: [{ label: 'Model-free endpoint', link: '/build/direct-execution/' }, { label: 'Agent-backed choice', link: '/build/agent-choice/' }] },
+      { label: 'Reference', items: [{ label: 'Operations & bindings', link: '/reference/operations/' }] },
+      { label: 'Guides', items: [{ label: 'Architecture & safety', link: '/architecture/' }, { label: 'Capabilities', link: '/capabilities/' }, { label: 'Operations & troubleshooting', link: '/guides/operations/' }] },
+      { label: 'Internals', items: [{ label: 'Execution flow', link: '/internals/execution/' }] },
       { label: 'ModePot', link: 'https://modepot.io/' },
     ],
   })],
