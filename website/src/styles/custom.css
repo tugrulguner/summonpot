@@ -1,6 +1,6 @@
 /* Public ModePot family presentation tokens; no shared runtime dependency. */
 :root {
-  --mp-font-sans: \"Avenir Next\", Avenir, \"Segoe UI\", sans-serif;
+  --mp-font-sans: 'Avenir Next', Avenir, 'Segoe UI', sans-serif;
   --mp-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --mp-canvas-light: #f8f7f4;
   --mp-surface-light: #ffffff;
@@ -49,20 +49,20 @@
   --sl-color-gray-5: var(--mp-border-light);
   --sl-color-gray-6: var(--mp-raised-light);
   --sl-color-gray-7: #f6f7f9;
-  --sl-color-black: var(--mp-surface-light);
+  --sl-color-black: var(--mp-canvas-light);
   --sl-color-accent-low: #f3eefb;
   --sl-color-accent: var(--mp-accent-light);
   --sl-color-accent-high: #52328d;
 }
 
 :where(body, button, input, select, textarea) { font-family: var(--mp-font-sans); }
-button, select, input, textarea { border-radius: 6px; }
+button, select, input, textarea, a.sl-link-button { border-radius: 6px; }
 body { font-size: 16px; line-height: 1.6; }
 header.header { height: 64px; padding-inline: 24px; background-color: var(--mp-raised-dark); }
 :root[data-theme='light'] header.header { background-color: var(--mp-raised-light); }
 header.header a { min-height: 44px; }
 main { min-width: 0; }
-.main-frame { max-width: 1248px; padding-inline: 24px; }
+.main-frame { max-width: 1248px; padding-inline-end: 24px; }
 .content-panel { min-width: 0; }
 .sidebar-pane { min-width: 0; }
 .main-pane { min-width: 0; }

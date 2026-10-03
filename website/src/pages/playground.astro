@@ -70,7 +70,7 @@ ${endpoint}`;
     if (window.parent !== window) {
       try {
         const parentRoot = window.parent.document.documentElement;
-        const parentThemeSelect = window.parent.document.querySelector('starlight-theme-select select');
+        const parentThemeSelect = window.parent.document.querySelector<HTMLSelectElement>('starlight-theme-select select');
         const syncTheme = () => {
           const theme = parentThemeSelect?.value === 'light' || parentThemeSelect?.value === 'dark'
             ? parentThemeSelect.value

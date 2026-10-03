@@ -37,12 +37,22 @@ try {
       return {selector:n.tagName,text:n.textContent.trim().slice(0,55),fg:s.color,bg,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
     });
     const frame=document.querySelector('iframe');
-    return {theme:document.documentElement.dataset.theme,bg:getComputedStyle(document.body).backgroundColor,bgLuminance:luminance(getComputedStyle(document.body).backgroundColor),colors,document:document.documentElement.scrollWidth,body:document.body.scrollWidth,viewport:innerWidth,heroImage:document.querySelector('.hero img')?.getAttribute('src'),heroBackground:document.querySelector('.hero')&&getComputedStyle(document.querySelector('.hero')).backgroundImage,frameDark:frame?.contentWindow.matchMedia('(prefers-color-scheme: dark)').matches};
+    const primaryLink=document.querySelector('a.sl-link-button');
+    const heading=document.querySelector('.content-panel h1'),sidebar=document.querySelector('.sidebar-pane');
+    return {theme:document.documentElement.dataset.theme,bg:getComputedStyle(document.body).backgroundColor,bgLuminance:luminance(getComputedStyle(document.body).backgroundColor),font:getComputedStyle(document.body).fontFamily,headerHeight:getComputedStyle(document.querySelector('header.header')).height,primaryRadius:primaryLink&&getComputedStyle(primaryLink).borderRadius,modePot:[...document.querySelectorAll('header.header a')].some(a=>a.textContent.trim()==='ModePot'&&a.getAttribute('href')==='https://modepot.io/'),headingLeft:heading?.getBoundingClientRect().left,sidebarRight:sidebar?.getBoundingClientRect().right,colors,document:document.documentElement.scrollWidth,body:document.body.scrollWidth,viewport:innerWidth,heroImage:document.querySelector('.hero img')?.getAttribute('src'),heroBackground:document.querySelector('.hero')&&getComputedStyle(document.querySelector('.hero')).backgroundImage,frameDark:frame?.contentWindow.matchMedia('(prefers-color-scheme: dark)').matches};
    });
    const state=await inspect();check(state.theme===theme,`${route}: theme control did not switch`);
+   if(route==='/') {
+    check(theme==='light'?state.bg==='rgb(248, 247, 244)':state.bg==='rgb(22, 24, 27)',`${theme}: rendered canvas is not the shared family canvas (${state.bg})`);
+    check(state.font.startsWith('"Avenir Next", Avenir, "Segoe UI", sans-serif'),`${theme}: rendered body font does not resolve to the shared family stack (${state.font})`);
+    check(state.headerHeight==='64px',`${theme}: rendered header is not 64px (${state.headerHeight})`);
+    check(state.primaryRadius==='6px',`${theme}: rendered primary CTA is not 6px (${state.primaryRadius})`);
+    check(state.modePot,`${theme}: visible ModePot return link missing from the header`);
+   }
    check(theme==='light'?state.bgLuminance>.8:state.bgLuminance<.06,`${route} ${theme}: page background contradicts selected theme (${state.bg})`);
    for(const c of state.colors)check(c.ratio>=4.5,`${route} ${theme}: ${c.text} contrast ${c.ratio.toFixed(2)} (${c.fg} on ${c.bg})`);
    check(state.document<=1280&&state.body<=1280,`${route} ${theme}: desktop overflow`);
+   if(route!=='/')check(state.headingLeft>=state.sidebarRight-1,`${route} ${theme}: documentation heading is obscured by the fixed sidebar (${state.headingLeft} < ${state.sidebarRight})`);
    if(route==='/') {
     check(state.heroBackground==='none',`${theme}: obsolete green hero wash remains`);
     check(Boolean(state.heroImage),`${theme}: canonical artwork missing`);

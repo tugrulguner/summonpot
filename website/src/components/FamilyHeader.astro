@@ -1,0 +1,29 @@
+---
+import config from 'virtual:starlight/user-config';
+import LanguageSelect from '../../node_modules/@astrojs/starlight/components/LanguageSelect.astro';
+import Search from '../../node_modules/@astrojs/starlight/components/Search.astro';
+import SiteTitle from '../../node_modules/@astrojs/starlight/components/SiteTitle.astro';
+import SocialIcons from '../../node_modules/@astrojs/starlight/components/SocialIcons.astro';
+import ThemeSelect from '../../node_modules/@astrojs/starlight/components/ThemeSelect.astro';
+const shouldRenderSearch = config.pagefind || config.components.Search !== '@astrojs/starlight/components/Search.astro';
+---
+<div class="header">
+  <div class="title-wrapper sl-flex"><SiteTitle /></div>
+  <div class="sl-flex print:hidden">{shouldRenderSearch && <Search />}</div>
+  <div class="sl-flex print:hidden right-group">
+    <div class="sl-flex social-icons"><SocialIcons /><a class="family-return" href="https://modepot.io/">ModePot</a></div>
+    <ThemeSelect />
+    <LanguageSelect />
+  </div>
+</div>
+<style>
+  @layer starlight.core {
+    .header { display:flex; gap:var(--sl-nav-gap); justify-content:space-between; align-items:center; height:100%; }
+    .title-wrapper { overflow:clip; padding:.25rem; margin:-.25rem; min-width:0; }
+    .header > div:nth-child(2) { margin-inline-start:auto; }
+    .right-group,.social-icons { gap:1rem; align-items:center; }
+    .social-icons::after { content:''; height:2rem; border-inline-end:1px solid var(--sl-color-gray-5); }
+    .family-return { min-height:44px; display:inline-flex; align-items:center; color:var(--sl-color-white); text-decoration:none; font-size:14px; }
+
+  }
+</style>
