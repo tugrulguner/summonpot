@@ -1,44 +1,87 @@
+/* Public ModePot family presentation tokens; no shared runtime dependency. */
 :root {
-  /* Dark defaults; Starlight uses "white" as ink and "black" as canvas. */
-  --sl-color-white: #edeff2;
+  --mp-font-sans: 'Avenir Next', Avenir, 'Segoe UI', sans-serif;
+  --mp-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --mp-canvas-light: #f8f7f4;
+  --mp-surface-light: #ffffff;
+  --mp-raised-light: #eceef1;
+  --mp-ink-light: #181a1d;
+  --mp-muted-light: #616b78;
+  --mp-border-light: #c6cbd2;
+  --mp-control-border-light: #616b78;
+  --mp-error-light: #a4262b;
+  --mp-canvas-dark: #16181b;
+  --mp-surface-dark: #202226;
+  --mp-raised-dark: #292d33;
+  --mp-ink-dark: #edeff2;
+  --mp-muted-dark: #aeb4bc;
+  --mp-border-dark: #555d68;
+  --mp-control-border-dark: #aeb4bc;
+  --mp-error-dark: #ff9b9b;
+  --mp-accent-light: #6542a6;
+  --mp-accent-dark: #bba5f3;
+  --sl-font: var(--mp-font-sans);
+  --sl-font-system: var(--mp-font-sans);
+  --sl-font-mono: var(--mp-font-mono);
+  color-scheme: dark;
+  --sl-color-white: var(--mp-ink-dark);
   --sl-color-gray-1: #dfe2e7;
-  --sl-color-gray-2: #b0b6bf;
+  --sl-color-gray-2: var(--mp-muted-dark);
   --sl-color-gray-3: #8b949f;
-  --sl-color-gray-4: #555d68;
+  --sl-color-gray-4: var(--mp-border-dark);
   --sl-color-gray-5: #383e47;
-  --sl-color-gray-6: #202226;
+  --sl-color-gray-6: var(--mp-surface-dark);
   --sl-color-gray-7: #1a1c20;
-  --sl-color-black: #16181b;
+  --sl-color-black: var(--mp-canvas-dark);
   --sl-color-accent-low: #2b2440;
-  --sl-color-accent: #bba5f3;
+  --sl-color-accent: var(--mp-accent-dark);
   --sl-color-accent-high: #d5c6f7;
+  font-family: var(--mp-font-sans);
 }
 
-:root[data-theme='light'] {
-  --sl-color-white: #181a1d;
+:root[data-theme=light] {
+  color-scheme: light;
+  --sl-color-white: var(--mp-ink-light);
   --sl-color-gray-1: #292e35;
   --sl-color-gray-2: #424a54;
-  --sl-color-gray-3: #616b78;
+  --sl-color-gray-3: var(--mp-muted-light);
   --sl-color-gray-4: #858e9a;
-  --sl-color-gray-5: #c6cbd2;
-  --sl-color-gray-6: #eceef1;
+  --sl-color-gray-5: var(--mp-border-light);
+  --sl-color-gray-6: var(--mp-raised-light);
   --sl-color-gray-7: #f6f7f9;
-  --sl-color-black: #ffffff;
+  --sl-color-black: var(--mp-canvas-light);
   --sl-color-accent-low: #f3eefb;
-  --sl-color-accent: #6542a6;
+  --sl-color-accent: var(--mp-accent-light);
   --sl-color-accent-high: #52328d;
 }
 
-/* Keep the canonical purple artwork; no tinted canvas or hero wash. */
-.hero {
-  background: none;
-  border-radius: 0;
+:where(body, button, input, select, textarea) { font-family: var(--mp-font-sans); }
+button, select, input, textarea, a.sl-link-button { border-radius: 6px; }
+body { font-size: 16px; line-height: 1.6; }
+header.header { height: 64px; padding-inline: 24px; background-color: var(--mp-raised-dark); }
+:root[data-theme='light'] header.header { background-color: var(--mp-raised-light); }
+header.header a { min-height: 44px; }
+main { min-width: 0; }
+.main-frame { max-width: 1248px; padding-inline-end: 24px; }
+.content-panel { min-width: 0; }
+.sidebar-pane { min-width: 0; }
+.main-pane { min-width: 0; }
+.hero { background: none; border-radius: 0; }
+.hero h1 { font-size: clamp(32px, 5vw, 56px); font-weight: 700; line-height: 1.1; letter-spacing: -0.03em; text-transform: none; }
+.hero img { display: block; width: 100%; max-width: 32.5rem; height: auto; max-height: 22rem; object-fit: contain; }
+button, select, input, textarea { min-height: 44px; }
+:where(button, select, input, textarea, a, summary):focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+
+@media (max-width: 50rem) {
+  header.header { height: 64px; padding-inline: 16px; }
+  .main-frame { padding-inline: 16px; }
+  .sidebar-pane { min-width: 0; }
+  .hero h1 { font-size: clamp(32px, 7vw, 44px); }
 }
-.hero img {
-  display: block;
-  width: 100%;
-  max-width: 32.5rem;
-  height: auto;
-  max-height: 22rem;
-  object-fit: contain;
+
+@media (max-width: 25rem) {
+  header.header .social-icons a[href^='https://github.com/'] { display: none; }
+  header.header .right-group, header.header .social-icons { gap: 4px; }
+  header.header .social-icons::after { display: none; }
+  html[data-has-sidebar] header.header { padding-inline-end: 52px; }
 }

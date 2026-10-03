@@ -30,6 +30,7 @@ export default defineConfig({
     social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/tugrulguner/summonpot' }],
     favicon: '/favicon.svg',
     customCss: ['./src/styles/custom.css'],
+    components: { Header: './src/components/FamilyHeader.astro' },
     head: [
       { tag: 'script', attrs: {}, content: posthogScript },
       { tag: 'meta', attrs: { property: 'og:type', content: 'website' } },
