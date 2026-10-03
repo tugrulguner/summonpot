@@ -3,38 +3,108 @@ import config from 'virtual:starlight/user-config';
 import LanguageSelect from '../../node_modules/@astrojs/starlight/components/LanguageSelect.astro';
 import Search from '../../node_modules/@astrojs/starlight/components/Search.astro';
 import SiteTitle from '../../node_modules/@astrojs/starlight/components/SiteTitle.astro';
-import SocialIcons from '../../node_modules/@astrojs/starlight/components/SocialIcons.astro';
 import ThemeSelect from '../../node_modules/@astrojs/starlight/components/ThemeSelect.astro';
 const shouldRenderSearch = config.pagefind || config.components.Search !== '@astrojs/starlight/components/Search.astro';
 ---
 <div class="header">
   <div class="title-wrapper sl-flex"><SiteTitle /></div>
-  <div class="sl-flex print:hidden">{shouldRenderSearch && <Search />}</div>
-  <div class="sl-flex print:hidden right-group">
-    <div class="sl-flex social-icons"><SocialIcons /><a class="family-return" href="https://modepot.io/">ModePot</a></div>
+  <div class="sl-flex print:hidden header-tools">
+    {shouldRenderSearch && <Search />}
+    <a class="family-home-mobile" href="https://modepot.io/">ModePot</a>
     <ThemeSelect />
+    <button class="family-menu-button" type="button" aria-expanded="false" aria-controls="family-mobile-menu">Menu</button>
+  </div>
+  <div class="sl-flex print:hidden right-group">
+    <nav class="family-links" aria-label="ModePot family">
+      <a href="https://modepot.io/">ModePot</a>
+      <a href="https://github.com/tugrulguner/summonpot">GitHub</a>
+      <a href="https://discord.gg/u3AANZr6RG">Community</a>
+      <a href="https://tugrul.modepot.io/">About Tugrul</a>
+    </nav>
     <LanguageSelect />
   </div>
 </div>
+<div id="family-mobile-menu" class="family-mobile-menu" role="region" aria-label="Menu" hidden>
+  <nav class="family-mobile-resources" aria-label="ModePot family">
+    <a href="https://github.com/tugrulguner/summonpot">GitHub</a>
+    <a href="https://discord.gg/u3AANZr6RG">Community</a>
+    <a href="https://tugrul.modepot.io/">About Tugrul</a>
+  </nav>
+  <nav class="family-mobile-docs" aria-label="Summonpot documentation">
+    <a href="/">Overview</a>
+    <a href="/quick-start/">Quick start</a>
+    <a href="/build/direct-execution/">Model-free endpoint</a>
+    <a href="/build/agent-choice/">Agent-backed choice</a>
+    <a href="/reference/operations/">Operations &amp; bindings</a>
+    <a href="/architecture/">Architecture &amp; safety</a>
+    <a href="/capabilities/">Capabilities</a>
+    <a href="/guides/operations/">Operations &amp; troubleshooting</a>
+    <a href="/internals/execution/">Execution flow</a>
+    <a href="/playground/">Contract playground</a>
+  </nav>
+</div>
+<script>
+  const menuButton = document.querySelector('.family-menu-button');
+  const menu = document.querySelector('#family-mobile-menu');
+  if (menuButton instanceof HTMLButtonElement && menu instanceof HTMLElement) {
+    const closeMenu = (restoreFocus = false) => {
+      menu.hidden = true;
+      menuButton.setAttribute('aria-expanded', 'false');
+      if (restoreFocus) menuButton.focus();
+    };
+    menuButton.addEventListener('click', () => {
+      const opening = menu.hidden;
+      menu.hidden = !opening;
+      menuButton.setAttribute('aria-expanded', String(opening));
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !menu.hidden) closeMenu(true);
+    });
+    document.addEventListener('click', (event) => {
+      if (event.target instanceof Node && !menu.contains(event.target) && !menuButton.contains(event.target)) closeMenu();
+    });
+  }
+</script>
 <style>
   @layer starlight.core {
     .header { display:flex; gap:var(--sl-nav-gap); justify-content:space-between; align-items:center; height:100%; }
-    .title-wrapper { flex-shrink:0; overflow:clip; padding:.25rem; margin:-.25rem; min-width:0; }
-    .header > div:nth-child(2) { margin-inline-start:auto; }
-    .right-group,.social-icons { gap:1rem; align-items:center; }
-    .social-icons::after { content:''; height:2rem; border-inline-end:1px solid var(--sl-color-gray-5); }
-    .family-return { min-height:44px; display:inline-flex; align-items:center; color:var(--sl-color-white); text-decoration:none; font-size:14px; }
-    @media (min-width: 25.0625rem) and (max-width: 40rem) {
-      .right-group { margin-inline-end: 3rem; }
+    .title-wrapper { overflow:clip; padding:.25rem; margin:-.25rem; min-width:0; }
+    .right-group,.family-links,.header-tools { display:flex; align-items:center; }
+    .right-group { gap:1rem; }
+    .family-links { gap:.125rem; }
+    .family-links a,.family-home-mobile { color:var(--sl-color-white); font:600 14px/1.4 var(--mp-font-sans); text-decoration:none; white-space:nowrap; }
+    .family-links a { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding-inline:7px; border-radius:6px; }
+    .family-links a:focus-visible,.family-mobile-menu a:focus-visible,.family-menu-button:focus-visible { outline:2px solid var(--sl-color-accent); outline-offset:2px; }
+    .header-tools { gap:.375rem; min-width:0; }
+    .family-home-mobile,.family-menu-button { display:none; }
+    .family-mobile-menu,.family-mobile-menu[hidden] { display:none; }
+    @media (min-width:50rem) {
+      :global(:root[data-has-sidebar]) { --__sidebar-pad:calc(2 * var(--sl-nav-pad-x)); }
+      :global(:root:not([data-has-toc])) { --__toc-width:0rem; }
+      .header { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-content:center; }
     }
-    @media (max-width: 40rem) {
-      .header, .right-group, .social-icons { gap:4px; }
-      .social-icons::after { display:none; }
-      .social-icons :global(a:not(.family-return)) { display:none; }
-      .family-return { font-size:13px; }
-      :global(.site-title) { font-size:18px; }
-      :global(starlight-theme-select select) { width:36px; padding-inline-start:36px; padding-inline-end:0; }
+    @media (max-width:49.999rem) {
+      .header { gap:0; }
+      .title-wrapper { flex:0 1 104px; }
+      :global(.site-title) { font-size:16px; }
+      .header-tools { flex:0 0 auto; margin:0; justify-content:flex-end; gap:0; }
+      .right-group { display:none !important; }
+      .family-home-mobile { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding-inline:2px; font-size:12px; }
+      :global(header.header starlight-theme-select) { flex:0 0 44px; width:44px; }
+      :global(header.header starlight-theme-select label) { width:44px; --sl-select-width:2.75rem; --sl-inline-padding:0px; --sl-label-icon-size:0px; --sl-caret-size:0px; }
+      :global(header.header starlight-theme-select .label-icon), :global(header.header starlight-theme-select .caret) { display:none; }
+      :global(header.header starlight-theme-select select) { width:44px !important; margin-inline:0 !important; padding-inline:0 !important; text-align:center; }
+      :global(header.header .header-tools site-search) { flex:0 0 44px; }
+      :global(header.header .header-tools site-search button) { width:44px; min-width:44px; min-height:44px; padding:0; }
+      .family-menu-button { display:inline-flex; align-items:center; justify-content:center; min-width:48px; min-height:44px; padding:0 4px; border:1px solid var(--mp-control-border-light); border-radius:6px; background:var(--mp-raised-light); color:var(--mp-ink-light); font:600 12px/1.4 var(--mp-font-sans); cursor:pointer; }
+      :global(:root[data-theme='dark']) .family-menu-button { border-color:var(--mp-control-border-dark); background:var(--mp-raised-dark); color:var(--mp-ink-dark); }
+      .family-mobile-menu:not([hidden]) { position:fixed; z-index:100; inset:64px 0 auto; display:block; max-height:calc(100dvh - 64px); overflow:auto; padding:12px 16px 24px; border-block:1px solid var(--sl-color-gray-5); background:var(--sl-color-bg-sidebar); box-shadow:0 8px 16px rgb(0 0 0 / .16); }
+      .family-mobile-resources,.family-mobile-docs { display:grid; gap:4px; }
+      .family-mobile-resources { padding-bottom:12px; border-bottom:1px solid var(--sl-color-gray-5); }
+      .family-mobile-docs { padding-top:12px; }
+      .family-mobile-menu a { display:flex; align-items:center; min-height:44px; padding:8px 12px; border-radius:6px; color:var(--sl-color-white); font:600 14px/1.4 var(--mp-font-sans); text-decoration:none; }
+      .family-mobile-menu a:hover { background:var(--sl-color-bg-nav); }
+      :global(.sl-menu-button) { display:none !important; }
     }
-
   }
 </style>
