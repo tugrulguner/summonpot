@@ -27,7 +27,7 @@ try {
    const response=await page.goto(base+route,{waitUntil:'networkidle'});check(response.ok(),`${route}: HTTP ${response.status()}`);
    await page.locator('starlight-theme-select select').first().selectOption(theme);
    await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))});
-   const inspect=async()=>page.evaluate(()=>{
+   const inspect=async()=>page.evaluate((route)=>{
     const channels=c=>c.match(/[\d.]+/g).slice(0,3).map(Number);
     const luminance=c=>{const [r,g,b]=channels(c).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});return .2126*r+.7152*g+.0722*b};
     const background=n=>{while(n){const c=getComputedStyle(n).backgroundColor;if(!/rgba\([^)]*,\s*0(?:\.0+)?\)$/.test(c)&&c!=='transparent')return c;n=n.parentElement}throw new Error('No opaque background')};
@@ -37,10 +37,10 @@ try {
       return {selector:n.tagName,text:n.textContent.trim().slice(0,55),fg:s.color,bg,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
     });
     const frame=document.querySelector('iframe');
-    const primaryLink=document.querySelector('a.sl-link-button');
-    const heading=document.querySelector('.content-panel h1'),sidebar=document.querySelector('.sidebar-pane');
-    return {theme:document.documentElement.dataset.theme,bg:getComputedStyle(document.body).backgroundColor,bgLuminance:luminance(getComputedStyle(document.body).backgroundColor),font:getComputedStyle(document.body).fontFamily,headerHeight:getComputedStyle(document.querySelector('header.header')).height,primaryRadius:primaryLink&&getComputedStyle(primaryLink).borderRadius,modePot:[...document.querySelectorAll('header.header a')].some(a=>a.textContent.trim()==='ModePot'&&a.getAttribute('href')==='https://modepot.io/'),headingLeft:heading?.getBoundingClientRect().left,sidebarRight:sidebar?.getBoundingClientRect().right,colors,document:document.documentElement.scrollWidth,body:document.body.scrollWidth,viewport:innerWidth,heroImage:document.querySelector('.hero img')?.getAttribute('src'),heroBackground:document.querySelector('.hero')&&getComputedStyle(document.querySelector('.hero')).backgroundImage,frameDark:frame?.contentWindow.matchMedia('(prefers-color-scheme: dark)').matches};
-   });
+    const primaryLink=document.querySelector('.framework-action.primary');
+    const heading=route==='/'?document.querySelector('.framework-hero h1'):document.querySelector('.content-panel h1'),sidebar=document.querySelector('.sidebar-pane');
+    return {theme:document.documentElement.dataset.theme,bg:getComputedStyle(document.body).backgroundColor,bgLuminance:luminance(getComputedStyle(document.body).backgroundColor),font:getComputedStyle(document.body).fontFamily,headerHeight:getComputedStyle(document.querySelector('header.header')).height,primaryRadius:primaryLink&&getComputedStyle(primaryLink).borderRadius,modePot:[...document.querySelectorAll('header.header a')].some(a=>a.textContent.trim()==='ModePot'&&a.getAttribute('href')==='https://modepot.io/'),headingLeft:heading?.getBoundingClientRect().left,sidebarRight:sidebar?.getBoundingClientRect().right,colors,document:document.documentElement.scrollWidth,body:document.body.scrollWidth,viewport:innerWidth,heroImage:document.querySelector('.framework-art img')?.getAttribute('src'),heroBackground:document.querySelector('.framework-hero')&&getComputedStyle(document.querySelector('.framework-hero')).backgroundImage,frameDark:frame?.contentWindow.matchMedia('(prefers-color-scheme: dark)').matches};
+   },route);
    const state=await inspect();check(state.theme===theme,`${route}: theme control did not switch`);check(state.modePot,`${route} ${theme}: visible ModePot return link missing from the header`);
    if(route==='/') {
     check(theme==='light'?state.bg==='rgb(248, 247, 244)':state.bg==='rgb(22, 24, 27)',`${theme}: rendered canvas is not the shared family canvas (${state.bg})`);
