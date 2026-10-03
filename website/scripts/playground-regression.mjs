@@ -6,6 +6,8 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("../dist/", import.meta.url)));
+const evidenceDir = process.env.PLAYGROUND_EVIDENCE;
+if (evidenceDir) await (await import("node:fs/promises")).mkdir(evidenceDir, { recursive: true });
 const mime = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -81,8 +83,14 @@ try {
   await page.evaluate(async () => { await document.fonts.ready; await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); });
   const composition = await page.evaluate(() => {
     const rect = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return {top:r.top,bottom:r.bottom,height:r.height,width:r.width}; };
-    return { run:rect('.actions button[type="submit"]'), reset:rect('#reset'), code:rect('.code-panel'), controls:rect('.controls-panel'), result:rect('.result'), flow:document.querySelectorAll('.contract-flow li').length, closed:[...document.querySelectorAll('.full-source,.execution-detail')].every(d => !d.open) };
+    return { run:rect('.actions button[type="submit"]'), reset:rect('#reset'), code:rect('.code-panel'), controls:rect('.controls-panel'), result:rect('.result'), header:rect('.family-header'),flow:document.querySelectorAll('.contract-flow li').length, closed:[...document.querySelectorAll('.full-source,.execution-detail')].every(d => !d.open),fontFamily:getComputedStyle(document.body).fontFamily,bodyFont:getComputedStyle(document.body).fontSize,headingFont:getComputedStyle(document.querySelector('h1')).fontSize,headingCase:getComputedStyle(document.querySelector('h1')).textTransform,primaryRadius:getComputedStyle(document.querySelector('.actions button[type="submit"]')).borderRadius,secondaryRadius:getComputedStyle(document.querySelector('#reset')).borderRadius,primaryFont:getComputedStyle(document.querySelector('.actions button[type="submit"]')).fontFamily,sharedCanvas:getComputedStyle(document.documentElement).getPropertyValue('--mp-canvas-light').trim(),sharedAccent:getComputedStyle(document.documentElement).getPropertyValue('--mp-accent-light').trim() };
   });
+  check(composition.fontFamily.includes('Avenir Next')&&composition.bodyFont==='16px','playground does not use the shared family typography tokens');
+  check(Number.parseFloat(composition.headingFont)>=32&&Number.parseFloat(composition.headingFont)<=56&&!['uppercase','lowercase'].includes(composition.headingCase),'playground primary heading does not match the responsive normal-case family scale');
+  check(composition.header.height===64,'standalone playground header must match the shared 64px header');
+  check(composition.primaryRadius==='6px'&&composition.secondaryRadius==='6px','playground actions must use the shared 6px radius');
+  check(composition.primaryFont.includes('Avenir Next'),'playground action typography must inherit the shared Avenir system');
+  check(composition.sharedCanvas==='#f8f7f4'&&composition.sharedAccent==='#6542a6','playground shared canvas/accent tokens drifted from the family contract');
   check(composition.run.height === 44 && composition.reset.height === 44 && composition.run.top === composition.reset.top, 'primary actions must share a 44px height and baseline');
   check(Math.abs(composition.code.top - composition.controls.top) <= 1 && composition.result.bottom <= composition.controls.bottom, 'code and interactive result must form one aligned workbench');
   check(composition.flow === 3 && composition.closed, 'authority flow must be visible and secondary details initially closed');
@@ -126,10 +134,10 @@ try {
     );
   const shot = (name) =>
     page.screenshot({
-      path: resolve(tmpdir(), `summonpot-playground-${name}.png`),
+      path: resolve(evidenceDir || tmpdir(), `playground-${name}.png`),
       fullPage: true,
     });
-  await shot("1280-light");
+  await shot("1280-light-initial");
 
   await run();
   await waitRunning();
@@ -336,7 +344,7 @@ try {
           "1280-dark",
           "768-dark",
           "320-dark",
-        ].map((n) => resolve(tmpdir(), `summonpot-playground-${n}.png`)),
+        ].map((n) => resolve(evidenceDir || tmpdir(), `summonpot-playground-${n}.png`)),
         browserErrors,
         failures,
       },
