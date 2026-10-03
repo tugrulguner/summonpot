@@ -4,7 +4,7 @@
   <img src="summonpot-lockup.png" alt="Summonpot" width="600">
 </p>
 
-<p align="center">Part of <a href="https://modepot.io/">ModePot</a>.</p>
+<p align="center">Part of <a href="https://modepot.io/">ModePot</a>. &nbsp; <a href="https://summonpot.modepot.io/">Project website</a></p>
 
 <p align="center">
   <strong>Declare deterministic operations and agentic decisions through one framework.</strong>
