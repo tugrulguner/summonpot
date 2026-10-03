@@ -24,6 +24,7 @@
 </p>
 
 <p align="center">
+  <a href="https://summonpot.modepot.io/">Documentation</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#why-summonpot">Why summonpot</a> ·
   <a href="#exact-capabilities-not-ambient-authority">Capabilities</a> ·

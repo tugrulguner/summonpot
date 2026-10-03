@@ -1,0 +1,90 @@
+---
+title: Operation and binding reference
+description: Public operation declarations, bindings, call bounds, defaults, and runtime limits.
+---
+
+import { LinkButton } from '@astrojs/starlight/components';
+
+<LinkButton href="/reference/operations.md" variant="secondary">Download this reference as Markdown</LinkButton>
+
+This page specifies the public declaration vocabulary and the currently enforced runtime slice. The [capability guide](https://github.com/tugrulguner/summonpot/blob/main/docs/declarative-capabilities.md) remains the detailed canonical source for value-transfer and structural-validation details; this reference maps the common public contract and links to that implementation-focused document.
+
+## Endpoint declaration
+
+`Summon(name)` creates an application registry. `@summon(path, method="POST", model=None)` registers a declaration. The decorated function takes the request contract (a Pydantic model for body endpoints) plus declaration-only dependency markers and returns the endpoint output type. Its docstring is the fixed goal. The body is not executed; call the generated HTTP route, not the Python declaration.
+
+The generated FastAPI app exposes request/response schemas and OpenAPI. POST/PUT/PATCH use request bodies; GET/DELETE/HEAD parameters are query parameters. The supported methods are GET, POST, PUT, PATCH, DELETE, and HEAD. A route's dependency parameters are not client-provided body fields. For example, declare a body route with `@summon("/items", method="POST")` and a query route with `@summon("/items", method="GET")`; parameters on that GET declaration are query inputs. Path placeholders such as `@summon("/items/{item_id}")` must match a declared scalar parameter. The generated API describes these transport fields; they do not create extra capability authority. See [HTTP and error reference](https://github.com/tugrulguner/summonpot/blob/main/docs/declarative-capabilities.md#what-the-boundary-does-and-does-not-cover).
+
+A request model is the body contract; use scalar/list query-compatible parameters for bodyless methods. Dependency-marker parameters such as `result=Required(...)` are declaration-only and excluded from HTTP input schemas. The complete guide examples use POST JSON and can be exercised against `TestClient(build_app(summon))`; for a multi-file CLI-launched app and its acceptance tests, see the [support-service example](https://github.com/tugrulguner/summonpot/tree/main/examples/06_support_service), [example test suite](https://github.com/tugrulguner/summonpot/blob/main/tests/test_examples.py), and [example guide](https://github.com/tugrulguner/summonpot/blob/main/examples/README.md).
+
+## Dependency markers and bounds
+
+| Public call | Meaning | Default bound |
+|---|---|---|
+| `Depends(operation)` | Expose an optional operation; success need not call it. | zero or more |
+| `Required(operation)` | Expose an operation; successful output requires its completion. | at least one |
+| `Exactly(n)` | Bound operation starts to exactly `n`. | minimum and maximum `n` |
+| `AtLeast(n)` | Require at least `n` calls. | no maximum |
+| `AtMost(n)` | Permit up to `n` calls. | minimum zero |
+| `Between(minimum, maximum)` | Bound calls to the inclusive interval. | given interval |
+
+`Required(op, calls=AtMost(3))` means at least one and at most three, because `Required` retains its lower bound. `Depends(op, calls=Exactly(1))` is contradictory and rejected; use `Required`. Bounds must be nonnegative built-in integers (a bool is not accepted as an integer count); an upper bound below a lower bound is rejected. For the no-model path specifically, the only admitted marker is one required `Exactly(1)` operation.
+
+Bare callable `Depends(fn)` and `Required(fn)` preserve the legacy agent-backed path. A bare callable does not provide the typed argument-source and operation-output contract of `Operation`.
+
+## Typed operation declaration
+
+```python
+operation = Operation(
+    callable,
+    bind={"argument": FromRequest("field")},
+    output=ResultModel,
+)
+```
+
+This is signature notation rather than a runnable fragment: `callable` and `ResultModel` are placeholders. Use the complete programs in the two Build guides to copy an executable endpoint.
+
+- The first argument is the exact application callable.
+- `bind` maps callable parameter names to explicit sources. Missing, extra, incompatible, or unsupported explicit sources fail during endpoint registration.
+- `output` declares the operation result schema. In the bound runtime it is locally validated before successful completion; a validation error is not retried automatically.
+- `after` and `FromResult` / `FromContext` are public vocabulary for planned graph semantics, not working execution features in this release slice.
+- An `Operation` object is immutable at the declaration boundary: binding mappings are snapshotted and `after` is tuple-normalized.
+
+### Binding sources
+
+| Source | Value authority | Current meaning |
+|---|---|---|
+| `FromRequest("field")` | Validated request | Canonical request value injected by framework; hidden from agent argument schema. |
+| `AgentChoice()` | Agent/model | The specific argument remains model supplied in the supported agent-backed bound-operation slice. |
+| `FromResult(operation, "field")` | Prior operation result | Planned graph vocabulary; not supported execution. |
+| `FromContext("key")` | Framework context | Planned context injection; not supported execution. |
+
+`FromRequest` values are checked against the receiving callable parameter noncoercively before application code begins. This is data validation, not authentication or authorization. For supported bounds and receiver schema edge cases, consult the [detailed capability contract](https://github.com/tugrulguner/summonpot/blob/main/docs/declarative-capabilities.md#arguments-are-constrained-for-the-first-bound-runtime-slice).
+
+### Explicit shapes accepted today
+
+The shipped runtime-enforced explicit operation slice is one required `Exactly(1)` operation with a complete argument contract using `FromRequest`, direct `AgentChoice`, or supported callable defaults. `output=` must be declared for the operation result checks. Registration rejects unsupported explicit shapes rather than falling back to arbitrary model-supplied arguments. The no-model sub-slice further requires: Pydantic request model, at least one `FromRequest`, no `AgentChoice`, all remaining parameters request-bound or supported immutable callable defaults, and `output` identical (`is`) to endpoint response model.
+
+Immutable defaults are exact built-in `None`, `bool`, `int`, `float`, `complex`, `str`, `bytes`; tuples/frozensets recursively containing only these values are also supported. Mutable defaults, custom types/subclasses, and scalar request declarations do not qualify for direct execution.
+
+| Shape | Current execution |
+|---|---|
+| Complete sole required operation meeting every direct predicate | Runs the operation directly; no model resolution/construction/call. |
+| Complete sole required operation with a direct `AgentChoice` | Agent-backed runtime; only declared choice values are model supplied. |
+| Bare legacy callable dependency | Existing provider-neutral agent path. |
+| Unsupported/incomplete explicit `Operation` contract | Rejected during registration. |
+| Multi-operation graph, `FromResult`, `FromContext`, `after`, broader compiler | Planned, not shipped. |
+
+No runtime fallback to a model occurs after direct execution begins. One reserved start is not exactly-once completion: failures and side effects are application concerns.
+
+## Output and error behavior
+
+Operation output validation occurs before the call counts as successful for `Required`. Endpoint output is validated against its declared response model. These are schema/type guarantees, not proof that final model prose is derived from operation output. Provider calls may fail or exceed usage limits; HTTP maps invalid request/injected values to 422, usage limits to 429, timeout to 504, and upstream provider errors to 429 (provider throttling) or 502. Public error text is intentionally fixed/redacted; internal diagnostic details go to server logs. Exact error mapping is implemented in [`server.py`](https://github.com/tugrulguner/summonpot/blob/main/src/summonpot/server.py).
+
+## Security and side effects
+
+Capabilities are real application callables, not simulations. Keep the declared set minimal, validate identity/authorization inside every operation, avoid raw database connections/sessions, shells, arbitrary SQL, and broad service objects, and add application-side idempotency/transaction safeguards where side effects need them. `SUMMONPOT_MODEL=test` is keyless but can invoke capabilities with placeholder arguments: it is not a dry-run sandbox. See [Architecture & safety](/architecture/) and [the agent-backed build guide](/build/agent-choice/).
+
+## Planned vocabulary
+
+`FromResult`, `FromContext`, `after`, collection-backed choices, broader call bounds in operation graphs, and a multi-operation deterministic compiler are not supported execution shapes. They may be declaration vocabulary; do not build copyable examples that execute them or imply registration acceptance. The roadmap tracks future work. No documented endpoint declaration currently compiles a general dependency graph into model-free execution.
