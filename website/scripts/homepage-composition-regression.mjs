@@ -50,9 +50,18 @@ try {
   check(state.credit?.y>=Math.max(...state.actions.map(a=>a.box.bottom)),`${width}: creator credit is not immediately after the actions`);
   check(state.install&&state.notice&&state.demo&&state.install.y>state.hero.y&&state.notice.y>state.install.y&&state.demo.y>state.notice.y,`${width}: installation/maturity/demo section order incorrect`);
   check(state.frames===0,`${width}: homepage must link to, not embed, the standalone playground (${state.frames} iframe(s))`);
+  const nextQuickstart=page.locator('main .pagination-links a[rel="next"]');
+  check(await nextQuickstart.count()===1,`${width}/${theme}: native closing Next Quick start link missing`);
+  check(await nextQuickstart.getAttribute('href')==='/quick-start/',`${width}/${theme}: footer quick-start route is incorrect`);
+  check((await nextQuickstart.innerText()).replace(/\s+/g,' ').includes('Next Quick start'),`${width}/${theme}: footer link must visibly say Next Quick start`);
+  const footerPosition=await nextQuickstart.evaluate(link=>({top:link.getBoundingClientRect().top,contentBottom:document.querySelector('.sl-markdown-content').getBoundingClientRect().bottom}));
+  check(footerPosition.top>=footerPosition.contentBottom,`${width}/${theme}: footer navigation is not after homepage content`);
+  if(evidence){const {mkdir}=await import('node:fs/promises');await mkdir(evidence,{recursive:true});await page.screenshot({path:resolve(evidence,`summonpot-${width}-${theme}.png`),fullPage:true});if(width===1280||width===390)await page.screenshot({path:resolve(evidence,`summonpot-${width}-${theme}-firstfold.png`)});}
+  await nextQuickstart.click();
+  check(new URL(page.url()).pathname==='/quick-start/',`${width}/${theme}: clicking the footer link did not reach quick start`);
+  check((await page.locator('main h1').first().innerText()).includes('Quick start'),`${width}/${theme}: footer destination did not render its quick-start page`);
   check(!state.overflow,`${width}: horizontal overflow`);
   check(errors.length===0,`${width}/${theme}: browser errors ${errors.join('; ')}`);
-  if(evidence){const {mkdir}=await import('node:fs/promises');await mkdir(evidence,{recursive:true});await page.screenshot({path:resolve(evidence,`summonpot-${width}-${theme}.png`),fullPage:true});if(width===1280||width===390)await page.screenshot({path:resolve(evidence,`summonpot-${width}-${theme}-firstfold.png`)});}
   await page.close();
  }
 } finally {await browser.close();await new Promise(ok=>server.close(ok));}
