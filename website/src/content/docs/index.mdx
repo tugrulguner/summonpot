@@ -2,27 +2,44 @@
 title: Typed APIs with Bounded Agent-Owned Decisions
 description: Build typed Python APIs that combine deterministic operations with explicitly bounded agent-owned decisions.
 template: splash
-hero:
-  title: APIs for the AI era, one simple contract.
-  tagline: Combine deterministic, application-owned operations with agent-owned decisions under bounded authority. Keep one typed endpoint contract from request to response.
-  image:
-    html: '<img src="/summonpot-lockup.png" alt="Summonpot — a simple contract for deterministic operations and bounded agent-owned decisions" width="520" />'
-  actions:
-    - text: Quick start
-      link: /quick-start/
-      variant: primary
-    - text: Read the architecture
-      link: /architecture/
-      variant: minimal
-    - text: View on GitHub
-      link: https://github.com/tugrulguner/summonpot
-      variant: minimal
-      attrs: { target: _blank, rel: noopener }
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-<p class="creator-attribution"><a href="https://tugrul.modepot.io/">Created by Tugrul Guner</a></p>
+<section class="framework-hero" aria-labelledby="framework-title">
+  <div class="framework-copy">
+    <p class="framework-eyebrow">CONTRACT-FIRST PYTHON APIS</p>
+    <h1 id="framework-title">APIs for the AI era, one simple contract.</h1>
+    <p class="framework-tagline">Combine deterministic, application-owned operations with agent-owned decisions under bounded authority. Keep one typed endpoint contract from request to response.</p>
+    <nav class="framework-actions" aria-label="Primary actions">
+      <a class="framework-action primary" href="/quick-start/">Quick start</a>
+      <a class="framework-action secondary" href="/playground/">Playground</a>
+      <a class="framework-action tertiary" href="https://github.com/tugrulguner/summonpot" target="_blank" rel="noopener">GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+    <a class="creator-attribution" href="https://tugrul.modepot.io/">Created by Tugrul Guner</a>
+  </div>
+  <figure class="framework-art">
+    <img src="/summonpot-lockup.png" alt="Summonpot — a simple contract for deterministic operations and bounded agent-owned decisions" width="1200" height="900" />
+  </figure>
+</section>
+
+<section class="installation-strip" aria-label="Installation">
+  <div><p class="section-eyebrow">GET STARTED</p><h2>Install Summonpot</h2></div>
+  <code>{'pip install "summonpot[serve,cli]"'}</code>
+  <a href="/quick-start/">Quick start guide <span aria-hidden="true">→</span></a>
+</section>
+
+<aside class="maturity-notice" aria-label="Project maturity"><strong>Alpha</strong><span>Summonpot is under active development. Review the documented boundaries before relying on it.</span></aside>
+
+<section class="project-demo" aria-label="Project demonstration">
+  <div>
+    <p class="section-eyebrow">EXPLORE THE MECHANISM</p>
+    <h2>One contract. Explicit authority.</h2>
+    <p>Explore the shipped bounded customer lookup: request-owned data, an allowed choice, and one application-owned operation.</p>
+  </div>
+  <a href="/playground/">Open the playground <span aria-hidden="true">→</span></a>
+  <p class="demo-boundary"><strong>Browser-local preview.</strong> Your browser runs a JavaScript preview; no Python server, model, or API call runs here.</p>
+</section>
 
 Summonpot modernizes APIs for the AI era. Instead of splitting application endpoints and agent workflows across separate abstractions, declare a typed endpoint whose contract states what callers may send, what the application may execute, where the agent may decide, and what the endpoint may return.
 
