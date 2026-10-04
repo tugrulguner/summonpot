@@ -4,14 +4,14 @@
   <img src="summonpot-lockup.png" alt="Summonpot" width="600">
 </p>
 
-<p align="center">Part of <a href="https://modepot.io/">ModePot</a>. &nbsp; <a href="https://summonpot.modepot.io/">Project website</a></p>
+<p align="center">Part of <a href="https://modepot.io/">ModePot</a>. &nbsp; <a href="https://summonpot.modepot.io/">Project website</a> &nbsp; <a href="https://tugrul.modepot.io/">Created by Tugrul Guner</a></p>
 
 <p align="center">
-  <strong>Declare deterministic operations and agentic decisions through one framework.</strong>
+  <strong>APIs for the AI era, one simple contract.</strong>
 </p>
 
 <p align="center">
-  A contract-first Python framework for combining application-owned execution and agent-owned choices in one typed HTTP API, with simple, fully contract-based endpoints.
+  Combine deterministic, application-owned operations with agent-owned decisions under bounded authority. Keep one typed endpoint contract from request to response.
 </p>
 
 <p align="center">
@@ -24,8 +24,11 @@
 </p>
 
 <p align="center">
+  <a href="https://summonpot.modepot.io/quick-start/">Quick start</a> ·
+  <a href="https://summonpot.modepot.io/playground/">Playground</a> ·
+  <a href="https://summonpot.modepot.io/architecture/">Deep docs</a> ·
   <a href="https://summonpot.modepot.io/">Documentation</a> ·
-  <a href="#quick-start">Quick start</a> ·
+  <a href="#quick-start">README quick start</a> ·
   <a href="#why-summonpot">Why summonpot</a> ·
   <a href="#exact-capabilities-not-ambient-authority">Capabilities</a> ·
   <a href="#how-it-works-today">How it works</a> ·
