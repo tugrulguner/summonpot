@@ -1,1 +1,1 @@
-Align framework landing-page hero spacing, family navigation, and link sizing with the shared ModePot site presentation.
+Center the Summonpot homepage content at desktop and mobile widths, and link to its standalone browser-local playground instead of embedding it in the landing page.

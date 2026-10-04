@@ -36,10 +36,10 @@ try {
       const s=getComputedStyle(n);const bg=background(n);const a=luminance(s.color),b=luminance(bg);
       return {selector:n.tagName,text:n.textContent.trim().slice(0,55),fg:s.color,bg,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
     });
-    const frame=document.querySelector('iframe');
+
     const primaryLink=document.querySelector('.framework-action.primary');
     const heading=route==='/'?document.querySelector('.framework-hero h1'):document.querySelector('.content-panel h1'),sidebar=document.querySelector('.sidebar-pane');
-    return {theme:document.documentElement.dataset.theme,bg:getComputedStyle(document.body).backgroundColor,bgLuminance:luminance(getComputedStyle(document.body).backgroundColor),font:getComputedStyle(document.body).fontFamily,headerHeight:getComputedStyle(document.querySelector('header.header')).height,primaryRadius:primaryLink&&getComputedStyle(primaryLink).borderRadius,modePot:[...document.querySelectorAll('header.header a')].some(a=>a.textContent.trim()==='ModePot'&&a.getAttribute('href')==='https://modepot.io/'),headingLeft:heading?.getBoundingClientRect().left,sidebarRight:sidebar?.getBoundingClientRect().right,colors,document:document.documentElement.scrollWidth,body:document.body.scrollWidth,viewport:innerWidth,heroImage:document.querySelector('.framework-art img')?.getAttribute('src'),heroBackground:document.querySelector('.framework-hero')&&getComputedStyle(document.querySelector('.framework-hero')).backgroundImage,frameDark:frame?.contentWindow.matchMedia('(prefers-color-scheme: dark)').matches};
+    return {theme:document.documentElement.dataset.theme,bg:getComputedStyle(document.body).backgroundColor,bgLuminance:luminance(getComputedStyle(document.body).backgroundColor),font:getComputedStyle(document.body).fontFamily,headerHeight:getComputedStyle(document.querySelector('header.header')).height,primaryRadius:primaryLink&&getComputedStyle(primaryLink).borderRadius,homepageFrames:document.querySelectorAll('iframe').length,playgroundLink:[...document.querySelectorAll('main a')].some(a=>a.getAttribute('href')==='/playground/'),modePot:[...document.querySelectorAll('header.header a')].some(a=>a.textContent.trim()==='ModePot'&&a.getAttribute('href')==='https://modepot.io/'),headingLeft:heading?.getBoundingClientRect().left,sidebarRight:sidebar?.getBoundingClientRect().right,colors,document:document.documentElement.scrollWidth,body:document.body.scrollWidth,viewport:innerWidth,heroImage:document.querySelector('.framework-art img')?.getAttribute('src'),heroBackground:document.querySelector('.framework-hero')&&getComputedStyle(document.querySelector('.framework-hero')).backgroundImage};
    },route);
    const state=await inspect();check(state.theme===theme,`${route}: theme control did not switch`);check(state.modePot,`${route} ${theme}: visible ModePot return link missing from the header`);
    if(route==='/') {
@@ -56,20 +56,8 @@ try {
    if(route==='/') {
     check(state.heroBackground==='none',`${theme}: obsolete green hero wash remains`);
     check(Boolean(state.heroImage),`${theme}: canonical artwork missing`);
-    await page.locator('iframe').scrollIntoViewIfNeeded();
-    await page.frameLocator('iframe').locator('h1').waitFor();
-    const frameState = await page.locator('iframe').evaluate(frame => ({
-      theme: frame.contentDocument.documentElement.dataset.theme,
-      bg: frame.contentWindow.getComputedStyle(frame.contentDocument.body).backgroundColor,
-    }));
-    const frameChannels = frameState.bg.match(/[\d.]+/g).slice(0,3).map(Number);
-    check(frameState.theme===theme && frameChannels.every(v => theme==='light'?v>230:v<40),`${theme}: embedded preview contradicts explicit site theme (${frameState.bg})`);
-    const opposite = theme==='light'?'dark':'light';
-    await page.locator('starlight-theme-select select').first().selectOption(opposite);
-    await page.waitForFunction(value => document.querySelector('iframe').contentDocument.documentElement.dataset.theme===value, opposite);
-    check(await page.locator('iframe').evaluate(frame => frame.contentDocument.documentElement.dataset.theme)===opposite,`${theme}: existing embed did not follow a theme switch`);
-    await page.locator('starlight-theme-select select').first().selectOption(theme);
-    await page.waitForFunction(value => document.querySelector('iframe').contentDocument.documentElement.dataset.theme===value, theme);
+    check(state.homepageFrames===0,`${theme}: homepage must link to the standalone playground, not embed it`);
+    check(state.playgroundLink,`${theme}: homepage playground action missing`);
     await page.evaluate(() => scrollTo(0,0));
     if(out)await page.screenshot({path:`${out}/homepage-1280-${theme}.png`,fullPage:true});
     await page.setViewportSize({width:320,height:390});
@@ -77,12 +65,12 @@ try {
     const mobile=await inspect();check(mobile.document<=320&&mobile.body<=320,`${theme}: mobile overflow`);
     if(out)await page.screenshot({path:`${out}/homepage-320-${theme}.png`,fullPage:true});
     await page.setViewportSize({width:1280,height:900});
+    const opposite = theme==='light'?'dark':'light';
     await page.locator('starlight-theme-select select').first().selectOption('auto');
     await page.waitForFunction(value => document.documentElement.dataset.theme===value, opposite);
     const automatic=await inspect();
     check(automatic.theme===opposite && (opposite==='light'?automatic.bgLuminance>.8:automatic.bgLuminance<.06),`${theme}: Auto did not resolve the system theme consistently`);
-    await page.waitForFunction(value => document.querySelector('iframe').contentDocument.documentElement.dataset.theme===value, opposite);
-    check(await page.locator('iframe').evaluate(frame=>frame.contentDocument.documentElement.dataset.theme)===opposite,`${theme}: embedded preview did not follow Auto`);
+
    }
    cases.push({route,theme,background:state.bg,minimumContrast:Math.min(...state.colors.map(c=>c.ratio))});
    if(out && route!=='/') { await page.evaluate(() => scrollTo(0,0)); await page.screenshot({path:`${out}/docs-${route.replaceAll('/','-')}-${theme}.png`,fullPage:true}); }
