@@ -7,3 +7,4 @@ function enableHomepageCodeKeyboardScrolling() {
 
 enableHomepageCodeKeyboardScrolling();
 document.addEventListener('astro:page-load', enableHomepageCodeKeyboardScrolling);
+window.addEventListener('resize', enableHomepageCodeKeyboardScrolling);

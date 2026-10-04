@@ -40,6 +40,28 @@ try {
   check(state.installCommand==='pip install "summonpot[serve,cli]"',`${width}/${theme}: install command must preserve ASCII shell quotes: ${state.installCommand}`);
   check(state.h1.length===1&&state.h1[0]==='APIs for the AI era, one simple contract.',`${width}: expected one canonical first-fold H1: ${state.h1.join('|')}`);
   check(state.hero&&state.copy&&state.art&&state.image,`${width}: hero geometry/art missing`);
+  if(width===1280){
+   await page.setViewportSize({width:320,height:850});
+   await page.evaluate(async()=>{await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));});
+   const resized=page.locator('main .sl-markdown-content pre');
+   const resizedCount=await resized.count();let overflowing=[];
+   for(let i=0;i<resizedCount;i++)if(await resized.nth(i).evaluate(pre=>pre.scrollWidth>pre.clientWidth))overflowing.push(i);
+   check(overflowing.length>0,`${theme}: resize reveals overflowing homepage code`);
+   for(const i of overflowing){
+    const block=resized.nth(i);let reached=false;
+    for(let step=0;step<120;step++){await page.keyboard.press('Tab');if(await block.evaluate(pre=>document.activeElement===pre)){reached=true;break;}}
+    check(reached,`${theme}: resized code block ${i} reachable by Tab`);
+    const focused=await block.evaluate(pre=>({tabIndex:pre.tabIndex,outline:getComputedStyle(pre).outlineStyle}));
+    check(focused.tabIndex===0,`${theme}: resized code block ${i} has tabIndex 0`);
+    check(focused.outline!=='none',`${theme}: resized code block ${i} focus is visible`);
+    for(let step=0;step<300;step++){if(await block.evaluate(pre=>pre.scrollLeft>=pre.scrollWidth-pre.clientWidth-1))break;await page.keyboard.press('ArrowRight');}
+    const scroll=await block.evaluate(pre=>({left:pre.scrollLeft,max:pre.scrollWidth-pre.clientWidth}));
+    check(scroll.left>=scroll.max-1,`${theme}: ArrowRight reveals resized code block ${i}`);
+   }
+   check(await page.evaluate(()=>document.documentElement.scrollWidth)<=320,`${theme}: resized homepage has no page overflow`);
+   await page.setViewportSize({width,height:850});
+   await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+  }
   check(state.hero&&Math.abs(state.hero.x-(width-state.hero.width)/2)<=2,`${width}/${theme}: hero is not horizontally centered (${JSON.stringify(state.hero)})`);
   for(const [name,section] of [['hero',state.hero],['installation',state.install],['maturity',state.notice],['demo',state.demo]]) if(section) check(Math.abs(section.x-(width-section.width)/2)<=20,`${width}/${theme}: ${name} section is not centered with balanced page gutters (${JSON.stringify(section)})`);
   if(width>700) check(state.main&&state.markdown&&Math.abs(state.markdown.x-(width-state.markdown.width)/2)<=2,`${width}/${theme}: main content axis is off-center (${JSON.stringify({main:state.main,markdown:state.markdown})})`);
