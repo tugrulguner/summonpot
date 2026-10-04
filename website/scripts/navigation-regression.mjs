@@ -83,6 +83,16 @@ try {
         check(await button.getAttribute("aria-expanded") === "false" && await button.evaluate(node => document.activeElement === node), `${route} ${width}: Escape did not close Menu and restore focus`);
       }
     } else {
+      const desktopHeaderOrder = await page.evaluate(() => {
+        const navigation = document.querySelector('.family-links');
+        const theme = document.querySelector('starlight-theme-select');
+        return !theme || Boolean(navigation && navigation.compareDocumentPosition(theme) & Node.DOCUMENT_POSITION_FOLLOWING);
+      });
+      check(desktopHeaderOrder, `${route} ${width}: family navigation must precede theme control like the Intpot reference`);
+      if (await page.locator('starlight-theme-select').count()) {
+        const familyLinkStyle = await page.locator('.family-links a').first().evaluate(node => ({ fontSize: getComputedStyle(node).fontSize, fontWeight: getComputedStyle(node).fontWeight }));
+        check(familyLinkStyle.fontSize === '16px' && familyLinkStyle.fontWeight === '400', `${route} ${width}: family link weight/size must match Intpot (16px/400), got ${familyLinkStyle.fontSize}/${familyLinkStyle.fontWeight}`);
+      }
       const labels = await page.locator(`${group} a`).allTextContents();
       check(JSON.stringify(labels.map(x => x.trim())) === JSON.stringify(expected.map(([label]) => label)), `${route} ${width}: desktop resource order/labels are wrong (${labels.join(", ")})`);
       for (const [label, href] of expected) {

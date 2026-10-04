@@ -37,6 +37,7 @@ try {
   check(state.installCommand==='pip install "summonpot[serve,cli]"',`${width}/${theme}: install command must preserve ASCII shell quotes: ${state.installCommand}`);
   check(state.h1.length===1&&state.h1[0]==='APIs for the AI era, one simple contract.',`${width}: expected one canonical first-fold H1: ${state.h1.join('|')}`);
   check(state.hero&&state.copy&&state.art&&state.image,`${width}: hero geometry/art missing`);
+  check(state.hero?.y===153,`${width}/${theme}: framework hero should align to Intpot reference top (153px), got ${state.hero?.y}`);
   if(width>400){check(state.art.x>state.copy.x,`${width}: art does not follow copy on desktop/tablet`);check(state.image.x>=state.art.x&&state.image.right<=state.art.right+1,`${width}: art escapes its bounded frame`);}
   else check(state.art.y>=state.copy.bottom-1,`${width}: mobile art does not follow copy`);
   check(state.actions.map(a=>a.text).join('|').startsWith('Quick start|Playground|GitHub'),`${width}: CTA order incorrect`);
