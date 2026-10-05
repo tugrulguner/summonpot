@@ -293,7 +293,10 @@ def test_playground_teaches_the_shipped_bounded_operation_contract():
     example = (ROOT / "examples/07_bound_operation.py").read_text(encoding="utf-8")
 
     assert "examples/07_bound_operation.py" in page
-    assert "readFile(new URL('../../../examples/07_bound_operation.py'" in page
+    assert (
+        "resolve(process.cwd(), '../examples/07_bound_operation.py')" in page
+        or "new URL('../../../examples/07_bound_operation.py', import.meta.url)" in page
+    )
     assert "code={contract}" in page and "code={example}" in page
     assert "example.slice(example.indexOf('customer_lookup = Operation(')" in page
     for token in (
