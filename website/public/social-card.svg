@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Summonpot social preview</title>
+  <desc id="desc">Minimal Summonpot lockup. Deterministic operations. Bounded agent-owned decisions.</desc>
+  <rect width="1200" height="630" fill="#090C11"/>
+  <line x1="414" y1="128" x2="414" y2="502" stroke="#2A3039" stroke-width="2"/>
+  <g transform="translate(80 160) scale(2.35)">
+      <path d="M44 22h10v20c0 5-2.3 9.6-6.2 12.4C34.1 64.3 26 78.2 26 93c0 17 12.7 25 38 25s38-8 38-25c0-14.8-8.1-28.7-21.8-38.6C76.3 51.6 74 47 74 42V22h10" fill="none" stroke="#A987FF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="40" y="72" width="48" height="35" rx="11" fill="none" stroke="#A987FF" stroke-width="7"/>
+      <path d="M64 79l10 10-10 10-10-10z" fill="#A987FF"/>
+  </g>
+  <text x="478" y="190" fill="#A987FF" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" letter-spacing="4">MODEPOT / OPEN SOURCE</text>
+  <text x="472" y="330" fill="#F4F2EA" font-family="Arial, Helvetica, sans-serif" font-size="80" font-weight="700" letter-spacing="-4">summonpot</text>
+  <text x="478" y="402" fill="#C4CAD3" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="400">Deterministic operations.</text>
+  <text x="478" y="443" fill="#C4CAD3" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="400">Bounded agent-owned decisions.</text>
+  <line x1="478" y1="492" x2="1100" y2="492" stroke="#A987FF" stroke-width="4"/>
+</svg>
