@@ -1,0 +1,1 @@
+Normalize Summonpot homepage, documentation, and standalone and embedded playground controls to the ModePot family typography, layout, spacing, and purple-accent presentation while preserving the framework's native Light, Dark, and Auto themes and the browser-local, shipped-example authority boundary.
