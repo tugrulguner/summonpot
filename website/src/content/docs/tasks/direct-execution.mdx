@@ -1,0 +1,127 @@
+---
+title: Build a model-free endpoint
+description: Implement and verify the shipped, narrow direct-execution contract.
+slug: build/direct-execution
+---
+
+import { LinkButton } from '@astrojs/starlight/components';
+
+<LinkButton href="/build/direct-execution.md" variant="secondary">Download this guide as Markdown</LinkButton>
+
+This guide builds an endpoint whose fully resolved operation runs without looking up a model. This is a deliberately narrow shipped path—not a general deterministic workflow compiler. Requirements and registration-time rejections are specified in the [operation reference](/reference/operations/).
+
+## Before you start
+
+Use Python 3.11–3.14 and install the HTTP extra: `python -m pip install 'summonpot[serve]'`. This example performs arithmetic only; no provider credentials or network model calls are involved. The `summonpot` CLI requires the optional `cli` extra, but this example starts the server through its public Python API.
+
+Save the complete program below as `direct_quote.py`:
+
+```python
+from decimal import Decimal, ROUND_HALF_UP
+
+from pydantic import BaseModel, Field
+from summonpot import Exactly, FromRequest, Operation, Required, Summon
+
+
+class QuoteRequest(BaseModel):
+    unit_price_cents: int = Field(gt=0)
+    quantity: int = Field(ge=1, le=100)
+    tax_rate_percent: Decimal = Field(ge=0, le=30)
+
+
+class QuoteResponse(BaseModel):
+    subtotal_cents: int
+    tax_cents: int
+    total_cents: int
+
+
+def calculate_quote(
+    unit_price_cents: int,
+    quantity: int,
+    tax_rate_percent: Decimal,
+) -> QuoteResponse:
+    """Calculate the approved quote using decimal half-up tax rounding."""
+    subtotal = unit_price_cents * quantity
+    tax = (Decimal(subtotal) * tax_rate_percent / Decimal(100)).quantize(
+        Decimal("1"), rounding=ROUND_HALF_UP
+    )
+    return QuoteResponse(
+        subtotal_cents=subtotal,
+        tax_cents=int(tax),
+        total_cents=subtotal + int(tax),
+    )
+
+
+quote_operation = Operation(
+    calculate_quote,
+    bind={
+        "unit_price_cents": FromRequest("unit_price_cents"),
+        "quantity": FromRequest("quantity"),
+        "tax_rate_percent": FromRequest("tax_rate_percent"),
+    },
+    output=QuoteResponse,
+)
+
+summon = Summon("direct-quote-service")
+
+
+@summon("/quotes/direct")
+def create_quote(
+    request: QuoteRequest,
+    quote=Required(quote_operation, calls=Exactly(1)),
+) -> QuoteResponse:
+    """Return the exact approved quote through its one complete operation path."""
+    ...
+
+
+if __name__ == "__main__":
+    summon.serve(host="127.0.0.1", port=8000)
+```
+
+The endpoint declaration is intentionally an ellipsis. It is not a handler body: the registered function is a contract, direct Python invocation is rejected, and the generated HTTP route invokes the runtime. `request` defines and validates the JSON body; the docstring is the fixed goal; `Required(..., calls=Exactly(1))` declares the sole mandatory operation and bound; and the response annotation is the endpoint output schema.
+
+`Operation` wraps the exact application callable. Each parameter is explicitly bound from the validated request, and `output=QuoteResponse` asks the runtime to validate the callable's result. The callable remains application authority; the framework does not replace its implementation or infer authorization. Put authorization and any write policy inside the application operation.
+
+## Run and verify through HTTP
+
+Start the server in one terminal:
+
+```sh
+python direct_quote.py
+```
+
+In another terminal, submit a harmless request:
+
+```sh
+curl -i -X POST http://127.0.0.1:8000/quotes/direct \
+  -H 'Content-Type: application/json' \
+  -d '{"unit_price_cents":1299,"quantity":3,"tax_rate_percent":"8.25"}'
+```
+
+The response body is `{"subtotal_cents":3897,"tax_cents":322,"total_cents":4219}`. The operation computes it; no model is resolved or called. This path requires a Pydantic request model, exactly one required `Exactly(1)` operation, at least one `FromRequest` binding (this example binds all three inputs), only `FromRequest` or supported immutable callable defaults for remaining parameters, and an operation output that is the identical response-model class declared by the endpoint. A declaration outside that full predicate is not eligible for direct execution.
+
+Check rejection before application code with invalid quantity:
+
+```sh
+curl -i -X POST http://127.0.0.1:8000/quotes/direct \
+  -H 'Content-Type: application/json' \
+  -d '{"unit_price_cents":1299,"quantity":0,"tax_rate_percent":"8.25"}'
+```
+
+Pydantic rejects the request with HTTP 422. The operation is not invoked for invalid input. The route also publishes its request and response contract in OpenAPI at `/openapi.json`; the interactive schema is at `/docs`.
+
+## What the bound and validation promise
+
+The runtime reserves the permitted operation start before invoking application code. An operation that returns an invalid declared output does not satisfy `Required`, and it is not automatically retried. This is a per-request start bound, not exactly-once completion, rollback, distributed deduplication, or cancellation: application code may have side effects before it raises or before output validation fails. Use idempotency and transaction policy in the application where required.
+
+`FromRequest` supplies the canonical value from the validated request and checks it against the receiving parameter contract without coercion. Validation does not establish user identity or authorization. Keep sensitive access checks in the operation and do not bind an untrusted identifier as proof of permission.
+
+## If this shape does not register
+
+- `Operation(fn)` without complete bindings is explicit but not an eligible direct operation; registration rejects unsupported explicit shapes.
+- A scalar endpoint request, no request-bound argument, multiple operations, optional `Depends`, or a direct `AgentChoice` is not this no-model shape.
+- The output must match by class identity, not merely equivalent fields.
+- Mutable/custom callable defaults do not qualify. Supported immutable exact built-ins are `None`, `bool`, `int`, `float`, `complex`, `str`, `bytes`, and recursively composed tuples/frozensets of those exact values.
+- Bare legacy `Depends(fn)` / `Required(fn)` callables keep their agent-backed behavior; their presence does not prove deterministic direct execution.
+
+For a semantic choice, see [Build an agent-backed bound operation](/build/agent-choice/). For runtime mechanics and error handling, see [Execution internals](/internals/execution/). The broader multi-operation deterministic compiler, operation result/context binding (`FromResult`, `FromContext`), and `after` dependency graph remain planned, not executable shipped features.

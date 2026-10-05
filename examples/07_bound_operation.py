@@ -1,6 +1,6 @@
 """Level 7: one exactly-once operation with mixed argument authority."""
 
-from typing import Literal
+from typing import Literal, TypedDict
 
 from pydantic import BaseModel
 
@@ -30,7 +30,12 @@ class CustomerView(BaseModel):
     display: str
 
 
-_CUSTOMERS = {
+class _Customer(TypedDict):
+    name: str
+    status: Literal["active", "paused"]
+
+
+_CUSTOMERS: dict[str, _Customer] = {
     "customer-7": {"name": "Ada", "status": "active"},
     "customer-9": {"name": "Grace", "status": "paused"},
 }

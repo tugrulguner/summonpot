@@ -8,11 +8,17 @@ it needed the rejection case.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from pydantic import BaseModel
 
 from summonpot import (
     AgentChoice,
+    AtLeast,
+    AtMost,
+    Depends,
+    Exactly,
     FromContext,
     FromRequest,
     FromResult,
@@ -54,36 +60,92 @@ def record_audit(customer_id: str) -> Customer:
 # --- valid declarations are still accepted -----------------------------------
 
 
-def test_a_bare_callable_needs_no_contract():
-    """The contract is opt-in; endpoints written before it keep working."""
+@pytest.mark.parametrize(
+    "dependency", [Depends(lookup_customer), Required(lookup_customer)]
+)
+def test_a_bare_callable_with_implicit_marker_bounds_needs_no_contract(dependency):
+    """Legacy Depends(fn) and Required(fn) endpoints keep working unchanged."""
     summon = Summon("svc")
 
     @summon("/orders")
-    def create_order(
-        request: OrderRequest, customer=Required(lookup_customer)
-    ) -> OrderResponse:
+    def create_order(request: OrderRequest, customer=dependency) -> OrderResponse:
         """Place an order."""
         ...
 
     assert summon.endpoints[0].tools[0].contract is None
 
 
-def test_an_operation_may_declare_an_output_without_bindings():
-    """Declaring no bindings means what it means today: the model chooses."""
-    summon = Summon("svc")
+def test_a_copied_legacy_tool_cannot_disguise_changed_bounds_as_implicit():
+    source = Summon("source")
+
+    @source("/source")
+    def source_endpoint(
+        request: OrderRequest, customer=Required(lookup_customer)
+    ) -> OrderResponse:
+        """Load one customer through the legacy path."""
+        ...
+
+    forged = replace(source.endpoints[0].tools[0], bounds=Exactly(2))
+    summon = Summon("svc", tools=[forged])
+
+    with pytest.raises(TypeError, match="cannot enforce the declared call bound"):
+
+        @summon("/orders")
+        def create_order(request: OrderRequest) -> OrderResponse:
+            """Place an order."""
+            ...
+
+
+def test_an_unchanged_copy_of_a_legacy_tool_keeps_implicit_marker_bounds():
+    source = Summon("source")
+
+    @source("/source")
+    def source_endpoint(
+        request: OrderRequest, customer=Required(lookup_customer)
+    ) -> OrderResponse:
+        """Load one customer through the legacy path."""
+        ...
+
+    copied = replace(source.endpoints[0].tools[0])
+    summon = Summon("svc", tools=[copied])
 
     @summon("/orders")
-    def create_order(
-        request: OrderRequest,
-        customer=Required(Operation(lookup_customer, output=Customer)),
-    ) -> OrderResponse:
+    def create_order(request: OrderRequest) -> OrderResponse:
         """Place an order."""
         ...
 
-    assert summon.endpoints[0].tools[0].contract is not None
+    assert summon.endpoints[0].tools[0].bounds == copied.bounds
 
 
-def test_a_complete_chain_of_bindings_is_accepted():
+def test_a_bare_operation_contract_is_rejected_instead_of_using_the_legacy_path():
+    summon = Summon("svc")
+
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
+
+        @summon("/orders")
+        def create_order(
+            request: OrderRequest,
+            customer=Required(Operation(lookup_customer)),
+        ) -> OrderResponse:
+            """Place an order."""
+            ...
+
+
+def test_an_output_contract_without_enforceable_bindings_is_rejected():
+    summon = Summon("svc")
+
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
+
+        @summon("/orders")
+        def create_order(
+            request: OrderRequest,
+            customer=Required(Operation(lookup_customer, output=Customer)),
+        ) -> OrderResponse:
+            """Place an order."""
+            ...
+
+
+def test_a_complete_chain_is_rejected_until_multi_operation_execution_ships():
     lookup = Operation(
         lookup_customer,
         bind={"customer_id": FromRequest("customer_id")},
@@ -91,43 +153,68 @@ def test_a_complete_chain_of_bindings_is_accepted():
     )
     summon = Summon("svc")
 
-    @summon("/orders")
-    def create_order(
-        request: OrderRequest,
-        customer=Required(lookup),
-        order=Required(
-            Operation(
-                place_order,
-                bind={
-                    "customer_id": FromRequest("customer_id"),
-                    "tier": FromResult(lookup, "tier"),
-                    "sku": FromRequest("sku"),
-                },
-                output=OrderResponse,
-            )
-        ),
-    ) -> OrderResponse:
-        """Place an order."""
-        ...
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
 
-    assert len(summon.endpoints[0].tools) == 2
+        @summon("/orders")
+        def create_order(
+            request: OrderRequest,
+            customer=Required(lookup),
+            order=Required(
+                Operation(
+                    place_order,
+                    bind={
+                        "customer_id": FromRequest("customer_id"),
+                        "tier": FromResult(lookup, "tier"),
+                        "sku": FromRequest("sku"),
+                    },
+                    output=OrderResponse,
+                )
+            ),
+        ) -> OrderResponse:
+            """Place an order."""
+            ...
 
 
-@pytest.mark.parametrize("source", [AgentChoice(), FromContext("user_id")])
-def test_non_request_sources_are_accepted(source):
+def test_direct_agent_choice_is_accepted_by_the_enforced_slice():
     summon = Summon("svc")
 
     @summon("/orders")
     def create_order(
         request: OrderRequest,
         customer=Required(
-            Operation(lookup_customer, bind={"customer_id": source}, output=Customer)
+            Operation(
+                lookup_customer,
+                bind={"customer_id": AgentChoice()},
+                output=Customer,
+            ),
+            calls=Exactly(1),
         ),
     ) -> OrderResponse:
         """Place an order."""
         ...
 
     assert summon.endpoints[0].tools[0].contract is not None
+
+
+def test_from_context_is_rejected_until_context_injection_ships():
+    summon = Summon("svc")
+
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
+
+        @summon("/orders")
+        def create_order(
+            request: OrderRequest,
+            customer=Required(
+                Operation(
+                    lookup_customer,
+                    bind={"customer_id": FromContext("user_id")},
+                    output=Customer,
+                ),
+                calls=Exactly(1),
+            ),
+        ) -> OrderResponse:
+            """Place an order."""
+            ...
 
 
 def test_from_request_resolves_against_a_scalar_endpoint():
@@ -142,7 +229,8 @@ def test_from_request_resolves_against_a_scalar_endpoint():
                 lookup_customer,
                 bind={"customer_id": FromRequest("customer_id")},
                 output=Customer,
-            )
+            ),
+            calls=Exactly(1),
         ),
     ) -> str:
         """Place an order."""
@@ -175,20 +263,142 @@ def test_a_diamond_of_dependencies_is_not_a_cycle():
     )
     summon = Summon("svc")
 
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
+
+        @summon("/orders")
+        def create_order(
+            request: OrderRequest,
+            a=Required(first),
+            b=Required(second),
+            c=Required(third),
+        ) -> OrderResponse:
+            """Place an order."""
+            ...
+
+
+# --- invalid declarations fail at registration -------------------------------
+
+
+def test_a_binding_source_outside_the_closed_vocabulary_is_rejected():
+    summon = Summon("svc")
+
+    with pytest.raises(TypeError, match="binding source must be one of"):
+
+        @summon("/orders")
+        def create_order(
+            request: OrderRequest,
+            customer=Required(
+                Operation(
+                    lookup_customer,
+                    bind={"customer_id": object()},  # type: ignore[dict-item]
+                    output=Customer,
+                ),
+                calls=Exactly(1),
+            ),
+        ) -> OrderResponse:
+            """Place an order."""
+            ...
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        type("RequestSourceSubclass", (FromRequest,), {})("customer_id"),
+        type("ResultSourceSubclass", (FromResult,), {})(
+            Operation(lookup_customer, output=Customer), "customer_id"
+        ),
+        type("ContextSourceSubclass", (FromContext,), {})("principal"),
+        type("ChoiceSourceSubclass", (AgentChoice,), {})(),
+    ],
+    ids=["request", "result", "context", "choice"],
+)
+def test_a_binding_source_subclass_is_outside_the_exact_vocabulary(source):
+    summon = Summon("svc")
+
+    with pytest.raises(TypeError, match="binding source must be one of"):
+
+        @summon("/orders")
+        def create_order(
+            request: OrderRequest,
+            customer=Required(
+                Operation(
+                    lookup_customer,
+                    bind={"customer_id": source},
+                    output=Customer,
+                ),
+                calls=Exactly(1),
+            ),
+        ) -> OrderResponse:
+            """Place an order."""
+            ...
+
+
+def test_each_runtime_supported_binding_source_is_accepted():
+    summon = Summon("svc")
+
     @summon("/orders")
     def create_order(
         request: OrderRequest,
-        a=Required(first),
-        b=Required(second),
-        c=Required(third),
+        customer=Required(
+            Operation(
+                search_customers,
+                bind={
+                    "query": FromRequest("customer_id"),
+                    "limit": AgentChoice(),
+                },
+                output=Customer,
+            ),
+            calls=Exactly(1),
+        ),
     ) -> OrderResponse:
         """Place an order."""
         ...
 
-    assert len(summon.endpoints[0].tools) == 3
+    assert summon.endpoints[0].tools[0].contract is not None
 
 
-# --- invalid declarations fail at registration -------------------------------
+@pytest.mark.parametrize(
+    "dependency",
+    [
+        Required(lookup_customer, calls=AtLeast(2)),
+        Required(lookup_customer, calls=Exactly(1)),
+        Depends(lookup_customer, calls=AtMost(1)),
+    ],
+    ids=["broader-required", "uncontracted-exact", "optional-maximum"],
+)
+def test_an_unenforceable_explicit_call_bound_is_rejected(dependency):
+    summon = Summon("svc")
+
+    with pytest.raises(TypeError, match="cannot enforce the declared call bound"):
+
+        @summon("/orders")
+        def create_order(
+            request: OrderRequest,
+            customer=dependency,
+        ) -> OrderResponse:
+            """Place an order."""
+            ...
+
+
+def test_a_second_capability_cannot_disable_an_existing_operation_contract():
+    summon = Summon("svc", tools=[record_audit])
+
+    with pytest.raises(TypeError, match="would leave its explicit contract unenforced"):
+
+        @summon("/orders")
+        def create_order(
+            request: OrderRequest,
+            customer=Required(
+                Operation(
+                    lookup_customer,
+                    bind={"customer_id": FromRequest("customer_id")},
+                    output=Customer,
+                ),
+                calls=Exactly(1),
+            ),
+        ) -> OrderResponse:
+            """Place an order."""
+            ...
 
 
 def test_a_binding_for_an_unknown_argument_is_rejected():
@@ -351,7 +561,9 @@ def flexible_lookup(customer_id: str, **extra: object) -> Customer:
 
 def _register(summon: Summon, contract: Operation) -> None:
     @summon("/orders")
-    def create_order(request: OrderRequest, op=Required(contract)) -> OrderResponse:
+    def create_order(
+        request: OrderRequest, op=Required(contract, calls=Exactly(1))
+    ) -> OrderResponse:
         """Place an order."""
         ...
 
@@ -495,7 +707,7 @@ def test_agent_choice_may_only_offer_results_of_a_declared_operation():
             ...
 
 
-def test_after_naming_a_declared_operation_is_accepted():
+def test_after_naming_a_declared_operation_reaches_fail_closed_admission():
     lookup = Operation(
         lookup_customer,
         bind={"customer_id": FromRequest("customer_id")},
@@ -503,27 +715,27 @@ def test_after_naming_a_declared_operation_is_accepted():
     )
     summon = Summon("svc")
 
-    @summon("/orders")
-    def create_order(
-        request: OrderRequest,
-        customer=Required(lookup),
-        order=Required(
-            Operation(
-                place_order,
-                bind={
-                    "customer_id": FromRequest("customer_id"),
-                    "tier": FromResult(lookup, "tier"),
-                    "sku": FromRequest("sku"),
-                },
-                output=OrderResponse,
-                after=[lookup],
-            )
-        ),
-    ) -> OrderResponse:
-        """Place an order."""
-        ...
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
 
-    assert len(summon.endpoints[0].tools) == 2
+        @summon("/orders")
+        def create_order(
+            request: OrderRequest,
+            customer=Required(lookup),
+            order=Required(
+                Operation(
+                    place_order,
+                    bind={
+                        "customer_id": FromRequest("customer_id"),
+                        "tier": FromResult(lookup, "tier"),
+                        "sku": FromRequest("sku"),
+                    },
+                    output=OrderResponse,
+                    after=[lookup],
+                )
+            ),
+        ) -> OrderResponse:
+            """Place an order."""
+            ...
 
 
 # --- a result must be structured to be read from -----------------------------
@@ -652,7 +864,7 @@ def test_agent_choice_may_not_offer_a_result_with_no_declared_output():
             ...
 
 
-def test_agent_choice_may_offer_a_result_with_a_declared_output():
+def test_valid_result_backed_agent_choice_reaches_fail_closed_admission():
     producer = Operation(
         list_tiers,
         bind={"customer_id": FromRequest("customer_id")},
@@ -660,26 +872,26 @@ def test_agent_choice_may_offer_a_result_with_a_declared_output():
     )
     summon = Summon("svc")
 
-    @summon("/orders")
-    def create_order(
-        request: OrderRequest,
-        customer=Required(producer),
-        order=Required(
-            Operation(
-                place_order,
-                bind={
-                    "customer_id": FromRequest("customer_id"),
-                    "tier": AgentChoice(from_result=producer, item_type=str),
-                    "sku": FromRequest("sku"),
-                },
-                output=OrderResponse,
-            )
-        ),
-    ) -> OrderResponse:
-        """Place an order."""
-        ...
+    with pytest.raises(TypeError, match="explicit contract unenforced"):
 
-    assert len(summon.endpoints[0].tools) == 2
+        @summon("/orders")
+        def create_order(
+            request: OrderRequest,
+            customer=Required(producer),
+            order=Required(
+                Operation(
+                    place_order,
+                    bind={
+                        "customer_id": FromRequest("customer_id"),
+                        "tier": AgentChoice(from_result=producer, item_type=str),
+                        "sku": FromRequest("sku"),
+                    },
+                    output=OrderResponse,
+                )
+            ),
+        ) -> OrderResponse:
+            """Place an order."""
+            ...
 
 
 def test_agent_choice_may_not_offer_a_scalar_result():

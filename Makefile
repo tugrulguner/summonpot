@@ -8,15 +8,15 @@ test:
 	uv run pytest tests/ -v
 
 lint:
-	uv run ruff check src/ tests/
-	uv run ruff format --check src/ tests/
+	uv run ruff check src/ tests/ examples/ scripts/
+	uv run ruff format --check src/ tests/ examples/ scripts/
 
 typecheck:
-	uv run pyright src/ tests/
+	uv run pyright src/ tests/ examples/ scripts/
 
 format:
-	uv run ruff check --fix src/ tests/
-	uv run ruff format src/ tests/
+	uv run ruff check --fix src/ tests/ examples/ scripts/
+	uv run ruff format src/ tests/ examples/ scripts/
 
 check: lint typecheck test
 

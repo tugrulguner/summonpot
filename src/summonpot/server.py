@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Union, get_args, get_origin
 from summonpot import __version__
 from summonpot._execution import (
     _CompiledEndpoint,
+    _create_parameter_model,
     _registered_plan,
     _RequestValues,
     _validated_transport_request,
@@ -76,6 +77,7 @@ def build_app(summon: Summon) -> Any:
             app.add_api_route(route_path, _handle_with_query, **route_kwargs)
         elif definition.parameters:
             RequestModel: Any
+            body_field_names: dict[str, str] | Any = None
             if definition.input_model is not None:
                 RequestModel = definition.input_model
             elif not _body_parameters(definition):
@@ -86,23 +88,21 @@ def build_app(summon: Summon) -> Any:
                 # even though the URL already supplied every value.
                 RequestModel = None
             else:
-                from pydantic import create_model
-
-                fields: dict[str, tuple[type, Any]] = {}
-                for p in _body_parameters(definition):
-                    field_type = _field_type(p)
-                    if p.required:
-                        fields[p.name] = (field_type, ...)
-                    else:
-                        fields[p.name] = (field_type, p.default)
-
-                RequestModel = create_model(
+                RequestModel, body_field_names = _create_parameter_model(
                     f"{definition.name}Request",
-                    **fields,  # pyright: ignore[reportArgumentType, reportCallIssue]
+                    [
+                        (p.name, _field_type(p), p.required, p.default)
+                        for p in _body_parameters(definition)
+                    ],
+                    all_parameter_names=[p.name for p in definition.parameters],
                 )
 
             _handle_with_body = _make_body_handler(
-                endpoint, summon, RequestModel, definition
+                endpoint,
+                summon,
+                RequestModel,
+                definition,
+                body_field_names=body_field_names,
             )
 
             app.add_api_route(route_path, _handle_with_body, **route_kwargs)
@@ -207,8 +207,19 @@ async def _run_endpoint(summon: Any, endpoint: Any, params: dict[str, Any]) -> A
         UserError,
     )
 
+    from summonpot.runtime import _OperationInputError
+
     try:
         return await summon._runtime.call(endpoint, params)
+    except _OperationInputError:
+        logger.warning(
+            "Endpoint %s rejected an injected value at its receiving operation contract",
+            endpoint.path,
+        )
+        raise HTTPException(
+            status_code=422,
+            detail="Request data did not satisfy a receiving operation contract.",
+        ) from None
     except UsageLimitExceeded as exc:
         # Details are logged, never returned: an exception raised inside the agent
         # loop can carry rejected model output or tool-call context, and the HTTP
@@ -289,6 +300,8 @@ def _make_body_handler(
     summon: Any,
     request_model: type[Any] | None,
     definition: Any | None = None,
+    *,
+    body_field_names: Any = None,
 ) -> Any:
     """Create a route handler for a body method, retaining endpoint context in its closure.
 
@@ -321,7 +334,12 @@ def _make_body_handler(
 
         if hasattr(body, "model_dump"):
             prompt = body.model_dump(mode="json", by_alias=True)
-            typed = {name: getattr(body, name) for name in type(body).model_fields}
+            typed = {
+                (
+                    body_field_names[name] if body_field_names is not None else name
+                ): getattr(body, name)
+                for name in type(body).model_fields
+            }
         else:
             prompt = dict(body or {})
             typed = dict(prompt)

@@ -297,7 +297,7 @@ class Money:
 def test_query_transport_accepts_values_without_a_json_form():
     received: list[Any] = []
 
-    def apply(value: int) -> Result:
+    def apply(value: Any) -> Result:
         received.append(value)
         return Result(value=1)
 

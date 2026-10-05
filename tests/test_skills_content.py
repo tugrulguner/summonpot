@@ -77,26 +77,46 @@ def test_skill_states_the_current_binding_execution_boundary():
     assert "calls=Exactly(1)" in body
     assert "trusted and defaulted arguments are hidden from the model" in body
     assert "Multi-operation chains" in body
-    assert "model-supplied argument behavior" in body
+    assert "rejected during registration" in body
+    assert "exact built-in source types" in body
+    assert "`Operation(fn)` is still an explicit contract" in body
     assert "executes it directly without resolving or constructing a model" in body
     assert "no model fallback after direct execution begins" in body.lower()
     assert "uses a Pydantic request model" in body
     assert "Scalar request declarations also remain agent-backed" in body
     assert "copy hooks are not proof of immutability" in body
+    assert "receiving operation parameter" in body
+    assert "strictly before application code starts" in body
+    assert "not replaced by a coerced value" in body
+    assert "exact primitive types" in body
+    assert "primitive `Literal` values" in body
+    assert "structurally checked Pydantic model instances" in body
+    assert 'typed `extra="allow"` fields' in body
+    assert "float `multiple_of`" in body
+    assert "enum receiver contracts" in body
+    assert "Bare Decimal receivers require finite values" in body
+    assert "Decimal `allow_inf_nan=True`" in body
+    assert "callable discriminators" in body
+    assert "string `pattern` constraints" in body
+    assert "non-pattern string constraints remain supported" in body
+    assert "custom functional validators" in body
+    assert "rejected at registration" in body
 
 
 def test_skill_uses_the_current_ai_api_positioning_and_direct_runtime_boundary():
     body = " ".join(skill_body().split())
+    body_lower = body.lower()
 
     assert "modernizes APIs for AI" in body
     assert "stable public abstraction" in body
     assert "exact application behavior" in body
     assert "explicitly bounded agentic decisions" in body
-    assert "one fully resolved `exactly(1)` operation path" in body.lower()
+    assert "one fully resolved `exactly(1)` operation path" in body_lower
     assert (
-        "all other declarations still use the provider-neutral agent runtime"
-        in body.lower()
+        "bare legacy capabilities still use the provider-neutral agent runtime"
+        in body_lower
     )
+    assert "unsupported explicit contracts are rejected before serving" in body_lower
     assert "Broader multi-operation deterministic execution remains planned" in body
 
 
@@ -109,6 +129,18 @@ def test_skill_documents_supported_request_declaration_shapes():
     assert "exactly one Pydantic request model" in body
     assert "bodyless methods" in body_lower
     assert "scalar or sequences-of-scalars query parameters" in body_lower
+
+
+def test_skill_documents_raw_runtime_and_http_input_parity():
+    body = " ".join(skill_body().split())
+
+    assert "Raw `Runtime.call` mappings use the same declared input contract" in body
+    assert "required fields, defaults, aliases, and canonical typed values" in body
+    assert "HTTP validation remains a one-shot handoff" in body
+    assert "does not rerun request validators" in body
+    assert "does not call field serializers or application copy/string hooks" in body
+    assert "Parameterless endpoints accept only an empty raw mapping" in body
+    assert "before model execution" in body
 
 
 def test_skill_documents_runtime_extras_and_safe_network_exposure():
@@ -126,10 +158,24 @@ def test_skill_documents_runtime_extras_and_safe_network_exposure():
 def test_skill_states_python_support_and_executor_neutral_contract_terms():
     body = " ".join(skill_body().split())
 
-    assert "Python 3.11 through 3.13" in body
+    assert "Python 3.11 through 3.14" in body
     assert "fixed execution goal" in body
     assert "available to execution" in body
     assert "On the agent-backed path" in body
+
+
+def test_skill_documents_output_namespace_enforcement():
+    body = " ".join(skill_body().split())
+
+    for requirement in (
+        "Output object keys must be unambiguous",
+        "aliases, serialization aliases, or computed fields",
+        "nested models, dataclasses, and typed dictionaries",
+        'model with `extra="allow"`',
+        "shadows a canonical field name or emitted alias",
+        "application serializers, copy hooks, `repr`, or `str`",
+    ):
+        assert requirement in body
 
 
 def test_skill_python_examples_compile():

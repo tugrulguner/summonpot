@@ -10,6 +10,19 @@ release assembles them here — run `make changelog-draft` to preview them.
 
 <!-- towncrier release notes start -->
 
+## [0.9.0] - 2026-09-25
+
+### Changed
+
+- Reject explicit capability contracts at registration unless the current runtime can enforce their bindings, output, ordering, and call bounds; bare callable dependencies retain legacy behavior.
+
+### Fixed
+
+- Align raw Runtime.call mapping validation with generated HTTP input semantics for required fields, defaults, aliases, scalar declarations, canonical typed values, custom-initialized and recursive request models, nested values, and parameterless endpoints without rerunning request validators or custom initializers or invoking lossy value hooks. Preserve nested model fields in hook-free agent prompt projections, omit fields declared with `Field(exclude=True)` while retaining authoritative typed values and empty aliases, and safely fall back for hashed containers whose projected members are unhashable. Raw custom-initialized request graphs now reject model instances in exact built-in dictionary keys or values and fail closed for non-exact or otherwise uninspectable container-like values, as well as deep graphs beyond the safe inspection limit, before application constructors or container hooks can run.
+- Reject ambiguous validation and serialization namespaces for every endpoint response and declared operation output at registration, and reject alias-shadowing extras from model instances or raw mappings without lossy serialization.
+- Validate injected request values strictly against receiving operation parameter constraints before application code starts, including recursively resolved quoted annotations and typed Pydantic extras. The hook-free receiver vocabulary now rejects non-finite bare Decimals, Decimal `allow_inf_nan=True`, callable discriminators, string patterns, unsupported float `multiple_of`, enum contracts, and Pydantic models with custom constructors or post-init hooks at registration while retaining finite Decimal values, integer and finite Decimal `multiple_of`, ordinary safe unions and tagged unions, non-pattern string constraints, and ordinary Pydantic models.
+
+
 ## [0.8.0] - 2026-09-11
 
 ### Added

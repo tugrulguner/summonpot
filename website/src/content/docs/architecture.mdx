@@ -1,0 +1,36 @@
+---
+title: Architecture & safety boundaries
+description: How one endpoint contract bounds execution, decisions, and outputs.
+---
+
+## One public abstraction
+
+Summonpot modernizes APIs for the AI era without replacing an endpoint with a separate agent layer. A declaration combines a validated request model, fixed goal, explicit application-owned capabilities, and typed response. The same contract generates HTTP routes and OpenAPI.
+
+## Authority is explicit
+
+- The application supplies exact callables and decides which capabilities exist.
+- `Depends(...)` and `Required(...)` express optional and mandatory operations.
+- `FromRequest(...)` binds trusted, validated caller data.
+- `AgentChoice(...)` marks only the arguments where an agent-owned decision is permitted.
+- The agent runtime is bounded; operation use is enforced per request and output is validated locally.
+- An operation output is not a distributed exactly-once completion guarantee.
+
+The endpoint goal is fixed in code; caller input is business data, not instructions that redefine authority. The contract closes the capability set, and successful responses must satisfy the declared model.
+
+## What runs without a model
+
+One fully resolved `Exactly(1)` operation can execute directly only in a narrow supported slice: a Pydantic request, at least one `FromRequest` binding, remaining parameters from request data or supported immutable identity-stable callable defaults, and operation output exactly matching the endpoint response model. This path does not resolve, construct, or call a model. It does not fall back to a model after execution begins.
+
+Other declarations retain the provider-neutral agent runtime. Unsupported explicit contract shapes fail at registration rather than quietly accepting unenforced model-supplied arguments. Broader multi-operation deterministic execution remains planned.
+
+## Safe integration checklist
+
+1. Register only exact application callables intended for this endpoint.
+2. Bind caller-controlled fields through validated request models.
+3. Use `AgentChoice` only for genuinely semantic choices, never for trusted identifiers or authorization.
+4. Keep side-effecting operations narrow and enforce authorization inside application code.
+5. Apply timeouts and usage limits; treat the keyless test model as executable, not as a sandbox.
+6. Confirm output validation and public error redaction are part of the integration's expectations.
+
+See the source-level [authority-boundary design](https://github.com/tugrulguner/summonpot/blob/main/docs/declarative-capabilities.md), [review guidance](https://github.com/tugrulguner/summonpot/blob/main/docs/reviewing.md), and [roadmap](https://github.com/tugrulguner/summonpot/blob/main/ROADMAP.md).

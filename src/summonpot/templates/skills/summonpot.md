@@ -8,8 +8,9 @@ request model, the goal, the exact capabilities, and the response model.
 One fully resolved `Exactly(1)` operation path executes without a model when the endpoint
 uses a Pydantic request model and it has at least
 one `FromRequest` binding, uses only `FromRequest` or immutable identity-stable callable
-defaults, and the operation output is exactly the endpoint response model. All other declarations still use the provider-neutral agent
-runtime. Broader multi-operation deterministic execution remains planned. The framework
+defaults, and the operation output is exactly the endpoint response model. Bare legacy
+capabilities still use the provider-neutral agent runtime. Unsupported explicit contracts
+are rejected before serving. Broader multi-operation deterministic execution remains planned. The framework
 owns execution, including any agent loop. **The ellipsis is a complete declaration body**,
 not an implementation waiting to be written. Calling the decorated declaration directly is
 rejected; execution goes through the served endpoint.
@@ -110,17 +111,16 @@ these is a hard error:
 ## Typed operation contracts
 
 Use `Operation` when the source of each capability argument is part of the endpoint
-contract. Keep these declarations beside the application operations, then reference the
-complete contracts through `Depends` or `Required`:
+contract. The currently admitted shape is one required operation with `calls=Exactly(1)`,
+a declared output, no ordering, and complete `FromRequest` or direct `AgentChoice` bindings:
 
 ```python
-from my_service.models import Customer, OrderOption, OrderRequest, OrderResponse
-from my_service.operations import find_options, load_customer, place_order
+from my_service.models import Customer, OrderRequest, OrderResponse
+from my_service.operations import load_customer
 from summonpot import (
     AgentChoice,
-    FromContext,
+    Exactly,
     FromRequest,
-    FromResult,
     Operation,
     Required,
     Summon,
@@ -129,23 +129,11 @@ from summonpot import (
 
 customer = Operation(
     load_customer,
-    bind={"customer_id": FromRequest("customer_id")},
-    output=Customer,
-)
-options = Operation(
-    find_options,
-    bind={"sku": FromRequest("sku")},
-    output=list[OrderOption],
-)
-order = Operation(
-    place_order,
     bind={
-        "customer_id": FromResult(customer, "customer_id"),
-        "option": AgentChoice(from_result=options, item_type=OrderOption),
-        "actor_id": FromContext("actor_id"),
+        "customer_id": FromRequest("customer_id"),
+        "format": AgentChoice(),
     },
-    output=OrderResponse,
-    after=(customer, options),
+    output=Customer,
 )
 
 summon = Summon("order-api")
@@ -154,11 +142,9 @@ summon = Summon("order-api")
 @summon("/orders")
 def create_order(
     request: OrderRequest,
-    customer_result=Required(customer),
-    available_options=Required(options),
-    order_result=Required(order),
+    customer_result=Required(customer, calls=Exactly(1)),
 ) -> OrderResponse:
-    """Place an order using one approved option."""
+    """Load the customer and return the approved response."""
     ...
 ```
 
@@ -171,7 +157,10 @@ The argument sources mean:
 | framework-owned context | `FromContext("key")` |
 | direct or collection-backed model selection | `AgentChoice(...)` |
 
-Once `bind=` is present, bind every argument that has no default. Registration rejects
+`FromResult`, `FromContext`, collection-backed `AgentChoice`, and `after=` remain public
+declaration vocabulary for future execution slices, but those explicit shapes are rejected
+during registration today. Binding sources must be exact built-in source types; subclasses
+are rejected. Once `bind=` is present, bind every argument that has no default. Registration rejects
 unknown arguments, missing request or result fields, undeclared producers, unreadable
 outputs, invalid `after=` references, and unsupported selectable collection shapes.
 Dependency cycles are structurally unrepresentable through the immutable public
@@ -183,16 +172,16 @@ relationships that cannot be established remain unknown. An unknown branch does 
 erase a known contradiction.
 
 `output=` is required before another operation can use `FromResult` or collection-backed
-`AgentChoice`. Bare callables and `Operation` declarations without `bind` remain valid;
-in those cases the model chooses the arguments as before.
+`AgentChoice`. Bare callable dependencies without an explicit contract remain valid and use
+the legacy model-chosen argument path. `Operation(fn)` is still an explicit contract. It and
+any other incomplete or unsupported `Operation` are rejected rather than silently downgraded.
 
 Call-bound helpers can refine a marker declaratively:
 
 ```python
-from summonpot import AtMost, Depends, Exactly, Required
+from summonpot import Exactly, Required
 
-lookup = Depends(customer, calls=AtMost(2))
-write = Required(order, calls=Exactly(1))
+lookup = Required(customer, calls=Exactly(1))
 ```
 
 For one required typed operation with `calls=Exactly(1)`, the runtime enforces bindings
@@ -203,12 +192,49 @@ Pydantic request model, has at least one `FromRequest` binding, uses only `FromR
 or supported immutable callable defaults, and `output=` is exactly the endpoint response model, Summonpot executes it directly
 without resolving or constructing a model. There is no model fallback after direct
 execution begins. Multi-operation chains, `FromResult`, `FromContext`, `after`,
-collection-backed choices, and broader call bounds remain registration-only. Unsupported
-shapes keep the existing model-supplied argument behavior.
+collection-backed choices, and broader call bounds are rejected during registration until
+their runtime semantics ship. Bare `Depends(fn)` and `Required(fn)` calls keep their implicit
+legacy bounds; explicit unsupported call bounds are not admitted.
+
+For both direct and agent-backed execution in that supported slice, an injected
+`FromRequest` value must satisfy its receiving operation parameter, including `Annotated`
+primitive constraints, strictly before application code starts. Validation is noncoercive:
+a broad request field does not authorize a narrower operation argument. A valid canonical
+validated request value is passed unchanged, not replaced by a coerced value, and the check
+does not rerun request-model validators.
+
+The supported receiver vocabulary is exact primitive types with common non-transforming
+numeric constraints and non-pattern string constraints, primitive `Literal` values with
+exact-type semantics, unions when any branch safely matches, recursively checked built-in
+containers, and structurally checked Pydantic model instances. The predicate uses unbound
+built-in container operations, does not rebuild sets or dictionaries, and never calls a
+serializer. Receiver models with typed `extra="allow"` fields have those extras checked
+structurally too. Bare Decimal receivers require finite values before bounds or
+`multiple_of` are checked. Decimal `allow_inf_nan=True`, float `multiple_of`, enum receiver
+contracts, callable discriminators, and string `pattern` constraints are rejected at
+registration because the hook-free predicate cannot reproduce their semantics exactly;
+non-pattern string constraints remain supported. Integer and finite Decimal `multiple_of`
+constraints remain supported. Receiver schemas containing custom functional validators
+(`BeforeValidator`, `AfterValidator`, `WrapValidator`, or `PlainValidator`), transforming
+string constraints, custom literal values, custom instance-checking metaclasses, or
+unsupported core schemas are rejected at registration rather than silently stripped.
 
 Runtime-enforced output schemas must not define a custom model `__init__`, including
 nested models. Registration rejects that unsupported constructor path rather than
 allowing it to bypass nested output validation. Use Pydantic model validators instead.
+
+Output object keys must be unambiguous. Registration checks aliases, serialization aliases,
+or computed fields in their respective namespaces for every endpoint response model and every
+declared operation `output=` shape, including unsupported and multi-operation runtime shapes.
+Enabled direct validation aliases cannot claim the same input key under the model's configured
+validation policy; declared fields,
+serialization aliases, and computed fields cannot emit the same JSON key, including inside
+nested models, dataclasses, and typed dictionaries. This admission does not provide runtime
+structural validation for broader graphs, whose execution remains unsupported. For a model with
+`extra="allow"` on a runtime-enforced path, validation rejects an extra from an instance or
+raw mapping after construction if it shadows a canonical field name or emitted alias, while
+preserving and validating noncolliding extras. The check does not invoke application
+serializers, copy hooks, `repr`, or `str`.
 
 HTTP request validation runs once. The adapter transfers a private, plan-bound validated
 value graph to the runtime rather than revalidating its JSON prompt representation or
@@ -216,7 +242,11 @@ calling application-defined copy hooks. Mutable compatibility views cannot chang
 operation inputs, and consumed transports cannot be replayed through request defaults.
 Compatibility projection preserves exact built-in JSON scalars and dictionaries with exact
 string keys. Exact list, tuple, set, and frozenset containers are recursively detached;
-typed views preserve their native kind, while prompts receive JSON arrays.
+typed views preserve their native kind when projected members remain safely hashable, while
+prompts receive JSON arrays. Hashed containers whose projected members are not hashable use
+the inert `"<unavailable>"` fallback instead of invoking application hash/equality hooks.
+Pydantic model values are projected from declared field storage, including aliases and
+supported nested values, without calling model serializers or representation hooks.
 Exact UUID, date, datetime, time, timedelta,
 Decimal, and bytes values remain usable: prompts receive framework-safe strings and
 custom-runtime typed views retain native values, with UUIDs independently reconstructed.
@@ -229,6 +259,17 @@ prompt receives its own detached projection, while bound operations retain the e
 validated Python values. This does not change the HTTP adapter's earlier body serialization
 or path-parameter rendering.
 Raw runtime inputs still undergo validation; ordinary request wrappers are not trusted.
+Raw `Runtime.call` mappings use the same declared input contract for required fields,
+defaults, aliases, and canonical typed values, whether the endpoint declares a Pydantic
+request model or individual parameters. HTTP validation remains a one-shot handoff: runtime
+preparation does not rerun request validators. Raw preparation does not call field serializers
+or application copy/string hooks when it builds the model-facing prompt projection.
+For a custom-initialized request contract, a raw mapping containing a model instance is
+rejected before its constructor runs; provide the equivalent nested mapping so Pydantic can
+validate it once. Already validated HTTP transport graphs remain one-shot handoffs.
+Parameterless endpoints accept only an empty raw mapping; undeclared raw keys are rejected
+before model execution or application value hooks can run. Their HTTP routes still expose no
+request fields.
 
 
 Supported immutable callable defaults are exact built-in `None`, `bool`, `int`,
@@ -313,7 +354,7 @@ Anthropic:
 pip install "summonpot[serve,cli,anthropic]"
 ```
 
-Python 3.11 through 3.13 is supported.
+Python 3.11 through 3.14 is supported.
 
 `serve` installs FastAPI and uvicorn, `cli` installs the `summonpot` command, and the
 provider extra installs that provider's client. Replace `anthropic` with the provider
@@ -410,6 +451,7 @@ Two things to know:
   resource such as a default SQLite connection; open one per call.
 - **Argument authority depends on the declaration shape.** The enforced single-operation
   form hides `FromRequest` and defaulted arguments and exposes only `AgentChoice`. Bare
-  capabilities and broader operation graphs still receive model-supplied arguments. A
-  fully resolved exact-response operation runs directly; all other declarations use the
-  agent path. Validate inputs and enforce authorization inside every capability.
+  callable capabilities still receive model-supplied arguments. A fully resolved
+  exact-response operation runs directly, and an admitted operation with direct
+  `AgentChoice` uses the agent path. Unsupported explicit operation shapes are rejected at
+  registration. Validate inputs and enforce authorization inside every capability.

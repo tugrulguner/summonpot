@@ -13,11 +13,14 @@ Pydantic request model
 
 The endpoint body is declarative and is never the handler. Request JSON carries business
 data, not an action selector. The same simple contract supports direct deterministic
-execution for the narrow complete path shipped below; all other requests use the agent
-runtime. For the enforced single required `Exactly(1)` slice, Summonpot hides and injects
-application-owned arguments and leaves only declared `AgentChoice` values to the agent.
-Unsupported shapes retain legacy model-supplied argument behavior until their full semantics
-ship. The typed HTTP endpoint stays stable as that balance changes.
+execution for the narrow complete path shipped below; admitted declarations with a direct
+semantic choice and bare legacy capabilities use the agent runtime. For the enforced single
+required `Exactly(1)` slice, Summonpot hides and injects application-owned arguments and
+leaves only declared `AgentChoice` values to the agent.
+Unsupported explicit contract shapes fail during registration until their full semantics
+ship. Bare `Depends(fn)` and `Required(fn)` declarations remain compatible with implicit
+marker bounds and no explicit `Operation` contract. The typed HTTP endpoint stays stable as
+that balance changes.
 
 ## Shipped foundation
 
@@ -41,6 +44,13 @@ The current release line provides:
 - Ellipsis declaration bodies that avoid abstract-method semantics, with direct Python calls rejected at the decorator boundary.
 - Immutable `Operation` declarations with `FromRequest`, `FromResult`, `FromContext`, and `AgentChoice` argument sources.
 - Runtime enforcement for one required `Exactly(1)` operation using `FromRequest`, direct `AgentChoice`, or callable defaults: trusted arguments are hidden and injected, the one start is reserved before invocation, and declared output is locally validated before success.
+- Receiving-operation constraint validation is shipped for injected `FromRequest` values in
+  that supported direct and agent-backed slice. The runtime checks each receiving operation
+  parameter strictly before application code, rejects coercion, preserves the canonical
+  validated request value, and does not rerun request-model validators. The closed hook-free
+  vocabulary accepts finite Decimal values and non-pattern string length constraints while
+  rejecting non-finite bare Decimals, Decimal `allow_inf_nan=True`, callable discriminators,
+  and string patterns at registration.
 - Single-operation deterministic execution when the endpoint uses a Pydantic request model,
   that slice has no `AgentChoice`, contains at
   least one `FromRequest` binding, uses only `FromRequest` or immutable identity-stable
@@ -52,7 +62,15 @@ The current release line provides:
   and non-finite values. An absent maximum (`None`) remains valid for unbounded calls;
   this count-type validation does not imply broader runtime call-bound enforcement.
 - Registration-time validation for complete bindings, request and result references, operation ordering, selectable collections, and provable type incompatibility.
-- Python 3.11–3.13 CI, package builds, and expanded runtime/CLI coverage.
+- Fail-closed runtime admission: binding sources must use the exact built-in source
+  vocabulary, and every explicit binding, ordering, call-bound, and output contract must fit
+  the one supported required `Exactly(1)` operation shape or registration rejects it. Adding
+  another capability cannot downgrade that contract to the legacy path.
+- Structural output-namespace validation rejects duplicate field, alias, serialization-alias,
+  and computed-field JSON keys at registration, including nested model, dataclass, and typed
+  dictionary shapes. Runtime output validation rejects allowed extras that shadow canonical
+  field names or emitted aliases while retaining noncolliding validated extras.
+- Python 3.11-3.14 CI, package builds, and expanded runtime/CLI coverage.
 
 ### 0.5.0 boundary
 
@@ -91,8 +109,8 @@ matching the endpoint response model. It runs without resolving, constructing, o
 multi-operation deterministic compiler remains planned.
 
 Multi-operation graphs, `FromResult`, `FromContext`, `after`, broader call bounds, and
-broader no-model execution remain planned. Those unsupported shapes remain on the agent
-runtime until their full semantics ship.
+broader no-model execution remain planned. Current source rejects those shapes when they are
+explicitly declared rather than routing them through an unenforced agent path.
 
 ### 0.8.0 boundary
 
@@ -101,10 +119,34 @@ validates call-bound count types when declarations are constructed, and hardens 
 validated HTTP request handoff so compatibility views cannot invoke application copy,
 serialization, string, representation, or container hooks against canonical operation
 inputs. It preserves safe native query values for agent prompts and custom runtimes while
-keeping unsupported values inert.
+keeping unsupported values inert. Runtime-enforced output schemas also reject ambiguous
+declared or extra-owned JSON keys without serializing application values.
 
 This release does not broaden runtime enforcement to multi-operation graphs. The remaining
-enforce-or-reject, input/output, failure, and deadline semantics stay in milestone 1 below.
+enforce-or-reject, input, failure, and deadline semantics stay in milestone 1 below.
+
+Current source completes the admission portion of that milestone: only one required typed
+operation with `calls=Exactly(1)`, complete supported bindings, declared output, no ordering,
+and no second capability is admitted. `FromRequest` and direct `AgentChoice` are the only
+runtime-supported binding sources. All other explicit shapes fail before serving; bare
+callable dependencies retain their implicit marker behavior.
+
+### 0.9.0 boundary
+
+Version 0.9.0 completes fail-closed runtime admission for explicit capability contracts in
+the shipped single-operation slice, validates receiving operation constraints before
+application code starts, and hardens declared and runtime output namespaces against
+ambiguous or duplicate emitted keys. Unsupported explicit shapes are rejected during
+registration rather than downgraded to the legacy model-supplied path.
+
+Raw runtime mappings use the declared request contract for the same required-field, default,
+alias, and canonical-value semantics as HTTP without rerunning the HTTP adapter's one-shot
+validation. Parameterless endpoints compile an explicit empty raw contract, rejecting
+undeclared keys before application hooks or model execution.
+
+This release does not add result chains, broader deterministic execution, stable typed
+operation-failure mappings, or end-to-end deadline semantics. Those remain in the milestones
+below.
 
 ## Next milestones
 
@@ -116,43 +158,18 @@ public graph, or handler body.
 
 ### 1. Contract enforcement and input/output hardening
 
-Close the gaps in existing declarations before adding result chains:
+Finish the two remaining boundary contracts before adding result chains. The completed 0.9.0
+admission, transport, and namespace boundary above remains the baseline:
 
-- Reject binding sources outside the closed `FromRequest`, `FromResult`, `FromContext`,
-  and `AgentChoice` vocabulary at registration.
-- Reject unsupported runtime call-bound shapes before serving; broader runtime enforcement
-  follows in milestone 5. Construction-time count-type validation is already shipped.
-- Enforce every explicitly declared binding, ordering constraint, call bound, and operation
-  output contract, or reject the unsupported declaration before serving. Adding a second
-  capability must not remove enforcement from an existing operation. Preserve legacy
-  model-supplied arguments only for bare capabilities without unsupported explicit constraints;
-  do not add a strict-mode switch.
-- Define how receiving operation constraints are checked before application code runs,
-  without silently transforming canonical bound values or unexpectedly rerunning application
-  validators. Request validation alone must not imply compatibility with a narrower operation
-  parameter contract.
-- Keep canonical validated request values separate from model-facing representations. Remove
-  application copy, serialization, and string-rendering hooks from the authoritative handoff;
-  render model input only when agent execution needs it. Preserve aliases, defaults, custom
-  runtime compatibility, and the validate-once boundary through explicit tests.
-- Align raw runtime input validation with HTTP required-field, default, and canonical-value
-  semantics, including scalar declarations.
-- Prevent output extras and serialization aliases from shadowing validated fields or producing
-  duplicate JSON keys. Unsupported output shapes should fail explicitly rather than weakening
-  validation. Keep private Pydantic integration isolated and dependency upgrades gated by the
-  adversarial suite; do not replace it with a lossy serialization round trip.
 - Map operation contract failures to stable redacted HTTP errors. Normal logs must not include
   sensitive validation inputs, provider bodies, or exception chains.
 - Define the deadline across request preparation, execution, and finalization; check it before
   starting effects. Document that synchronous application code cannot be forcibly stopped by
   an asyncio timeout and that a timeout does not prove an effect did not occur.
 
-Acceptance requires registration checks and real HTTP probes for the relevant boundaries,
-including a second-capability regression, invalid source rejection, unsupported runtime
-call-bound rejection, narrower receiving
-constraints, mutating serializers, output alias collisions, and sensitive failure logging.
-Keep fixes independently reviewable; a copy-hook fix alone is not completion of the transport
-boundary.
+Acceptance requires real HTTP probes for stable failure classification, sensitive failure
+logging, preparation and finalization timeouts, the pre-effect deadline check, and uncertain
+outcomes after synchronous work has started.
 
 ### 2. Validated result chains and failure semantics
 

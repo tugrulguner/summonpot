@@ -1,0 +1,23 @@
+---
+title: Capabilities
+description: Declare exact application operations and agent-owned choices.
+---
+
+Summonpot offers one declaration style for endpoints whose operations resolve deterministically and endpoints that permit bounded agent-owned decisions. The contract vocabulary includes `Operation`, `FromRequest`, `AgentChoice`, `Depends`, `Required`, and call bounds such as `Exactly(1)`.
+
+An `Operation` wraps an exact callable. Its inputs must have enforceable bindings; the supported runtime slice rejects unsupported explicit shapes during registration. `FromRequest` sources values from the validated caller model. A direct `AgentChoice` marks an argument the agent can choose; it does not grant authority beyond that registered callable.
+
+```python
+operation = Operation(
+    lookup_record,
+    bind={"record_id": FromRequest("record_id")},
+    output=RecordResponse,
+)
+
+@summon("/records/lookup")
+def lookup(request: LookupRequest, record=Required(operation, calls=Exactly(1))) -> RecordResponse:
+    """Return the requested record."""
+    ...
+```
+
+This fully resolved single-operation shape can bypass model setup when all supported deterministic-path requirements are met. Adding an explicit `AgentChoice` keeps execution in the agent runtime. Consult the [capability guide](https://github.com/tugrulguner/summonpot/blob/main/docs/declarative-capabilities.md) for complete contract details; multi-operation deterministic execution is not yet shipped.

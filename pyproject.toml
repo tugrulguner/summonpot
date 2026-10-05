@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "summonpot"
-version = "0.8.0"
+version = "0.9.0"
 description = "A contract-first Python framework for modernizing APIs for AI through exact application behavior and explicitly bounded agent-owned decisions."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11,<3.15"
 authors = [{ name = "Tugrul Guner" }]
 keywords = ["ai", "api", "agentic", "framework", "http", "llm", "openapi", "pydantic", "structured-output", "tool-calling"]
 classifiers = [
@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
@@ -80,13 +81,13 @@ summonpot = "summonpot.cli:app"
 [tool.hatch.build.targets.wheel]
 packages = ["src/summonpot"]
 # Contributor guidance, not runtime data: it must not ship to users.
-exclude = ["**/AGENTS.md", "/CLAUDE.md", "/.claude"]
+exclude = ["**/AGENTS.md", "/CLAUDE.md", "/.claude", "/.venv*", "/dist"]
 
 [tool.hatch.build.targets.sdist]
 # The wheel exclusion above does not reach the sdist: hatchling configures the
 # two targets separately, so without this the sdist carried both the root
 # AGENTS.md and src/summonpot/AGENTS.md while the wheel carried neither.
-exclude = ["**/AGENTS.md", "/CLAUDE.md", "/.claude"]
+exclude = ["**/AGENTS.md", "/CLAUDE.md", "/.claude", "/.venv*", "/dist"]
 
 [tool.towncrier]
 directory = "changelog.d"
@@ -126,7 +127,7 @@ testpaths = ["tests"]
 [tool.pyright]
 pythonVersion = "3.11"
 typeCheckingMode = "standard"
-include = ["src", "tests"]
+include = ["src", "tests", "examples", "scripts"]
 reportUnknownMemberType = false
 reportUnknownArgumentType = false
 reportUnknownVariableType = false

@@ -1,0 +1,1 @@
+Expand the documentation with task guides for the supported model-free and agent-backed operation paths, an operation/binding reference, execution internals, and provider troubleshooting. Generate downloadable Markdown from the same guide sources and index the new routes in the website navigation and llms.txt.

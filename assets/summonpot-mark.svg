@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Summonpot mark</title>
+  <desc id="desc">A bounded agent-owned decision inside the ModePot flask</desc>
+  <path d="M44 22h10v20c0 5-2.3 9.6-6.2 12.4C34.1 64.3 26 78.2 26 93c0 17 12.7 25 38 25s38-8 38-25c0-14.8-8.1-28.7-21.8-38.6C76.3 51.6 74 47 74 42V22h10" fill="none" stroke="#A987FF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="40" y="72" width="48" height="35" rx="11" fill="none" stroke="#A987FF" stroke-width="7"/>
+  <path d="M64 79l10 10-10 10-10-10z" fill="#A987FF"/>
+</svg>

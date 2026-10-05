@@ -41,6 +41,10 @@ class ToolDef:
     # a private immutable execution plan; this mutable object remains inspection data.
     contract: Operation | None = None
     bounds: CallBounds | None = None
+    # ``None`` means a directly constructed ToolDef: a non-None ``bounds`` value is
+    # then itself evidence of an explicit declaration. Dependency registration sets
+    # this boolean so its resolved marker bounds are not mistaken for ``calls=``.
+    bounds_explicit: bool | None = None
 
     async def call(self, *args: Any, **kwargs: Any) -> Any:
         """Execute the tool with the given arguments.

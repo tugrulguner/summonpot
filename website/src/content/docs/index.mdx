@@ -1,0 +1,155 @@
+---
+title: Typed APIs with Bounded Agent-Owned Decisions
+description: Build typed Python APIs that combine deterministic operations with explicitly bounded agent-owned decisions.
+template: splash
+next: { label: Quick start, link: /quick-start/ }
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+import RoadmapHeroAction from '../../components/RoadmapHeroAction.astro';
+
+<script src="/scripts/homepage-code-keyboard.js"></script>
+
+<section class="framework-hero" aria-labelledby="framework-title">
+  <div class="framework-copy">
+    <p class="framework-eyebrow">CONTRACT-FIRST PYTHON APIS</p>
+    <h1 id="framework-title">APIs for the AI era, one simple contract.</h1>
+    <p class="framework-tagline">Combine deterministic, application-owned operations with agent-owned decisions under bounded authority. Keep one typed endpoint contract from request to response.</p>
+    <nav class="framework-actions" aria-label="Primary actions">
+      <a class="framework-action primary" href="/quick-start/">Quick start</a>
+      <a class="framework-action secondary" href="/playground/">Playground</a>
+      <RoadmapHeroAction />
+      <a class="framework-action tertiary" href="https://github.com/tugrulguner/summonpot" target="_blank" rel="noopener">GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+    <a class="creator-attribution" href="https://tugrul.modepot.io/">Created by Tugrul Guner</a>
+  </div>
+  <figure class="framework-art">
+    <img src="/summonpot-lockup.png" alt="Summonpot — a simple contract for deterministic operations and bounded agent-owned decisions" width="1200" height="900" />
+  </figure>
+</section>
+
+<section class="installation-strip" aria-label="Installation">
+  <div><p class="section-eyebrow">GET STARTED</p><h2>Install Summonpot</h2></div>
+  <code>{'pip install "summonpot[serve,cli]"'}</code>
+  <a href="/quick-start/">Quick start guide <span aria-hidden="true">→</span></a>
+</section>
+
+<aside class="maturity-notice" aria-label="Project maturity"><strong>Alpha</strong><span>Summonpot is under active development. Review the documented boundaries before relying on it.</span></aside>
+
+<section class="project-demo" aria-label="Project demonstration">
+  <div>
+    <p class="section-eyebrow">EXPLORE THE MECHANISM</p>
+    <h2>One contract. Explicit authority.</h2>
+    <p>Explore the shipped bounded customer lookup: request-owned data, an allowed choice, and one application-owned operation.</p>
+  </div>
+  <a href="/playground/">Open the playground <span aria-hidden="true">→</span></a>
+  <p class="demo-boundary"><strong>Browser-local preview.</strong> Your browser runs a JavaScript preview; no Python server, model, or API call runs here.</p>
+</section>
+
+Summonpot modernizes APIs for the AI era. Instead of splitting application endpoints and agent workflows across separate abstractions, declare a typed endpoint whose contract states what callers may send, what the application may execute, where the agent may decide, and what the endpoint may return.
+
+The agent's authority is bounded by the endpoint declaration. Exact application behavior stays application-owned; semantic choices are agent-owned only where the contract explicitly allows them.
+
+<CardGrid stagger>
+  <Card title="One endpoint contract" icon="seti:config">
+    Typed requests, a declared goal, an explicit capability set, validation, HTTP routes, and OpenAPI stay together.
+  </Card>
+  <Card title="Bounded authority" icon="seti:lock">
+    The agent can make only declared choices. Required operations and locally validated output constrain execution.
+  </Card>
+  <Card title="Start without a provider key" icon="seti:rocket">
+    Install the serving extras and use the keyless test model to wire a harmless endpoint.
+  </Card>
+</CardGrid>
+
+## Explore the shipped operation
+
+The [browser-local contract playground](/playground/) lets you inspect request-owned customer IDs, a bounded summary/detailed format you select, and one application-owned lookup. It does not call a model, execute Python, or contact a server. Compare the preview with the [shipped bound-operation example](https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py) for the actual Python declaration and API.
+
+## Try a complete endpoint
+
+This endpoint takes a validated topic, lets the agent choose the operation's response
+style, and requires one application-owned operation. The operation computes a candidate
+summary; the model cannot supply its topic or replace its implementation. The final
+model response is schema-validated, not automatically bound to that candidate.
+
+```python
+from typing import Literal
+
+from pydantic import BaseModel, Field
+from summonpot import AgentChoice, Exactly, FromRequest, Operation, Required, Summon
+
+
+class SummaryRequest(BaseModel):
+    topic: str = Field(min_length=1, max_length=200)
+
+
+class SummaryResponse(BaseModel):
+    summary: str
+    style: Literal["brief", "detailed"]
+
+
+def build_summary(topic: str, style: Literal["brief", "detailed"]) -> SummaryResponse:
+    """Build a summary for the requested topic in the selected style."""
+    length = 80 if style == "brief" else 240
+    return SummaryResponse(summary=f"{topic[:length]}", style=style)
+
+
+summary_operation = Operation(
+    build_summary,
+    bind={"topic": FromRequest("topic"), "style": AgentChoice()},
+    output=SummaryResponse,
+)
+
+summon = Summon("summary-api")
+
+
+@summon("/summarize")
+def summarize(
+    request: SummaryRequest,
+    result=Required(summary_operation, calls=Exactly(1)),
+) -> SummaryResponse:
+    """Summarize the requested topic and choose a brief or detailed style."""
+    ...
+```
+
+Save as `app.py`, install the serving extras, then start the local API:
+
+```bash
+python -m pip install 'summonpot[serve,cli]'
+export SUMMONPOT_MODEL=test
+summonpot serve app.py --host 127.0.0.1 --port 8000
+```
+
+The test model is keyless, **not** a side-effect-free sandbox. This example's operation is
+harmless; use only harmless capabilities when wiring your own endpoint. Try it through the
+same HTTP route clients use:
+
+```bash
+curl -X POST http://127.0.0.1:8000/summarize \
+  -H 'Content-Type: application/json' \
+  -d '{"topic":"Contract-first APIs keep application behavior explicit."}'
+```
+
+This contract requires one `Exactly(1)` operation and declares an `AgentChoice`, so the
+operation's call count and the final response schema are enforced. The topic argument is
+application-bound; the agent chooses the operation's style argument. The keyless test
+model returns placeholder response strings, not a useful semantic summary. Response
+validation does not prove that final text reproduces the operation's result.
+
+A fully application-bound operation in the supported single-operation shape can instead
+execute directly without resolving a model. Broader multi-operation deterministic
+execution remains planned; see the [roadmap](https://github.com/tugrulguner/summonpot/blob/main/ROADMAP.md).
+
+## Shipped today
+
+- Typed contract-first endpoints and generated HTTP/OpenAPI contracts.
+- Closed sets of application-owned callables; optional or required operations.
+- Bounded agent runtime with locally validated response models and limits.
+- A narrow, fully resolved single `Exactly(1)` operation path that executes without resolving or constructing a model.
+
+Broader multi-operation deterministic execution is **planned**, not shipped. See the [project roadmap](https://github.com/tugrulguner/summonpot/blob/main/ROADMAP.md) and [changelog](https://github.com/tugrulguner/summonpot/blob/main/CHANGELOG.md) for current boundaries.
+
+## Part of ModePot
+
+Summonpot is an open-source [ModePot](https://modepot.io/) project. Join the [ModePot Discord](https://discord.gg/u3AANZr6RG), explore the [source on GitHub](https://github.com/tugrulguner/summonpot), or read the [README](https://github.com/tugrulguner/summonpot#readme).

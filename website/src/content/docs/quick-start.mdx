@@ -1,0 +1,80 @@
+---
+title: Quick start
+description: Install Summonpot and serve your first typed endpoint.
+---
+
+## Install
+
+```bash
+pip install "summonpot[serve,cli]"
+```
+
+Summonpot supports Python 3.11–3.14. To wire an endpoint without a provider account, select the built-in test model:
+
+```bash
+export SUMMONPOT_MODEL=test
+```
+
+Continue with the [model-free endpoint task guide](/build/direct-execution/) for a complete validated HTTP example, the [agent-backed bound-operation guide](/build/agent-choice/) for explicit choices, and the [operation reference](/reference/operations/) for supported and planned declaration shapes.
+
+The test model is keyless, **not** side-effect-free: it can call capabilities with generated placeholder arguments. Use harmless capabilities only; this is not a dry-run sandbox.
+
+## Explore the restricted playground
+
+The [browser-local contract playground](/playground/) previews request-owned customer IDs, a bounded summary/detailed format you select, and an application-owned lookup from the [bound-operation example](https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py). It neither calls a model nor executes Python; it computes the operation result in this tab.
+
+## Run the actual keyless HTTP example
+
+The repository's [direct quote example](https://github.com/tugrulguner/summonpot/blob/main/examples/08_direct_execution.py) is the recommended no-credentials demo. It accepts one validated request and invokes exactly one declared operation using only request-bound values. It does not use the test model or any AI provider. The response is application-calculated—not an AI-generated quote.
+
+```bash
+uv run python -m summonpot serve examples/08_direct_execution.py --host 127.0.0.1 --port 8000
+curl -sS -X POST http://127.0.0.1:8000/quotes/direct \\
+  -H 'Content-Type: application/json' \\
+  -d '{"unit_price_cents":1299,"quantity":3,"tax_rate_percent":"8.25"}'
+```
+
+For this input the actual HTTP app returns subtotal 3897 cents, tax 322 cents, and total 4219 cents. These are deterministic outputs, not an AI response. Invalid request values are rejected with HTTP 422 before execution. The test suite exercises the actual HTTP app.
+
+## Declare a typed endpoint
+
+Save as `app.py`:
+
+```python
+from typing import Literal
+
+from pydantic import BaseModel, Field
+from summonpot import Summon
+
+class ReviewRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2_000)
+
+class ReviewResponse(BaseModel):
+    sentiment: Literal["positive", "negative", "neutral"]
+    summary: str
+
+summon = Summon("review-api")
+
+@summon("/review")
+def review(request: ReviewRequest) -> ReviewResponse:
+    """Classify the text's sentiment and summarize it in one short sentence."""
+    ...
+```
+
+The declaration is the endpoint contract; Summonpot owns orchestration. The ellipsis is intentional, and calling the decorated function directly is rejected. See the [runnable quick-start example](https://github.com/tugrulguner/summonpot/blob/main/examples/basic_app.py).
+
+## Serve and call
+
+```bash
+summonpot serve app.py --host 127.0.0.1 --port 8000
+```
+
+Visit [interactive API docs](http://127.0.0.1:8000/docs). Submit JSON with:
+
+```bash
+curl -X POST http://127.0.0.1:8000/review \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"The setup was clear and quick."}'
+```
+
+For production, configure a supported provider and retain bounded request/usage limits. Review each capability as application authority: the keyless model can still execute it.

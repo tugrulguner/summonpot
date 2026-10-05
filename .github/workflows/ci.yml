@@ -15,6 +15,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  website:
+    name: website
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run check
+      - run: npm run build
+
   lint:
     name: lint
     runs-on: ubuntu-latest
@@ -23,10 +44,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - run: uv sync --all-extras --locked
-      - run: uv run ruff check src/ tests/
-      - run: uv run ruff format --check src/ tests/
+      - run: uv run ruff check src/ tests/ examples/ scripts/
+      - run: uv run ruff format --check src/ tests/ examples/ scripts/
 
   typecheck:
     name: typecheck
@@ -36,9 +57,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - run: uv sync --all-extras --locked
-      - run: uv run pyright src/ tests/
+      - run: uv run pyright src/ tests/ examples/ scripts/
 
   test:
     name: test (py${{ matrix.python-version }})
@@ -47,12 +68,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: ${{ matrix.python-version }}
       - run: uv sync --all-extras --locked
@@ -70,7 +91,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - run: uv build
       - name: Verify distribution artifacts
         run: |
@@ -104,6 +125,14 @@ jobs:
               names = archive.getnames()
               assert any(name.endswith("/src/summonpot/__init__.py") for name in names), names
               assert any(name.endswith("/src/summonpot/py.typed") for name in names), names
+              assert any(
+                  name.endswith("/scripts/release_smoke.py") for name in names
+              ), names
+              assert any(
+                  name.endswith("/examples/09_contract_boundaries/app.py")
+                  for name in names
+              ), names
+              assert all("/.venv" not in name for name in names), names
               # The wheel exclusion does not reach the sdist: hatchling
               # configures the two targets separately.
               contributor_guidance = [
@@ -116,6 +145,18 @@ jobs:
 
           print(f"verified {wheels[0]} and {sdists[0]}")
           PY
+      - name: Smoke every example through the installed wheel
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/release-smoke
+          wheel=$(printf '%s\n' dist/*.whl)
+          uv pip install --python /tmp/release-smoke/bin/python "${wheel}[serve,cli]"
+          mkdir -p /tmp/release-smoke-input
+          cp -R examples /tmp/release-smoke-input/examples
+          cp scripts/release_smoke.py /tmp/release-smoke-input/release_smoke.py
+          cd /tmp/release-smoke-input
+          env -u PYTHONPATH /tmp/release-smoke/bin/python release_smoke.py \
+            --examples-root examples
       - name: Type-check a consumer against the installed wheel
         run: |
           set -euo pipefail

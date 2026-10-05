@@ -94,6 +94,14 @@ def test_contributor_guidance_is_excluded_from_both_targets(target):
     assert "/.claude" in _build_config()[target].get("exclude", [])
 
 
+@pytest.mark.parametrize("target", ["wheel", "sdist"])
+def test_local_environments_and_build_output_are_explicitly_excluded(target):
+    excluded = _build_config()[target].get("exclude", [])
+
+    assert "/.venv*" in excluded
+    assert "/dist" in excluded
+
+
 def test_agents_guidance_is_what_is_being_excluded():
     """A guard on the guard: if the file is renamed, the pattern is now dead."""
     assert (ROOT / "AGENTS.md").is_file()
@@ -145,6 +153,12 @@ def test_artifact_workflows_reject_all_contributor_guidance(
             archive.writestr(name, b"")
     with tarfile.open(dist / "summonpot.tar.gz", "w:gz") as archive:
         names = [f"project/src/{name}" for name in allowed]
+        names.extend(
+            [
+                "project/scripts/release_smoke.py",
+                "project/examples/09_contract_boundaries/app.py",
+            ]
+        )
         if target == "sdist" and member:
             names.append(member)
         for name in names:

@@ -102,7 +102,11 @@ def test_contributing_states_the_supported_binding_slice_precisely() -> None:
         in contributing
     )
     assert (
-        "Unsupported binding shapes, including `FromContext`, remain model-supplied"
+        "Unsupported explicit binding shapes, including `FromContext`, are rejected "
+        "before serving" in contributing
+    )
+    assert (
+        "Bare callable dependencies retain their implicit marker behavior"
         in contributing
     )
     assert "direct execution with no model resolved" in contributing

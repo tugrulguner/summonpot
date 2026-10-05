@@ -6,8 +6,9 @@ from pathlib import Path
 ROADMAP = Path(__file__).resolve().parents[1] / "ROADMAP.md"
 
 
-def test_hardening_is_planned_and_precedes_execution_expansion():
+def test_remaining_failure_and_deadline_work_precedes_execution_expansion():
     text = ROADMAP.read_text(encoding="utf-8")
+    shipped = " ".join(text.split("## Next milestones", 1)[0].split())
     planned = text.split("## Next milestones", 1)[1].split("## Non-goals", 1)[0]
     headings = re.findall(r"^### (\d+)\. (.+)$", planned, re.MULTILINE)
     assert [int(number) for number, _ in headings] == list(range(1, 10))
@@ -15,18 +16,39 @@ def test_hardening_is_planned_and_precedes_execution_expansion():
     assert "planned acceptance criteria, not claims" in planned
 
     hardening = " ".join(planned.split("### 2.", 1)[0].split())
-    for requirement in (
-        "reject the unsupported declaration before serving",
-        "Adding a second capability must not remove enforcement",
-        "invalid source rejection",
-        "unsupported runtime call-bound rejection",
+    for completed in (
         "receiving operation constraints",
         "render model input only when agent execution needs it",
-        "duplicate JSON keys",
-        "sensitive validation inputs, provider bodies, or exception chains",
         "a copy-hook fix alone is not completion of the transport boundary",
     ):
-        assert requirement in hardening
+        assert completed not in hardening
+    for completed in (
+        "Receiving-operation constraint validation is shipped",
+        "Fail-closed runtime admission",
+        "Structural output-namespace validation",
+        "Raw runtime mappings use the declared request contract",
+    ):
+        assert completed in shipped
+    for remaining in (
+        "sensitive validation inputs, provider bodies, or exception chains",
+        "deadline across request preparation, execution, and finalization",
+        "synchronous application code cannot be forcibly stopped",
+    ):
+        assert remaining in hardening
+
+
+def test_output_namespace_hardening_is_shipped_not_planned():
+    text = " ".join(ROADMAP.read_text(encoding="utf-8").split())
+    shipped, planned = text.split("## Next milestones", 1)
+
+    for requirement in (
+        "Structural output-namespace validation",
+        "duplicate field, alias, serialization-alias, and computed-field JSON keys",
+        "allowed extras that shadow canonical field names or emitted aliases",
+        "retaining noncolliding validated extras",
+    ):
+        assert requirement in shipped
+        assert requirement not in planned
 
 
 def test_count_type_validation_is_shipped_not_future_runtime_enforcement():
@@ -41,9 +63,47 @@ def test_count_type_validation_is_shipped_not_future_runtime_enforcement():
     ):
         assert requirement in shipped
         assert requirement not in hardening
-    assert "Construction-time count-type validation is already shipped" in hardening
-    assert "broader runtime enforcement follows in milestone 5" in hardening
+    assert "unsupported runtime bounds fail before serving" not in hardening
+    assert "### 5. Broader bounds and private path classification" in planned
     assert "invalid source/count rejection" not in planned
+
+
+def test_fail_closed_admission_is_shipped_not_left_as_a_future_claim():
+    text = " ".join(ROADMAP.read_text(encoding="utf-8").split())
+    shipped, planned = text.split("## Next milestones", 1)
+    hardening = planned.split("### 2.", 1)[0]
+
+    assert "Fail-closed runtime admission" in shipped
+    assert "All other explicit shapes fail before serving" in shipped
+    assert "The admission gate is shipped" not in hardening
+    assert "second-capability regression" not in hardening
+    assert "invalid source rejection" not in hardening
+    assert "unsupported runtime call-bound rejection" not in hardening
+
+
+def test_v090_boundary_records_the_completed_hardening_release():
+    text = " ".join(ROADMAP.read_text(encoding="utf-8").split())
+    shipped = text.split("## Shipped foundation", 1)[1].split("### 0.5.0 boundary", 1)[
+        0
+    ]
+    released_080 = text.split("### 0.8.0 boundary", 1)[1].split(
+        "### 0.9.0 boundary", 1
+    )[0]
+    released_090 = text.split("### 0.9.0 boundary", 1)[1].split(
+        "## Next milestones", 1
+    )[0]
+
+    for behavior in (
+        "fail-closed runtime admission",
+        "receiving operation constraints",
+        "output namespaces",
+        "Raw runtime mappings use the declared request contract",
+        "Parameterless endpoints compile an explicit empty raw contract",
+    ):
+        assert behavior not in released_080
+        assert behavior in released_090
+    assert "Matching raw `Runtime.call` input validation" not in shipped
+    assert "### Unreleased / next release boundary" not in text
 
 
 def test_context_slices_require_their_actual_execution_prerequisites():

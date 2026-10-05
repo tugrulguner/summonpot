@@ -42,36 +42,36 @@ Required use is checked by runtime state. It is not only written into the prompt
 
 ## Typed operation dataflow
 
-`Operation` adds a validated declaration of where capability arguments are intended to
-come from without adding configuration to `@summon(...)`:
+`Operation` adds an enforceable declaration of where capability arguments come from without
+adding configuration to `@summon(...)`:
 
 ```python
-from summonpot import AgentChoice, FromRequest, FromResult, Operation
+from summonpot import AgentChoice, Exactly, FromRequest, Operation, Required
 
 
 customer = Operation(
     load_customer,
-    bind={"customer_id": FromRequest("customer_id")},
+    bind={
+        "customer_id": FromRequest("customer_id"),
+        "format": AgentChoice(),
+    },
     output=CustomerRecord,
 )
-ticket = Operation(
-    create_ticket,
-    bind={
-        "customer_id": FromResult(customer, "customer_id"),
-        "priority": AgentChoice(),
-        "summary": AgentChoice(),
-    },
-    output=TicketReceipt,
-    after=(customer,),
-)
+
+
+@summon("/customers")
+def get_customer(
+    request: CustomerRequest,
+    customer_result=Required(customer, calls=Exactly(1)),
+) -> CustomerResponse:
+    """Load this customer and return the approved view."""
+    ...
 ```
 
-`FromRequest` names validated request data. `FromResult` names a field on a declared
-producer's typed output. `FromContext` names framework-owned state. `AgentChoice` is the
-explicit model-controlled source. Registration rejects incomplete bindings, missing
-fields, undeclared producers, and types known to be incompatible. Dependency cycles are
-structurally unrepresentable through the immutable public `Operation` API rather than
-discovered by a separate cycle detector.
+`FromRequest` names validated request data and direct `AgentChoice` is the explicit
+model-controlled source. Registration rejects incomplete bindings, missing fields, and
+types known to be incompatible. Binding objects must be exact built-in source vocabulary
+types; subclasses are rejected.
 
 The declarations are immutable and shipped today. The first runtime-enforced slice covers
 an endpoint with one required `Exactly(1)` operation whose arguments use `FromRequest`,
@@ -79,11 +79,12 @@ direct `AgentChoice`, or callable defaults. Trusted/defaulted arguments are abse
 model schema, the single start is reserved before application code, and `output=` is
 validated before the operation satisfies `Required`.
 
-Multi-operation chains, `FromResult`, `FromContext`, `after`, and broader call bounds remain
-registration-only. See [`08_direct_execution.py`](../examples/08_direct_execution.py) for the
+Multi-operation chains, `FromResult`, `FromContext`, `after`, collection-backed choices, and
+broader call bounds remain planned and are rejected at registration. See
+[`08_direct_execution.py`](../examples/08_direct_execution.py) for the
 credential-free direct slice, [`07_bound_operation.py`](../examples/07_bound_operation.py)
-for the agent-backed enforced slice, and
-[`06_support_service`](../examples/06_support_service/app.py) for the broader declared chain.
+for the agent-backed enforced slice, and [`06_support_service`](../examples/06_support_service/app.py)
+for a multi-file service using compatible bare callable dependencies.
 
 ## Deterministic and agentic execution
 
@@ -103,7 +104,10 @@ at least one argument is bound from `FromRequest`, every remaining argument come
 `FromRequest` or an immutable identity-stable callable default, and its declared output is
 the endpoint output model by exact identity, the runtime executes that operation directly
 before model resolution. There is no model fallback after direct execution starts.
-Any unresolved choice or unsupported declaration remains on the provider-neutral agent loop.
+A direct `AgentChoice` in the admitted shape uses the provider-neutral agent loop. An
+unsupported explicit declaration fails before serving; bare callable dependencies keep their
+legacy agent behavior. `Operation(fn)` is still an explicit contract and is rejected because
+it does not provide the complete enforced shape.
 
 Dependency parameters are declaration-only. They do not appear in the HTTP request body
 or OpenAPI request schema. The ellipsis is the complete declaration body, and direct calls
@@ -125,7 +129,11 @@ carrier is rejected. The framework does not call application-defined copy hooks 
 handing values off.
 Compatibility projection preserves exact built-in JSON scalars and dictionaries with exact
 string keys. Exact list, tuple, set, and frozenset containers are recursively detached;
-typed views preserve their native kind, while prompts receive JSON arrays.
+typed views preserve their native kind when projected members remain safely hashable, while
+prompts receive JSON arrays. Hashed containers whose projected members are not hashable use
+the inert `"<unavailable>"` fallback instead of invoking application hash/equality hooks.
+Pydantic model values are projected from declared field storage, including aliases and
+supported nested values, without calling model serializers or representation hooks.
 Exact UUID, date, datetime, time, timedelta,
 Decimal, and bytes values remain usable: prompts receive framework-safe strings and
 custom-runtime typed views retain native values, with UUIDs independently reconstructed.
@@ -139,17 +147,37 @@ validated Python values. This does not change the HTTP adapter's earlier body se
 or path-parameter rendering.
 As with any Pydantic application validator, code that retains and later mutates an object
 it returned remains application-owned behavior rather than a second request input.
+Raw `Runtime.call` mappings use the endpoint's declared request contract once, matching HTTP
+required fields, defaults, aliases, and canonical typed values for Pydantic request models
+and individual parameters. Unlike the body adapter's model-facing rendering, raw runtime
+preparation does not call declared field serializers, application copy hooks, or string hooks.
+Custom-initialized request contracts reject raw mappings containing model instances before
+the custom constructor runs; pass the equivalent nested mapping instead. This explicit
+boundary prevents constructed instances from bypassing nested validation or authorizing an
+unchecked original after a coercing validation pass. Already validated HTTP transport graphs
+remain one-shot handoffs and are not revalidated.
+For a parameterless endpoint the raw contract is explicitly empty: undeclared keys are rejected
+before model execution or application value hooks, while HTTP exposes no request fields.
 
 Output from runtime-enforced operations is validated against its declared schema without
 invoking serializers. Custom model `__init__` methods in these output schemas (including
 nested models) are rejected at registration: core's custom-constructor path can leave the
 compiled validator and trust unchecked nested instances. Use Pydantic model validators
 rather than a custom initializer for supported output validation.
-When an existing model instance allows extras, a colliding extra cannot overwrite a
-canonical field. During this revalidation, model `before` validators receive canonical
-fields plus noncolliding extras; colliding extras are validated separately and restored
-before model `after` and outer `wrap` validators observe the result. Caller-owned model
-storage is not rewritten. Raw mapping outputs retain their declared alias policy.
+Validation and serialization namespaces are checked separately. Enabled direct validation
+aliases cannot claim the same input key under the model's configured validation policy, while
+declared fields, serialization aliases, and computed
+fields must produce distinct emitted JSON object keys. This structural admission runs at
+registration for every endpoint response model and every declared operation `output=` shape,
+including nested models, dataclasses, typed dictionaries, multi-operation declarations, and
+operation shapes outside the currently enforced runtime slice. It does not claim runtime
+structural validation for those broader operation graphs; their execution remains unsupported.
+For runtime-enforced models with `extra="allow"`, both existing instances and raw mappings are
+rejected after model construction if an extra shadows either a canonical field name or an
+emitted alias. Noncolliding extras remain supported and typed extras are still validated.
+These checks do not serialize, copy, stringify, or take the representation of application
+values, and caller-owned model storage is not rewritten. Raw mappings retain their declared
+validation-alias policy.
 
 The endpoint agent receives its declared dependencies and no ambient application access. An operation can contain deterministic business logic or a safe database adapter. Raw database sessions, connections, cursors, ORM registries, shells, and arbitrary SQL execution should not be exposed.
 
@@ -176,13 +204,37 @@ the agent may call only that set. For one required `Exactly(1)` operation using
 - a second start is rejected before application code; and
 - invalid `output=` data does not satisfy `Required` and is not retried automatically.
 
-Broader operation shapes retain their existing model-supplied argument behavior until the
-complete graph semantics ship. In particular, `FromResult`, `FromContext`, `after`, and
-collection-backed choices are still declarations rather than runtime injection. Continue
-to validate inputs and enforce authorization inside every operation; trusted binding does
-not grant authorization or prove that final model claims match operation results.
+On both the direct and agent-backed forms of this supported slice, every injected
+`FromRequest` value is checked against its receiving operation parameter, including
+`Annotated` primitive constraints, strictly before application code starts. The check is
+noncoercive: a broader request contract cannot satisfy a narrower receiver by conversion.
+When the check succeeds, the canonical validated request value is passed unchanged, not
+replaced by a coerced value, and request-model validators are not rerun.
 
-Extending these guarantees across operation graphs is milestone 1 on the
+The supported receiver vocabulary is exact primitive types with common non-transforming
+numeric constraints and non-pattern string constraints, primitive `Literal` values with
+exact-type semantics, unions when any branch safely matches, recursively checked built-in
+containers, and structurally checked Pydantic model instances. The predicate uses unbound
+built-in container operations, does not rebuild sets or dictionaries, and never calls a
+serializer. Receiver models with typed `extra="allow"` fields have those extras checked
+structurally too. Bare Decimal receivers require finite values before bounds or
+`multiple_of` are checked. Decimal `allow_inf_nan=True`, float `multiple_of`, enum receiver
+contracts, callable discriminators, and string `pattern` constraints are rejected at
+registration because the hook-free predicate cannot reproduce their semantics exactly;
+non-pattern string constraints remain supported. Integer and finite Decimal `multiple_of`
+constraints remain supported. Receiver schemas containing custom functional validators
+(`BeforeValidator`, `AfterValidator`, `WrapValidator`, or `PlainValidator`), transforming
+string constraints, custom literal values, custom instance-checking metaclasses, or
+unsupported core schemas are rejected at registration rather than silently stripped.
+
+Broader explicit operation shapes are rejected before serving until complete graph semantics
+ship. In particular, `FromResult`, `FromContext`, `after`, collection-backed choices,
+broader bounds, and adding another capability cannot fall through to unenforced model
+arguments. Bare callable dependencies retain the legacy agent path. Continue to validate
+inputs and enforce authorization inside every operation; trusted binding does not grant
+authorization or prove that final model claims match operation results.
+
+Extending these guarantees across operation graphs begins in milestone 2 on the
 [roadmap](../ROADMAP.md).
 
 Strict SQLAlchemy and SQLite operation objects are planned and not yet shipped. See the target API examples in the README and the implementation sequence in the roadmap.
