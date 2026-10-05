@@ -51,7 +51,7 @@ const expected = [
   ["Community", "https://discord.gg/u3AANZr6RG"],
   ["About Tugrul", "https://tugrul.modepot.io/"],
 ];
-const routes = ["/", "/quick-start/", "/playground/", "/not-a-real-route/"];
+const routes = ["/", "/quick-start/", "/playground/", "/source/readme/", "/source/roadmap/", "/not-a-real-route/"];
 try {
   for (const route of routes) for (const width of [1280, 768, 401, 400, 390, 320]) {
     const page = await browser.newPage({ viewport: { width, height: width === 320 ? 850 : 900 }, colorScheme: "dark", reducedMotion: "reduce" });
@@ -59,6 +59,19 @@ try {
     page.on("pageerror", error => errors.push(error.message));
     const response = await page.goto(base + route, { waitUntil: "networkidle" });
     check(response?.status() === (route === "/not-a-real-route/" ? 404 : 200), `${route} ${width}: unexpected HTTP ${response?.status()}`);
+    if (route === "/source/readme/" || route === "/source/roadmap/") {
+      const filename = route.endsWith("readme/") ? "README.md" : "ROADMAP.md";
+      const sourceLink = page.getByRole("link", { name: filename, exact: true });
+      check((await page.locator("main h1").first().innerText()).trim().length > 0, `${route}: source document heading is not rendered`);
+      check(await sourceLink.count() === 1 && new RegExp(`/blob/[0-9a-f]{40}/${filename}$`).test(await sourceLink.getAttribute("href") ?? ""), `${route}: source-revision attribution is missing or not commit-pinned`);
+      const unpinned = await page.locator("main a").evaluateAll(links => links.map(link => link.getAttribute("href")).filter(href => href && !/^(?:https?:|mailto:|#|\/)/i.test(href)));
+      check(unpinned.length === 0, `${route}: relative source links were not rewritten to repository URLs (${unpinned.join(", ")})`);
+      if (filename === "README.md") {
+        const image = page.locator('main img[src*="summonpot-lockup.png"]');
+        check(await image.count() === 1 && new RegExp(`/raw/[0-9a-f]{40}/summonpot-lockup\\.png$`).test(await image.getAttribute("src") ?? ""), `${route}: relative README illustration is missing or not commit-pinned`);
+      }
+      if (filename === "ROADMAP.md") check(await page.locator("main").innerText().then(text => text.includes("planned work")), `${route}: roadmap planned-work disclaimer is missing`);
+    }
     await page.evaluate(async () => { await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); });
     if (route !== "/playground/") await page.locator("starlight-theme-select select").first().selectOption("light");
     const desktop = width >= 1024;
