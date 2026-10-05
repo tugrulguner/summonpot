@@ -1,24 +1,24 @@
-import { readdir, readFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { readdir, readFile } from "node:fs/promises";
+import { join, relative } from "node:path";
 
-const distRoot = new URL('../dist/', import.meta.url).pathname;
+const distRoot = new URL("../dist/", import.meta.url).pathname;
 const requiredPosthogConfig = [
   "posthog.init('phc_qXkp5FBQfrqHQwkqf3ys8iSoGoMYw2tpTHXGugXJhP8V'",
   "api_host:'https://us.i.posthog.com'",
   "defaults:'2026-05-30'",
   "person_profiles:'identified_only'",
-  'capture_pageview:true',
-  'capture_pageleave:true',
+  "capture_pageview:true",
+  "capture_pageleave:true",
   "dom_event_allowlist:['click']",
   "element_allowlist:['a','button']",
-  'disable_session_recording:true',
+  "disable_session_recording:true",
 ];
 
 async function* htmlFiles(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) yield* htmlFiles(path);
-    else if (entry.name.endsWith('.html')) yield path;
+    else if (entry.name.endsWith(".html")) yield path;
   }
 }
 
@@ -26,25 +26,49 @@ const failures = [];
 let htmlCount = 0;
 for await (const path of htmlFiles(distRoot)) {
   htmlCount += 1;
-  const html = await readFile(path, 'utf8');
+  const html = await readFile(path, "utf8");
   const outputPath = relative(distRoot, path);
-  if (outputPath === 'playground/index.html') {
-    for (const token of ['Restricted playground', 'browser-local', 'https://github.com/tugrulguner/summonpot/blob/main/examples/08_direct_execution.py', 'no model, network call, arbitrary code', 'name="viewport"']) {
-      if (!html.toLowerCase().includes(token.toLowerCase())) failures.push(`${outputPath}: missing playground contract ${token}`);
+  if (outputPath === "index.html" || outputPath === "quick-start/index.html") {
+    for (const stale of ["restricted quote playground", "browser-local quote playground", "one fixed quote operation"]) {
+      if (html.includes(stale)) failures.push(`${outputPath}: stale playground description ${stale}`);
+    }
+    if (!html.includes("examples/07_bound_operation.py")) failures.push(`${outputPath}: missing current bound-operation source`);
+  }
+  if (outputPath === "playground/index.html") {
+    for (const token of [
+      "Summonpot playground",
+      "browser-local",
+      "https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py",
+      "no model, server, network call, arbitrary code",
+      'name="viewport"',
+      "A fixed request. A bounded choice.",
+      "The request owns the customer ID.",
+      "AgentChoice()",
+      "FromRequest(",
+    ]) {
+      if (!html.toLowerCase().includes(token.toLowerCase()))
+        failures.push(`${outputPath}: missing playground contract ${token}`);
     }
     continue;
   }
   for (const setting of requiredPosthogConfig) {
-    if (!html.includes(setting)) failures.push(`${relative(distRoot, path)}: missing ${setting}`);
+    if (!html.includes(setting))
+      failures.push(`${relative(distRoot, path)}: missing ${setting}`);
   }
   if ((html.match(/posthog\.init\(/g) ?? []).length !== 1) {
-    failures.push(`${relative(distRoot, path)}: expected exactly one PostHog initialization`);
+    failures.push(
+      `${relative(distRoot, path)}: expected exactly one PostHog initialization`,
+    );
   }
-  if (!html.includes('https://modepot.io/')) {
-    failures.push(`${relative(distRoot, path)}: missing canonical ModePot return link`);
+  if (!html.includes("https://modepot.io/")) {
+    failures.push(
+      `${relative(distRoot, path)}: missing canonical ModePot return link`,
+    );
   }
-  if (html.includes('modepot.com')) failures.push(`${relative(distRoot, path)}: stale ModePot domain`);
-  if (html.includes('examples/01_quickstart')) failures.push(`${relative(distRoot, path)}: stale quick-start example URL`);
+  if (html.includes("modepot.com"))
+    failures.push(`${relative(distRoot, path)}: stale ModePot domain`);
+  if (html.includes("examples/01_quickstart"))
+    failures.push(`${relative(distRoot, path)}: stale quick-start example URL`);
   if (!html.includes('rel="alternate" type="text/plain" href="/llms.txt"')) {
     failures.push(`${outputPath}: missing llms.txt discovery link`);
   }
@@ -52,17 +76,23 @@ for await (const path of htmlFiles(distRoot)) {
     'property="og:image" content="https://summonpot.modepot.io/social-card-v2.png"',
     'name="twitter:image" content="https://summonpot.modepot.io/social-card-v2.png"',
   ]) {
-    if (!html.includes(token)) failures.push(`${outputPath}: missing discovery metadata ${token}`);
+    if (!html.includes(token))
+      failures.push(`${outputPath}: missing discovery metadata ${token}`);
   }
-  const jsonLd = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1];
+  const jsonLd = html.match(
+    /<script type="application\/ld\+json">([\s\S]*?)<\/script>/,
+  )?.[1];
   if (!jsonLd) {
     failures.push(`${outputPath}: missing JSON-LD`);
   } else {
     try {
       const data = JSON.parse(jsonLd);
-      const types = new Set((data['@graph'] ?? [data]).map((node) => node['@type']));
-      for (const type of ['SoftwareApplication', 'WebSite']) {
-        if (!types.has(type)) failures.push(`${outputPath}: missing ${type} structured data`);
+      const types = new Set(
+        (data["@graph"] ?? [data]).map((node) => node["@type"]),
+      );
+      for (const type of ["SoftwareApplication", "WebSite"]) {
+        if (!types.has(type))
+          failures.push(`${outputPath}: missing ${type} structured data`);
       }
     } catch (error) {
       failures.push(`${outputPath}: invalid JSON-LD (${error.message})`);
@@ -70,24 +100,40 @@ for await (const path of htmlFiles(distRoot)) {
   }
 }
 
-const llms = await readFile(join(distRoot, 'llms.txt'), 'utf8');
-if (!llms.includes('https://modepot.io/')) failures.push('llms.txt: missing canonical ModePot URL');
-if (llms.includes('modepot.com')) failures.push('llms.txt: stale ModePot domain');
-for (const token of ['## Install', '## Quick start', '## Boundaries and license', 'https://pypi.org/project/summonpot/', 'License: MIT']) {
+const llms = await readFile(join(distRoot, "llms.txt"), "utf8");
+if (!llms.includes("https://modepot.io/"))
+  failures.push("llms.txt: missing canonical ModePot URL");
+if (llms.includes("modepot.com"))
+  failures.push("llms.txt: stale ModePot domain");
+for (const token of [
+  "## Install",
+  "## Quick start",
+  "## Boundaries and license",
+  "https://pypi.org/project/summonpot/",
+  "License: MIT",
+]) {
   if (!llms.includes(token)) failures.push(`llms.txt: missing ${token}`);
 }
-const quickStart = await readFile(join(distRoot, 'quick-start', 'index.html'), 'utf8');
-if (!quickStart.includes('Python 3.11–3.14')) {
-  failures.push('quick-start/index.html: Python support range is stale');
+const quickStart = await readFile(
+  join(distRoot, "quick-start", "index.html"),
+  "utf8",
+);
+if (!quickStart.includes("Python 3.11–3.14")) {
+  failures.push("quick-start/index.html: Python support range is stale");
 }
-const socialCard = await readFile(join(distRoot, 'social-card-v2.png'));
-if (socialCard.readUInt32BE(16) !== 1200 || socialCard.readUInt32BE(20) !== 630) {
-  failures.push('social-card-v2.png: expected 1200x630 PNG');
+const socialCard = await readFile(join(distRoot, "social-card-v2.png"));
+if (
+  socialCard.readUInt32BE(16) !== 1200 ||
+  socialCard.readUInt32BE(20) !== 630
+) {
+  failures.push("social-card-v2.png: expected 1200x630 PNG");
 }
-if (htmlCount === 0) failures.push('no rendered HTML files found');
+if (htmlCount === 0) failures.push("no rendered HTML files found");
 if (failures.length) {
-  console.error(failures.join('\n'));
+  console.error(failures.join("\n"));
   process.exitCode = 1;
 } else {
-  console.log(`Verified analytics and discovery metadata in ${htmlCount} rendered HTML files.`);
+  console.log(
+    `Verified analytics and discovery metadata in ${htmlCount} rendered HTML files.`,
+  );
 }

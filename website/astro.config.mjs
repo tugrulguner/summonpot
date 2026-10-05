@@ -30,6 +30,7 @@ export default defineConfig({
     social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/tugrulguner/summonpot' }],
     favicon: '/favicon.svg',
     customCss: ['./src/styles/custom.css'],
+    components: { Header: './src/components/FamilyHeader.astro' },
     head: [
       { tag: 'script', attrs: {}, content: posthogScript },
       { tag: 'meta', attrs: { property: 'og:type', content: 'website' } },
@@ -44,8 +45,11 @@ export default defineConfig({
       { tag: 'script', attrs: { type: 'application/ld+json' }, content: JSON.stringify(structuredData) },
     ],
     sidebar: [
-      { label: 'Start here', items: [{ label: 'Quick start', link: '/quick-start/' }] },
-      { label: 'Guides', items: [{ label: 'Architecture & safety', link: '/architecture/' }, { label: 'Capabilities', link: '/capabilities/' }] },
+      { label: 'Start here', items: [{ label: 'Quick start', link: '/quick-start/' }, { label: 'README (current source)', link: '/source/readme/' }, { label: 'Roadmap (planned work)', link: '/source/roadmap/' }] },
+      { label: 'Build', items: [{ label: 'Model-free endpoint', link: '/build/direct-execution/' }, { label: 'Agent-backed choice', link: '/build/agent-choice/' }] },
+      { label: 'Reference', items: [{ label: 'Operations & bindings', link: '/reference/operations/' }] },
+      { label: 'Guides', items: [{ label: 'Architecture & safety', link: '/architecture/' }, { label: 'Capabilities', link: '/capabilities/' }, { label: 'Operations & troubleshooting', link: '/guides/operations/' }] },
+      { label: 'Internals', items: [{ label: 'Execution flow', link: '/internals/execution/' }] },
       { label: 'ModePot', link: 'https://modepot.io/' },
     ],
   })],

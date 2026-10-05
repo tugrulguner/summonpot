@@ -1,0 +1,98 @@
+---
+title: Build an agent-backed bound operation
+description: Separate request-owned arguments from one explicit agent choice.
+slug: build/agent-choice
+---
+
+import { LinkButton } from '@astrojs/starlight/components';
+
+<LinkButton href="/build/agent-choice.md" variant="secondary">Download this guide as Markdown</LinkButton>
+
+Use this pattern when the application owns identifiers and exact operations, but a bounded semantic choice belongs to the agent. The example uses the keyless test model and a harmless local operation. Keyless does not mean dry-run: capability code executes for real. Never attach destructive or privileged operations to a test-model endpoint.
+
+## Complete example
+
+Install `summonpot[serve]` and save as `agent_summary.py`:
+
+```python
+from typing import Literal
+
+from pydantic import BaseModel, Field
+from summonpot import AgentChoice, Exactly, FromRequest, Operation, Required, Summon
+
+
+class SummaryRequest(BaseModel):
+    topic: str = Field(min_length=1, max_length=200)
+
+
+class SummaryResponse(BaseModel):
+    summary: str
+    style: Literal["brief", "detailed"]
+
+
+def build_summary(topic: str, style: Literal["brief", "detailed"]) -> SummaryResponse:
+    """Build a deterministic local summary candidate."""
+    limit = 80 if style == "brief" else 240
+    return SummaryResponse(summary=topic[:limit], style=style)
+
+
+summary_operation = Operation(
+    build_summary,
+    bind={"topic": FromRequest("topic"), "style": AgentChoice()},
+    output=SummaryResponse,
+)
+
+summon = Summon("summary-api")
+
+
+@summon("/summarize")
+def summarize(
+    request: SummaryRequest,
+    result=Required(summary_operation, calls=Exactly(1)),
+) -> SummaryResponse:
+    """Summarize the request topic and choose a brief or detailed style."""
+    ...
+
+
+if __name__ == "__main__":
+    summon.serve(host="127.0.0.1", port=8000)
+```
+
+Run the local server:
+
+```sh
+SUMMONPOT_MODEL=test python agent_summary.py
+```
+
+Call the public HTTP route from another terminal:
+
+```sh
+curl -i -X POST http://127.0.0.1:8000/summarize \
+  -H 'Content-Type: application/json' \
+  -d '{"topic":"A concise contract separates trusted request data from bounded choices."}'
+```
+
+The test model supplies placeholder agent output, not a useful semantic answer; the operation still runs. The response must validate as `SummaryResponse`, and `Required` means the operation must succeed before a successful final output. Do not treat the final text as proof that it reproduces the operation result: local schema validation constrains shape and types, not semantic provenance.
+
+## Follow the authority boundary
+
+- `SummaryRequest` validates caller input. `FromRequest("topic")` injects that validated topic; it is absent from the model-visible operation arguments.
+- `AgentChoice()` is the only model-controlled argument in this declaration. It grants a choice within the registered `build_summary` callable, not permission to select another function or trusted customer identity.
+- `Required(..., calls=Exactly(1))` sets the mandatory operation and call bound. Runtime state enforces the bound; the prompt alone is not enforcement.
+- `output=SummaryResponse` validates operation output before it can count as a successful required call. The endpoint response is separately validated.
+
+Operation outputs and valid-looking final responses do not imply authorization, atomicity, idempotency, exactly-once completion, or a causal link between returned text and operation result. Enforce access control in the operation; design retries and side effects explicitly.
+
+## Common mistakes
+
+1. Do not make a customer ID an `AgentChoice`; bind trusted request fields and authorize them in application code.
+2. Do not expect keyless model output to exercise the semantic behavior of a real provider. This is a wiring check, not quality evaluation.
+3. Do not expose shell, raw database connections, arbitrary SQL, or broad service objects as capabilities.
+4. Do not assume a failed output validation undoes an operation that already had side effects.
+5. Do not switch to `Operation(fn)` with missing bindings to get a permissive fallback; unsupported explicit declarations fail at registration.
+
+## Limits of the shipped slice
+
+The runtime-enforced bound-operation slice supports the explicit `FromRequest` and direct `AgentChoice` binding vocabulary with compatible receiving types and exact output contracts. The no-model path is stricter and permits no unresolved `AgentChoice`. Bare callable dependencies remain on the legacy agent path. `FromResult`, `FromContext`, `after`, collection-backed choices, broader graph execution, and multi-operation deterministic compilation are planned/rejected for the current explicit runtime slice. See the [reference](/reference/operations/) and [roadmap](https://github.com/tugrulguner/summonpot/blob/main/ROADMAP.md).
+
+For exact model-free execution, use [Build a model-free endpoint](/build/direct-execution/). For provider/runtime setup and HTTP errors, see [Operations and troubleshooting](/guides/operations/).

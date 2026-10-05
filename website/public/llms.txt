@@ -20,6 +20,12 @@ The [quick-start guide](https://summonpot.modepot.io/quick-start/) defines a typ
 - [Quick start](https://summonpot.modepot.io/quick-start/): install, declare, serve, and call a typed endpoint.
 - [Architecture and safety](https://summonpot.modepot.io/architecture/): contract boundaries, authority, runtime behavior, and limitations.
 - [Capabilities](https://summonpot.modepot.io/capabilities/): exact operations and explicit agent choices.
+- [Build a model-free endpoint](https://summonpot.modepot.io/build/direct-execution/): complete no-model request path and exact eligibility predicate.
+- [Build an agent-backed bound operation](https://summonpot.modepot.io/build/agent-choice/): request-owned data and explicit agent choice.
+- [Operation and binding reference](https://summonpot.modepot.io/reference/operations/): declaration semantics, supported/rejected shapes, and planned vocabulary.
+- [Operations and troubleshooting](https://summonpot.modepot.io/guides/operations/): provider configuration, limits, HTTP failures, and security practices.
+- [Execution internals](https://summonpot.modepot.io/internals/execution/): registration-to-runtime dataflow and failure boundaries.
+- [Detailed capability contract](https://github.com/tugrulguner/summonpot/blob/main/docs/declarative-capabilities.md): source-level binding, validation, and security details.
 - [GitHub](https://github.com/tugrulguner/summonpot): source, README, roadmap, and release history.
 - [PyPI package](https://pypi.org/project/summonpot/): published Python distributions and release metadata.
 - [ModePot](https://modepot.io/): return to the open-source project family.

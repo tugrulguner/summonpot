@@ -1,0 +1,1 @@
+Show ModePot, repository, community, and creator links in Summonpot headers and compact menus.
