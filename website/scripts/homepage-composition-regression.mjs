@@ -67,8 +67,8 @@ try {
   if(width>700) check(state.main&&state.markdown&&Math.abs(state.markdown.x-(width-state.markdown.width)/2)<=2,`${width}/${theme}: main content axis is off-center (${JSON.stringify({main:state.main,markdown:state.markdown})})`);
   if(width>608){check(state.art.x>state.copy.x,`${width}: art does not follow copy on desktop/tablet`);check(state.image.x>=state.art.x&&state.image.right<=state.art.right+1,`${width}: art escapes its bounded frame`);}
   else check(state.art.y>=state.copy.bottom-1,`${width}: mobile art does not follow copy`);
-  check(state.actions.map(a=>a.text).join('|').startsWith('Quick start|Playground|GitHub'),`${width}: CTA order incorrect`);
-  check(state.actions[0]?.href==='/quick-start/'&&state.actions[1]?.href==='/playground/'&&state.actions[2]?.href==='https://github.com/tugrulguner/summonpot',`${width}: CTA destinations incorrect`);
+  check(state.actions.map(a=>a.text).join('|').startsWith('Quick start|Playground|Roadmap|GitHub'),`${width}: CTA order incorrect`);
+  check(state.actions[0]?.href==='/quick-start/'&&state.actions[1]?.href==='/playground/'&&state.actions[2]?.href==='/source/roadmap/'&&state.actions[3]?.href==='https://github.com/tugrulguner/summonpot',`${width}: CTA destinations incorrect`);
   check(state.actions.every(a=>a.box.height>=44),`${width}: action target below 44px`);
   check(state.credit?.y>=Math.max(...state.actions.map(a=>a.box.bottom)),`${width}: creator credit is not immediately after the actions`);
   check(state.install&&state.notice&&state.demo&&state.install.y>state.hero.y&&state.notice.y>state.install.y&&state.demo.y>state.notice.y,`${width}: installation/maturity/demo section order incorrect`);
@@ -100,6 +100,12 @@ try {
   await nextQuickstart.click();
   check(new URL(page.url()).pathname==='/quick-start/',`${width}/${theme}: clicking the footer link did not reach quick start`);
   check((await page.locator('main h1').first().innerText()).includes('Quick start'),`${width}/${theme}: footer destination did not render its quick-start page`);
+  await page.goto(`http://127.0.0.1:${server.address().port}/`);
+  const roadmap=page.locator('.framework-actions a[href="/source/roadmap/"]');
+  check(await roadmap.count()===1,`${width}/${theme}: visible hero roadmap link missing`);
+  await roadmap.click();
+  check(new URL(page.url()).pathname==='/source/roadmap/',`${width}/${theme}: hero roadmap link did not reach the roadmap route`);
+  check((await page.locator('main h1').first().innerText()).includes('Project roadmap'),`${width}/${theme}: roadmap destination H1 missing`);
   check(!state.overflow,`${width}: horizontal overflow`);
   check(errors.length===0,`${width}/${theme}: browser errors ${errors.join('; ')}`);
   await page.close();
