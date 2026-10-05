@@ -45,7 +45,7 @@ export default defineConfig({
       { tag: 'script', attrs: { type: 'application/ld+json' }, content: JSON.stringify(structuredData) },
     ],
     sidebar: [
-      { label: 'Start here', items: [{ label: 'Quick start', link: '/quick-start/' }] },
+      { label: 'Start here', items: [{ label: 'Quick start', link: '/quick-start/' }, { label: 'README (current source)', link: '/source/readme/' }, { label: 'Roadmap (planned work)', link: '/source/roadmap/' }] },
       { label: 'Build', items: [{ label: 'Model-free endpoint', link: '/build/direct-execution/' }, { label: 'Agent-backed choice', link: '/build/agent-choice/' }] },
       { label: 'Reference', items: [{ label: 'Operations & bindings', link: '/reference/operations/' }] },
       { label: 'Guides', items: [{ label: 'Architecture & safety', link: '/architecture/' }, { label: 'Capabilities', link: '/capabilities/' }, { label: 'Operations & troubleshooting', link: '/guides/operations/' }] },

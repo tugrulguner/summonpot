@@ -6,6 +6,8 @@ const website = dirname(dirname(fileURLToPath(import.meta.url)));
 const sourceRoot = join(website, "src/content/docs");
 const distRoot = join(website, "dist");
 const routes = [
+  ["source/readme.md", "readme.md", "source/readme/index.html"],
+  ["source/roadmap.md", "roadmap.md", "source/roadmap/index.html"],
   ["tasks/direct-execution.mdx", "build/direct-execution.md", "build/direct-execution/index.html"],
   ["tasks/agent-choice.mdx", "build/agent-choice.md", "build/agent-choice/index.html"],
   ["reference/operations.mdx", "reference/operations.md", "reference/operations/index.html"],
