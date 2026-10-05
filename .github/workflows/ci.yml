@@ -195,4 +195,4 @@ jobs:
           # Pinned to the exact version in uv.lock. Unpinned, the acceptance
           # result moves with whatever Pyright released that morning, and the
           # job resolves an unreviewed package on every run.
-          uvx pyright@1.1.411 --pythonpath /tmp/consumer/bin/python consumer.py
+          uvx pyright@1.1.414 --pythonpath /tmp/consumer/bin/python consumer.py
