@@ -1,0 +1,1 @@
+Astro 7 and Starlight 0.42 now resolve the custom header’s components through package exports. The playground reads its example from the repository root during prerendering, and the generated Starlight 404 page is no longer shadowed by a static public file.

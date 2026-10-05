@@ -1,7 +1,8 @@
 ---
 import { readFile } from 'node:fs/promises';
 import { Code } from 'astro:components';
-const example = await readFile(new URL('../../../examples/07_bound_operation.py', import.meta.url), 'utf8');
+import { resolve } from 'node:path';
+const example = await readFile(resolve(process.cwd(), '../examples/07_bound_operation.py'), 'utf8');
 const signature = example.slice(example.indexOf('def load_customer('), example.indexOf('    """Load one approved')).trimEnd();
 const binding = example.slice(example.indexOf('customer_lookup = Operation('), example.indexOf('summon = Summon(')).trimEnd();
 const endpoint = example.slice(example.indexOf('@summon('), example.indexOf('if __name__')).trimEnd();

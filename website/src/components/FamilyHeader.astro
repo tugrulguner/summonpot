@@ -1,15 +1,13 @@
 ---
-import config from 'virtual:starlight/user-config';
-import LanguageSelect from '../../node_modules/@astrojs/starlight/components/LanguageSelect.astro';
-import Search from '../../node_modules/@astrojs/starlight/components/Search.astro';
-import SiteTitle from '../../node_modules/@astrojs/starlight/components/SiteTitle.astro';
-import ThemeSelect from '../../node_modules/@astrojs/starlight/components/ThemeSelect.astro';
-const shouldRenderSearch = config.pagefind || config.components.Search !== '@astrojs/starlight/components/Search.astro';
+import LanguageSelect from '@astrojs/starlight/components/LanguageSelect.astro';
+import Search from '@astrojs/starlight/components/Search.astro';
+import SiteTitle from '@astrojs/starlight/components/SiteTitle.astro';
+import ThemeSelect from '@astrojs/starlight/components/ThemeSelect.astro';
 ---
 <div class="header">
   <div class="title-wrapper sl-flex"><SiteTitle /></div>
   <div class="sl-flex print:hidden header-tools">
-    {shouldRenderSearch && <Search />}
+    <Search />
   </div>
   <div class="sl-flex print:hidden right-group">
     <nav class="family-links" aria-label="ModePot family">
