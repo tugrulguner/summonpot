@@ -6,6 +6,7 @@ next: { label: Quick start, link: /quick-start/ }
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
+import RoadmapHeroAction from '../../components/RoadmapHeroAction.astro';
 
 <script src="/scripts/homepage-code-keyboard.js"></script>
 
@@ -17,6 +18,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
     <nav class="framework-actions" aria-label="Primary actions">
       <a class="framework-action primary" href="/quick-start/">Quick start</a>
       <a class="framework-action secondary" href="/playground/">Playground</a>
+      <RoadmapHeroAction />
       <a class="framework-action tertiary" href="https://github.com/tugrulguner/summonpot" target="_blank" rel="noopener">GitHub <span aria-hidden="true">↗</span></a>
     </nav>
     <a class="creator-attribution" href="https://tugrul.modepot.io/">Created by Tugrul Guner</a>
