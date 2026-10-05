@@ -1,0 +1,8 @@
+---
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const roadmapAvailable = existsSync(resolve(process.cwd(), '../ROADMAP.md'));
+---
+
+{roadmapAvailable && <a class="framework-action secondary" href="/source/roadmap/">Roadmap</a>}

@@ -17,6 +17,7 @@ ROADMAP = ROOT / "ROADMAP.md"
 CHANGELOG = ROOT / "CHANGELOG.md"
 CAPABILITY_GUIDE = ROOT / "docs" / "declarative-capabilities.md"
 REVIEWING = ROOT / "docs" / "reviewing.md"
+HOMEPAGE = ROOT / "website/src/content/docs/index.mdx"
 
 
 def _snippet_after(heading: str) -> str:
@@ -47,6 +48,54 @@ def test_bounding_a_call_snippet_runs():
     summon = namespace["summon"]
     assert summon._runtime.usage_limits is not None
     assert summon._runtime.timeout == 30.0
+
+
+def test_homepage_shell_request_uses_single_line_continuations():
+    text = HOMEPAGE.read_text(encoding="utf-8")
+    block = text.split("## Try a complete endpoint", 1)[1]
+    shell_blocks = re.findall(r"```bash\n(.*?)```", block, re.DOTALL)
+    request = next(code for code in shell_blocks if code.startswith("curl "))
+    for line in request.splitlines()[:-1]:
+        assert line.endswith("\\")
+        assert not line.endswith("\\\\"), "Shell continuation must use one backslash"
+
+
+def test_homepage_endpoint_example_runs_through_http(monkeypatch):
+    """The homepage's complete contract serves a real keyless HTTP request."""
+    import ast
+    import importlib.util
+    import sys
+    import tempfile
+
+    from fastapi.testclient import TestClient
+
+    from summonpot.runtime import Runtime
+    from summonpot.server import build_app
+
+    text = HOMEPAGE.read_text(encoding="utf-8")
+    block = text.split("## Try a complete endpoint", 1)[1]
+    match = re.search(r"```python\n(.*?)```", block, re.DOTALL)
+    assert match is not None
+    code = match.group(1)
+    ast.parse(code)
+    with tempfile.TemporaryDirectory() as directory:
+        module_path = Path(directory) / "homepage_demo.py"
+        module_path.write_text(code, encoding="utf-8")
+        spec = importlib.util.spec_from_file_location("homepage_demo", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        monkeypatch.setitem(sys.modules, spec.name, module)
+        spec.loader.exec_module(module)
+        module.summon._runtime = Runtime(model="test")
+        summon = module.summon
+
+    response = TestClient(build_app(summon)).post(
+        "/summarize", json={"topic": "contract-first APIs"}
+    )
+
+    assert response.status_code == 200
+    assert set(response.json()) == {"summary", "style"}
+    assert summon._runtime._agents
 
 
 @pytest.mark.parametrize("api", ["UsageLimits"])

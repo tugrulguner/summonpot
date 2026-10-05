@@ -1,0 +1,45 @@
+---
+title: Configure and troubleshoot
+description: Choose a provider safely, configure limits, and diagnose HTTP failures.
+---
+
+import { LinkButton } from '@astrojs/starlight/components';
+
+<LinkButton href="/guides/operations.md" variant="secondary">Download this guide as Markdown</LinkButton>
+
+## Provider selection
+
+An endpoint can set a model override in its `@summon(..., model=...)` declaration. Otherwise `Runtime` resolves `SUMMONPOT_MODEL` when handling a request, falling back to `openai:gpt-4o-mini`. Select a provider-supported model name and install the corresponding Summonpot provider extra when required. Credentials are provider-specific environment configuration; never commit them or print them in logs. The provider-neutral runtime and optional dependencies are defined in [`pyproject.toml`](https://github.com/tugrulguner/summonpot/blob/main/pyproject.toml).
+
+For agent-backed local wiring, set `SUMMONPOT_MODEL=test`. This avoids provider credentials but does not make capability execution inert: the test model may call declared operations with placeholder arguments. Use harmless, isolated operations only. For a no-model demonstration that makes no model call, use the fully qualifying [direct-execution guide](/build/direct-execution/).
+
+## Bound model work
+
+`Runtime` accepts `retries`, Pydantic AI `usage_limits`, and `timeout`. Set limits deliberately for the workload; timeout applies to execution, not side-effect rollback. Provider throttling can be returned as 429; upstream provider errors are surfaced as 502. A request-level timeout maps to 504. See [runtime implementation](https://github.com/tugrulguner/summonpot/blob/main/src/summonpot/runtime.py) and [HTTP mapping](https://github.com/tugrulguner/summonpot/blob/main/src/summonpot/server.py).
+
+## Troubleshooting
+
+| Symptom | Likely boundary | What to inspect |
+|---|---|---|
+| Registration raises for an explicit operation | Contract is incomplete or unsupported | Confirm every callable parameter is bound/defaulted, source vocabulary is supported, annotations are compatible, and output is declared. |
+| HTTP 422 | Invalid body/query or injected receiver mismatch | Compare payload with generated OpenAPI and receiving parameter annotations. Application code should not start for rejected request values. |
+| HTTP 429 | Usage limit or provider throttling | Logs distinguish configured usage exhaustion from upstream throttling; keep public messages redacted. |
+| HTTP 502 | Provider request failed | Check selected model, installed provider integration, credentials, and upstream availability in operator logs. |
+| HTTP 504 | Runtime timed out | Check timeout budget and operation/provider latency. A timed-out side effect may already have occurred. |
+| `test` response is placeholder text | Test model is for wiring, not quality | Test schema and route behavior; do not infer semantic output quality. |
+| Side effect occurred despite an error | Validation/timeout is not a transaction | Put authorization, transactionality, idempotency, and compensation in the application operation. |
+
+Public failure bodies are intentionally fixed rather than exposing provider text or operation details that may contain request data or secrets. Use server logs with appropriate access controls for diagnosis; do not echo sensitive exception bodies to clients.
+
+## Serve on loopback during development
+
+Install `summonpot[serve,cli]`, then use `summonpot serve app.py --host 127.0.0.1 --port 8000`. Binding to loopback avoids exposing an experimental endpoint to the network. The CLI loads a Python file containing a `Summon` instance named `summon`; package commands are defined in [`cli.py`](https://github.com/tugrulguner/summonpot/blob/main/src/summonpot/cli.py). Review deployment exposure, authentication, rate limits, secrets, and capability authority before binding publicly.
+
+## Security checklist
+
+- Authorize every request inside application-owned operations; request fields are not trusted identity.
+- Expose narrow operations, never ambient process/database/shell authority.
+- Treat all declared functions as real side effects even under the keyless model.
+- Add idempotency and transaction controls in application code when required.
+- Keep timeouts and provider limits; do not claim they roll back application changes.
+- Treat schema validation as structure/type enforcement, not factual or provenance verification.

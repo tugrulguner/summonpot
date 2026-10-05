@@ -5,7 +5,11 @@ on:
     branches: [main]
     paths:
       - "website/**"
+      - "README.md"
+      - "ROADMAP.md"
       - ".github/workflows/deploy-website.yml"
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -28,6 +32,7 @@ jobs:
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      DOCS_SOURCE_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,6 +43,7 @@ jobs:
           cache: npm
           cache-dependency-path: website/package-lock.json
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
       - run: npm run check
       - run: npm run build
       - run: npx wrangler deploy

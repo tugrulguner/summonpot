@@ -132,6 +132,21 @@ def test_direct_example_runs_without_resolving_a_model(monkeypatch):
     assert summon._runtime._agents == {}
 
 
+def test_curated_direct_demo_rejects_invalid_request_without_running_operation(
+    monkeypatch,
+):
+    monkeypatch.setenv("SUMMONPOT_MODEL", "invalid-provider:no-model")
+    summon = _load_example("08_direct_execution.py", monkeypatch)
+
+    response = TestClient(build_app(summon)).post(
+        "/quotes/direct",
+        json={"unit_price_cents": 1299, "quantity": 0, "tax_rate_percent": "8.25"},
+    )
+
+    assert response.status_code == 422
+    assert summon._runtime._agents == {}
+
+
 def test_contract_boundary_example_runs_all_release_checks(monkeypatch):
     checks = ROOT / "examples" / "09_contract_boundaries" / "checks.py"
     monkeypatch.syspath_prepend(str(checks.parent))
@@ -270,3 +285,31 @@ def test_ci_and_release_verify_runnable_sdist_assets():
         assert '/scripts/release_smoke.py"' in workflow
         assert '/examples/09_contract_boundaries/app.py"' in workflow
         assert '"/.venv" not in name' in workflow
+
+
+def test_playground_teaches_the_shipped_bounded_operation_contract():
+    page = (ROOT / "website/src/pages/playground.astro").read_text(encoding="utf-8")
+    home = (ROOT / "website/src/content/docs/index.mdx").read_text(encoding="utf-8")
+    example = (ROOT / "examples/07_bound_operation.py").read_text(encoding="utf-8")
+
+    assert "examples/07_bound_operation.py" in page
+    assert "readFile(new URL('../../../examples/07_bound_operation.py'" in page
+    assert "code={contract}" in page and "code={example}" in page
+    assert "example.slice(example.indexOf('customer_lookup = Operation(')" in page
+    for token in (
+        'FromRequest("customer_id")',
+        "AgentChoice()",
+        "Required(customer_lookup, calls=Exactly(1))",
+        "output=CustomerRecord",
+    ):
+        assert token in example
+    assert 'name="customer_id" type="text"' in page
+    assert "customer-7" in page and "customer-9" in page
+    assert "Run contract" in page
+    assert "No model, server, network call, arbitrary code" in page
+    assert "browser preview" in page and "No agent or Python server runs." in page
+    assert "operation override cannot replace request-owned data" in page
+    assert '"customer-7": {"name": "Ada", "status": "active"}' in example
+    assert '"customer-9": {"name": "Grace", "status": "paused"}' in example
+    assert "/playground/" in home
+    assert not (ROOT / "website/src/components/AgentDemo.astro").exists()
