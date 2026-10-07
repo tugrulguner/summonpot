@@ -322,7 +322,9 @@ def test_standalone_playground_uses_shared_posthog_without_duplicate_init():
     page = (ROOT / "website/src/pages/playground.astro").read_text(encoding="utf-8")
     analytics = (ROOT / "website/src/analytics/posthog.js").read_text(encoding="utf-8")
     config = (ROOT / "website/astro.config.mjs").read_text(encoding="utf-8")
-    verifier = (ROOT / "website/scripts/verify-rendered-output.mjs").read_text(encoding="utf-8")
+    verifier = (ROOT / "website/scripts/verify-rendered-output.mjs").read_text(
+        encoding="utf-8"
+    )
 
     assert "import { posthogInitialization } from '../analytics/posthog.js'" in page
     assert "set:html={posthogInitialization}" in page
