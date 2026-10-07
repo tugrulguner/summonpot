@@ -49,7 +49,6 @@ for await (const path of htmlFiles(distRoot)) {
       if (!html.toLowerCase().includes(token.toLowerCase()))
         failures.push(`${outputPath}: missing playground contract ${token}`);
     }
-    continue;
   }
   for (const setting of requiredPosthogConfig) {
     if (!html.includes(setting))
@@ -69,10 +68,10 @@ for await (const path of htmlFiles(distRoot)) {
     failures.push(`${relative(distRoot, path)}: stale ModePot domain`);
   if (html.includes("examples/01_quickstart"))
     failures.push(`${relative(distRoot, path)}: stale quick-start example URL`);
-  if (!html.includes('rel="alternate" type="text/plain" href="/llms.txt"')) {
+  if (outputPath !== "playground/index.html" && !html.includes('rel="alternate" type="text/plain" href="/llms.txt"')) {
     failures.push(`${outputPath}: missing llms.txt discovery link`);
   }
-  for (const token of [
+  for (const token of outputPath === "playground/index.html" ? [] : [
     'property="og:image" content="https://summonpot.modepot.io/social-card-v2.png"',
     'name="twitter:image" content="https://summonpot.modepot.io/social-card-v2.png"',
   ]) {
@@ -82,7 +81,9 @@ for await (const path of htmlFiles(distRoot)) {
   const jsonLd = html.match(
     /<script type="application\/ld\+json">([\s\S]*?)<\/script>/,
   )?.[1];
-  if (!jsonLd) {
+  if (outputPath === "playground/index.html") {
+    // The standalone layout intentionally omits Starlight discovery metadata.
+  } else if (!jsonLd) {
     failures.push(`${outputPath}: missing JSON-LD`);
   } else {
     try {

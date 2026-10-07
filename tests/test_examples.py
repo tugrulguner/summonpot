@@ -316,3 +316,24 @@ def test_playground_teaches_the_shipped_bounded_operation_contract():
     assert '"customer-9": {"name": "Grace", "status": "paused"}' in example
     assert "/playground/" in home
     assert not (ROOT / "website/src/components/AgentDemo.astro").exists()
+
+
+def test_standalone_playground_uses_shared_posthog_without_duplicate_init():
+    page = (ROOT / "website/src/pages/playground.astro").read_text(encoding="utf-8")
+    analytics = (ROOT / "website/src/analytics/posthog.js").read_text(encoding="utf-8")
+    config = (ROOT / "website/astro.config.mjs").read_text(encoding="utf-8")
+    verifier = (ROOT / "website/scripts/verify-rendered-output.mjs").read_text(
+        encoding="utf-8"
+    )
+
+    assert "import { posthogInitialization } from '../analytics/posthog.js'" in page
+    assert "set:html={posthogInitialization}" in page
+    assert page.count("posthog.init(") == 0
+    assert "import { posthogScript } from './src/analytics/posthog.js'" in config
+    assert "phc_qXkp5FBQfrqHQwkqf3ys8iSoGoMYw2tpTHXGugXJhP8V" in analytics
+    assert "https://us.i.posthog.com" in analytics
+    assert "person_profiles:'identified_only'" in analytics
+    assert "capture_pageview:true" in analytics
+    assert "capture_pageleave:true" in analytics
+    assert "disable_session_recording:true" in analytics
+    assert "expected exactly one PostHog initialization" in verifier
