@@ -66,6 +66,28 @@ The agent's authority is bounded by the endpoint declaration. Exact application 
 
 The [browser-local contract playground](/playground/) lets you inspect request-owned customer IDs, a bounded summary/detailed format you select, and one application-owned lookup. It does not call a model, execute Python, or contact a server. Compare the preview with the [shipped bound-operation example](https://github.com/tugrulguner/summonpot/blob/main/examples/07_bound_operation.py) for the actual Python declaration and API.
 
+## Execution paths at a glance
+
+The existing overview diagram shows the current single-operation direct slice beside the agent-backed path. It is conceptual; eligibility remains limited to the complete contract described below.
+
+<figure class="supporting-diagram">
+  <a href="/diagrams/one-declaration-two-flows.png" target="_blank" rel="noreferrer" aria-label="Open the full-size execution-path diagram">
+    <img src="/diagrams/one-declaration-two-flows.png" width="1600" height="900" alt="One Summonpot application branches into either the exact shipped single-operation direct slice or an agent-backed endpoint through the same typed HTTP and OpenAPI framework." loading="lazy" />
+  </a>
+  <figcaption>One application contract supports the currently shipped direct slice and the agent-backed path. <a href="/diagrams/one-declaration-two-flows.png">Open full size</a>.</figcaption>
+</figure>
+
+## Application authority stays bounded
+
+Application code supplies exact operations; only explicitly declared agent choices remain model-selected. Request bindings and required-operation enforcement stay under framework control.
+
+<figure class="supporting-diagram">
+  <a href="/diagrams/authority-boundary.svg" target="_blank" rel="noreferrer" aria-label="Open the full-size authority-boundary diagram">
+    <img src="/diagrams/authority-boundary.svg" width="800" height="450" alt="Authority boundary: application-owned operations and validated request data are distinct from bounded agent-owned choices; Summonpot enforces required operations and validates final output." loading="lazy" />
+  </a>
+  <figcaption>Declared capabilities bound authority; final output is validated locally. <a href="/diagrams/authority-boundary.svg">Open full size</a>.</figcaption>
+</figure>
+
 ## Try a complete endpoint
 
 This endpoint takes a validated topic, lets the agent choose the operation's response

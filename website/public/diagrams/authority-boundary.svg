@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="560" viewBox="0 0 1440 560" role="img" aria-labelledby="title desc">
+  <title id="title">One Summonpot framework supports deterministic and agentic endpoints</title>
+  <desc id="desc">One Summon application branches into the shipped single-operation direct slice and an agentic endpoint with an explicit agent-owned choice. Direct execution requires a Pydantic request, one Required Exactly 1 operation, at least one FromRequest binding, only FromRequest bindings or immutable identity-stable callable defaults, no unsupported ordering or sources, and exact operation-to-endpoint output identity. Both paths use typed contracts, HTTP, OpenAPI, and local validation.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#070a13"/>
+      <stop offset="1" stop-color="#11142b"/>
+    </linearGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arrow-cyan" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#34d399"/>
+    </marker>
+    <marker id="arrow-violet" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#a78bfa"/>
+    </marker>
+  </defs>
+
+  <rect x="1" y="1" width="1438" height="558" rx="24" fill="url(#background)" stroke="#29314d" stroke-width="2"/>
+
+  <path d="M300 280 C345 280 345 165 385 165" fill="none" stroke="#34d399" stroke-width="4" marker-end="url(#arrow-green)"/>
+  <path d="M300 280 C345 280 345 395 385 395" fill="none" stroke="#a78bfa" stroke-width="4" marker-end="url(#arrow-violet)"/>
+  <path d="M1040 165 C1090 165 1090 280 1130 280" fill="none" stroke="#34d399" stroke-width="4" marker-end="url(#arrow-green)"/>
+  <path d="M1040 395 C1090 395 1090 280 1130 280" fill="none" stroke="#a78bfa" stroke-width="4" marker-end="url(#arrow-violet)"/>
+
+  <text x="720" y="48" text-anchor="middle" fill="#f8fafc" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="27" font-weight="700">One framework. Deterministic and agentic endpoints.</text>
+  <text x="720" y="76" text-anchor="middle" fill="#94a3b8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15">The declaration style and public API stay the same.</text>
+
+  <g>
+    <rect x="40" y="175" width="260" height="210" rx="16" fill="#0b1825" stroke="#22d3ee" stroke-width="2"/>
+    <circle cx="72" cy="210" r="7" fill="#22d3ee" filter="url(#glow)"/>
+    <text x="92" y="217" fill="#67e8f9" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" font-weight="700">SUMMON APP</text>
+    <text x="72" y="266" fill="#f8fafc" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="17">Summon("research-api")</text>
+    <text x="72" y="310" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15">same declaration style</text>
+    <text x="72" y="348" fill="#64748b" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">two typed endpoints</text>
+  </g>
+
+  <g>
+    <rect x="390" y="95" width="650" height="180" rx="16" fill="#092019" stroke="#34d399" stroke-width="2"/>
+    <circle cx="422" cy="128" r="7" fill="#34d399" filter="url(#glow)"/>
+    <text x="442" y="135" fill="#6ee7b7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" font-weight="700">SHIPPED SINGLE-OP DIRECT SLICE</text>
+    <text x="422" y="170" fill="#f8fafc" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="700">Pydantic request • exactly one operation</text>
+    <text x="422" y="200" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">Required(..., calls=Exactly(1))</text>
+    <text x="422" y="222" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">≥1 FromRequest • immutable stable defaults only</text>
+    <text x="422" y="244" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">no ordering or unsupported sources</text>
+    <text x="422" y="266" fill="#94a3b8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">operation output = endpoint output (exact identity)</text>
+  </g>
+
+  <g>
+    <rect x="390" y="305" width="650" height="180" rx="16" fill="#17112b" stroke="#a78bfa" stroke-width="2"/>
+    <circle cx="422" cy="338" r="7" fill="#a78bfa" filter="url(#glow)"/>
+    <text x="442" y="345" fill="#c4b5fd" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" font-weight="700">AGENTIC ENDPOINT</text>
+    <text x="422" y="388" fill="#f8fafc" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="19" font-weight="700">@summon("/reports/agentic")</text>
+    <text x="422" y="426" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="16">FromRequest(...)  +  AgentChoice()</text>
+    <text x="422" y="458" fill="#94a3b8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">the agent owns only the declared semantic choice</text>
+  </g>
+
+  <g>
+    <rect x="1130" y="175" width="270" height="210" rx="16" fill="#211608" stroke="#f59e0b" stroke-width="2"/>
+    <circle cx="1162" cy="210" r="7" fill="#f59e0b" filter="url(#glow)"/>
+    <text x="1182" y="217" fill="#fbbf24" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" font-weight="700">SAME FRAMEWORK</text>
+    <text x="1162" y="264" fill="#f8fafc" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="16">typed request/response</text>
+    <text x="1162" y="302" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="16">HTTP + OpenAPI</text>
+    <text x="1162" y="340" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="16">local validation</text>
+  </g>
+
+  <rect x="275" y="510" width="890" height="30" rx="9" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+  <text x="720" y="531" text-anchor="middle" fill="#94a3b8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">Current runtime: eligible single-op slice runs directly  ·  every other declaration uses the agent runtime</text>
+</svg>

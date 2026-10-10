@@ -34,7 +34,8 @@ try {
    const links=[...document.querySelectorAll('.framework-actions a')].map(a=>({text:a.textContent.trim(),href:a.getAttribute('href'),cls:a.className,box:(()=>{const r=a.getBoundingClientRect();return {width:r.width,height:r.height,bottom:r.bottom}})()}));
    const main=document.querySelector('.main-frame')?.getBoundingClientRect();
    const markdown=document.querySelector('.sl-markdown-content')?.getBoundingClientRect();
-   return {main:main&&{x:main.x,width:main.width,right:main.right},markdown:markdown&&{x:markdown.x,width:markdown.width,right:markdown.right},hero:box('.framework-hero'),copy:box('.framework-copy'),art:box('.framework-art'),image:box('.framework-art img'),actions:links,credit:box('.framework-copy .creator-attribution'),install:box('.installation-strip'),notice:box('.maturity-notice'),demo:box('.project-demo'),installCommand:document.querySelector('.installation-strip code')?.textContent,theme:document.documentElement.dataset.theme, overflow:document.documentElement.scrollWidth>innerWidth, h1:[...document.querySelectorAll('main h1')].filter(x=>x.getClientRects().length).map(x=>x.textContent.trim()), frames:document.querySelectorAll('iframe').length, body:getComputedStyle(document.body).backgroundColor};
+   const diagrams=[...document.querySelectorAll('main .supporting-diagram')].map(f=>({img:f.querySelector('img')?.currentSrc,alt:f.querySelector('img')?.alt,caption:f.querySelector('figcaption')?.innerText,link:f.querySelector('figcaption a')?.href,box:(()=>{const r=f.getBoundingClientRect();return {x:r.x,right:r.right}})()}));
+   return {main:main&&{x:main.x,width:main.width,right:main.right},markdown:markdown&&{x:markdown.x,width:markdown.width,right:markdown.right},hero:box('.framework-hero'),copy:box('.framework-copy'),art:box('.framework-art'),image:box('.framework-art img'),actions:links,credit:box('.framework-copy .creator-attribution'),install:box('.installation-strip'),notice:box('.maturity-notice'),demo:box('.project-demo'),diagrams,installCommand:document.querySelector('.installation-strip code')?.textContent,theme:document.documentElement.dataset.theme, overflow:document.documentElement.scrollWidth>innerWidth, h1:[...document.querySelectorAll('main h1')].filter(x=>x.getClientRects().length).map(x=>x.textContent.trim()), frames:document.querySelectorAll('iframe').length, body:getComputedStyle(document.body).backgroundColor};
   });
   check(state.theme===theme,`${width}: theme mismatch`);
   check(state.installCommand==='pip install "summonpot[serve,cli]"',`${width}/${theme}: install command must preserve ASCII shell quotes: ${state.installCommand}`);
@@ -73,6 +74,12 @@ try {
   check(state.credit?.y>=Math.max(...state.actions.map(a=>a.box.bottom)),`${width}: creator credit is not immediately after the actions`);
   check(state.install&&state.notice&&state.demo&&state.install.y>state.hero.y&&state.notice.y>state.install.y&&state.demo.y>state.notice.y,`${width}: installation/maturity/demo section order incorrect`);
   check(state.frames===0,`${width}: homepage must link to, not embed, the standalone playground (${state.frames} iframe(s))`);
+  check(state.diagrams.length===2,`${width}/${theme}: expected both existing supporting diagrams, got ${state.diagrams.length}`);
+  for(const [i,diagram] of state.diagrams.entries()){
+   check(Boolean(diagram.img&&diagram.alt&&diagram.alt.length>30&&diagram.caption),`${width}/${theme}: diagram ${i} needs image, meaningful alt text and a visible caption`);
+   check(Boolean(diagram.link&&new URL(diagram.link).pathname===new URL(diagram.img).pathname),`${width}/${theme}: diagram ${i} needs an exact full-size link`);
+   check(Boolean(diagram.box&&diagram.box.x>=0&&diagram.box.right<=width+1),`${width}/${theme}: diagram ${i} escapes viewport`);
+  }
   if (width === 320) {
    const codeBlocks=page.locator('main .sl-markdown-content pre');
    const count=await codeBlocks.count();
