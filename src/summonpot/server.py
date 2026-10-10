@@ -60,7 +60,8 @@ def build_app(summon: Summon) -> Any:
         # the rest of this loop uses it: the public EndpointDef is mutable.
         route_kwargs: dict[str, Any] = {
             "methods": [method],
-            "response_model": definition.output_model,
+            "response_model": getattr(definition, "output_annotation", None)
+            or definition.output_model,
             "summary": (
                 definition.description.split("\n")[0]
                 if definition.description
@@ -79,7 +80,10 @@ def build_app(summon: Summon) -> Any:
             RequestModel: Any
             body_field_names: dict[str, str] | Any = None
             if definition.input_model is not None:
-                RequestModel = definition.input_model
+                RequestModel = (
+                    getattr(definition, "input_annotation", None)
+                    or definition.input_model
+                )
             elif not _body_parameters(definition):
                 # Every declared parameter is carried by the URL, so there is no
                 # body left to describe. Generating an empty model anyway would

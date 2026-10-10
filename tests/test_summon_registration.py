@@ -84,6 +84,22 @@ def test_registered_declaration_preserves_its_public_signature():
     assert inspect.signature(research_topic) == inspect.signature(expected)
 
 
+@pytest.mark.parametrize("field_name", ["self", "cls"])
+def test_endpoint_business_fields_named_self_or_cls_are_retained(field_name):
+    summon = Summon("svc")
+    namespace = {"Summon": summon}
+    exec(
+        f"def endpoint({field_name}: str) -> str:\n"
+        "    '''Echo a business field.'''\n"
+        "    ...\n",
+        namespace,
+    )
+
+    namespace["Summon"]("/echo")(namespace["endpoint"])
+
+    assert [p.name for p in summon.endpoints[0].parameters] == [field_name]
+
+
 def test_summon_registers_pydantic_input_and_output_contracts():
     summon = Summon("svc")
 
@@ -96,6 +112,31 @@ def test_summon_registers_pydantic_input_and_output_contracts():
     assert endpoint.input_model is ResearchRequest
     assert endpoint.output_model is ResearchResponse
     assert endpoint.return_type == "ResearchResponse"
+
+
+def test_annotated_models_are_classified_without_losing_the_annotation():
+    input_annotation = Annotated[ResearchRequest, Field(description="request contract")]
+    output_annotation = Annotated[
+        ResearchResponse, Field(description="response contract")
+    ]
+    namespace = {
+        "Summon": Summon("svc"),
+        "Input": input_annotation,
+        "Output": output_annotation,
+    }
+    exec(
+        "def endpoint(request: Input) -> Output:\n    '''Research.'''\n    ...\n",
+        namespace,
+    )
+
+    namespace["Summon"]("/research")(namespace["endpoint"])
+
+    endpoint = namespace["Summon"].endpoints[0]
+    assert endpoint.input_model is ResearchRequest
+    assert endpoint.output_model is ResearchResponse
+    assert endpoint.parameters[0].annotation is input_annotation
+    assert endpoint.input_annotation is input_annotation
+    assert endpoint.output_annotation is output_annotation
 
 
 def _register_with_unresolvable_annotations(source: str):

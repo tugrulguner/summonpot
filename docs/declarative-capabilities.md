@@ -30,6 +30,17 @@ The signature defines four things:
 - Dependencies are the complete set of deterministic operations available to execution.
 - The Pydantic return model is the required output contract.
 
+`Annotated[RequestModel, ...]` and `Annotated[ResponseModel, ...]` retain their
+validation and schema metadata across runtime execution and HTTP. The request remains
+a flat model body, not a nested parameter wrapper. Endpoint inspection exposes the
+underlying model classes and the full annotations separately. For direct execution,
+the operation output must be the exact response annotation, including its metadata;
+a bare model output does not satisfy an annotated response contract.
+
+Scalar business parameters named `self` or `cls` are ordinary request fields, not
+implicit receivers. Actual unbound endpoint methods are rejected; declare an endpoint
+as a standalone function or pass an already-bound callable.
+
 ## Dependency semantics
 
 `Depends(operation)` makes an exact operation available to execution. On the agent-backed

@@ -89,6 +89,36 @@ def test_direct_endpoint_runs_through_http_without_provider_credentials():
     assert summon._runtime._agents == {}
 
 
+def test_annotated_request_and_response_metadata_reach_openapi_and_runtime():
+    summon = Summon("annotated-service", model="test")
+    namespace = {
+        "Request": Annotated[DirectRequest, Field(description="request metadata")],
+        "Response": Annotated[DirectResponse, Field(description="response metadata")],
+        "Summon": summon,
+        "DirectResponse": DirectResponse,
+    }
+    exec(
+        "def endpoint(request: Request) -> Response:\n"
+        "    '''Return an annotated response.'''\n"
+        "    return DirectResponse(doubled=request.value * 2)\n",
+        namespace,
+    )
+    summon("/annotated")(namespace["endpoint"])
+
+    app = build_app(summon)
+    operation = app.openapi()["paths"]["/annotated"]["post"]
+    request_schema = operation["requestBody"]["content"]["application/json"]["schema"]
+    response_schema = operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]
+    response = TestClient(app).post("/annotated", json={"value": 4})
+
+    assert request_schema["$ref"].endswith("DirectRequest")
+    assert response_schema["description"] == "response metadata"
+    assert response.status_code == 200
+    assert response.json() == {"doubled": 0}
+
+
 def test_direct_http_route_uses_registration_time_metadata():
     class MutatedRequest(BaseModel):
         value: str
