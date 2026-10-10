@@ -74,7 +74,8 @@ try {
   check(state.credit?.y>=Math.max(...state.actions.map(a=>a.box.bottom)),`${width}: creator credit is not immediately after the actions`);
   check(state.install&&state.notice&&state.demo&&state.install.y>state.hero.y&&state.notice.y>state.install.y&&state.demo.y>state.notice.y,`${width}: installation/maturity/demo section order incorrect`);
   check(state.frames===0,`${width}: homepage must link to, not embed, the standalone playground (${state.frames} iframe(s))`);
-  check(state.diagrams.length===2,`${width}/${theme}: expected both existing supporting diagrams, got ${state.diagrams.length}`);
+  check(state.diagrams.length===1,`${width}/${theme}: expected exactly one meaningful supporting execution diagram (the original README diagram), got ${state.diagrams.length}`);
+  check(state.diagrams[0]?.img?.endsWith('/diagrams/one-declaration-two-flows.png'),`${width}/${theme}: the original supporting execution diagram must remain on the homepage`);
   for(const [i,diagram] of state.diagrams.entries()){
    check(Boolean(diagram.img&&diagram.alt&&diagram.alt.length>30&&diagram.caption),`${width}/${theme}: diagram ${i} needs image, meaningful alt text and a visible caption`);
    check(Boolean(diagram.link&&new URL(diagram.link).pathname===new URL(diagram.img).pathname),`${width}/${theme}: diagram ${i} needs an exact full-size link`);

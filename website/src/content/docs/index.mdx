@@ -77,17 +77,6 @@ The existing overview diagram shows the current single-operation direct slice be
   <figcaption>One application contract supports the currently shipped direct slice and the agent-backed path. <a href="/diagrams/one-declaration-two-flows.png">Open full size</a>.</figcaption>
 </figure>
 
-## Application authority stays bounded
-
-Application code supplies exact operations; only explicitly declared agent choices remain model-selected. Request bindings and required-operation enforcement stay under framework control.
-
-<figure class="supporting-diagram">
-  <a href="/diagrams/authority-boundary.svg" target="_blank" rel="noreferrer" aria-label="Open the full-size authority-boundary diagram">
-    <img src="/diagrams/authority-boundary.svg" width="800" height="450" alt="Authority boundary: application-owned operations and validated request data are distinct from bounded agent-owned choices; Summonpot enforces required operations and validates final output." loading="lazy" />
-  </a>
-  <figcaption>Declared capabilities bound authority; final output is validated locally. <a href="/diagrams/authority-boundary.svg">Open full size</a>.</figcaption>
-</figure>
-
 ## Try a complete endpoint
 
 This endpoint takes a validated topic, lets the agent choose the operation's response
