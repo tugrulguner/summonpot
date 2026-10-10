@@ -1,0 +1,1 @@
+Preserve `Annotated` metadata on Pydantic request and response models through runtime validation and HTTP schema generation.

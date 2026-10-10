@@ -1012,7 +1012,7 @@ def _compile_endpoint(
     """Snapshot validated endpoint metadata into an immutable runtime plan."""
     source_tools = tuple(endpoint.tools)
     output_adapter = (
-        TypeAdapter(endpoint.output_model)
+        TypeAdapter(endpoint.output_annotation or endpoint.output_model)
         if endpoint.output_model is not None
         else None
     )
@@ -1057,7 +1057,7 @@ def _compile_endpoint(
         input_validator=_compile_input_validator(input_adapter),
         prompt_schema=prompt_schema,
         prompt_definitions=prompt_definitions,
-        output_model=endpoint.output_model,
+        output_model=endpoint.output_annotation or endpoint.output_model,
         output_auditor=(
             _compile_output_auditor(output_adapter)
             if output_adapter is not None
@@ -1077,7 +1077,7 @@ def _compile_input_adapter(
 ) -> tuple[TypeAdapter[Any], Mapping[str, str] | None]:
     """Compile the request contract used by raw runtime callers."""
     if endpoint.input_model is not None:
-        return TypeAdapter(endpoint.input_model), None
+        return TypeAdapter(endpoint.input_annotation or endpoint.input_model), None
     if not endpoint.parameters:
         empty_model = create_model(
             f"{endpoint.name}RuntimeRequest",
@@ -1168,7 +1168,9 @@ def _direct_tool_index(
     if enforce_index is None or endpoint.input_model is None:
         return None
     contract = tools[enforce_index].contract
-    if contract is None or contract.output is not endpoint.output_model:
+    if contract is None or contract.output is not (
+        endpoint.output_annotation or endpoint.output_model
+    ):
         return None
     if not contract.bind or any(
         not isinstance(source, FromRequest) for source in contract.bind.values()

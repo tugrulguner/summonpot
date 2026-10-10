@@ -56,6 +56,11 @@ Four parts, all load-bearing:
 | `Depends` / `Required` | the complete set of operations available to execution |
 | return model | the final local validator; on the agent path, the structured-output schema |
 
+`Annotated[RequestModel, ...]` and `Annotated[ResponseModel, ...]` keep their Pydantic
+metadata through runtime validation and the generated OpenAPI request/response schemas.
+Use these annotations when attaching constraints or schema descriptions; the underlying
+models remain available through endpoint inspection.
+
 `Depends(op)` makes an operation available to execution. On the agent-backed path, the
 agent *may* call it. `Required(op)` rejects a final response until the operation has
 completed successfully. Required use is checked from runtime state, not asked for in the
