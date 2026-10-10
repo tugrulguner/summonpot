@@ -18,6 +18,14 @@ def test_skill_ships_inside_the_package():
     assert SKILL_NAME == "summonpot"
 
 
+def test_skill_documents_annotated_endpoint_metadata():
+    body = " ".join(skill_body().split())
+    assert "Annotated[RequestModel, ...]" in body
+    assert "Annotated[ResponseModel, ...]" in body
+    assert "exact response annotation, including its metadata" in body
+    assert "`self` or `cls` remain ordinary request fields" in body
+
+
 def test_description_says_when_to_load_it():
     """An agent reads only the description when deciding to open the skill."""
     assert "@summon" in SKILL_DESCRIPTION

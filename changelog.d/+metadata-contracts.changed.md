@@ -1,1 +1,1 @@
-Preserve `Annotated` metadata on Pydantic request and response models through runtime validation and HTTP schema generation.
+Preserve `Annotated` metadata on Pydantic request and response models through runtime validation and HTTP schema generation, retain business parameters named `self` or `cls`, and reject unbound endpoint receivers instead of silently dropping them.

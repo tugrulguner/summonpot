@@ -1051,7 +1051,7 @@ def _compile_endpoint(
         description=endpoint.description,
         return_type=endpoint.return_type,
         parameters=tuple(_compile_parameter(param) for param in endpoint.parameters),
-        input_model=endpoint.input_model,
+        input_model=endpoint.input_annotation or endpoint.input_model,
         input_adapter=input_adapter,
         input_field_names=input_field_names,
         input_validator=_compile_input_validator(input_adapter),
