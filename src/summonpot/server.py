@@ -60,7 +60,7 @@ def build_app(summon: Summon) -> Any:
         # the rest of this loop uses it: the public EndpointDef is mutable.
         route_kwargs: dict[str, Any] = {
             "methods": [method],
-            "response_model": definition.output_model,
+            "response_model": _transport_response_model(definition),
             "summary": (
                 definition.description.split("\n")[0]
                 if definition.description
@@ -79,7 +79,10 @@ def build_app(summon: Summon) -> Any:
             RequestModel: Any
             body_field_names: dict[str, str] | Any = None
             if definition.input_model is not None:
-                RequestModel = definition.input_model
+                RequestModel = (
+                    getattr(definition, "input_annotation", None)
+                    or definition.input_model
+                )
             elif not _body_parameters(definition):
                 # Every declared parameter is carried by the URL, so there is no
                 # body left to describe. Generating an empty model anyway would
@@ -112,6 +115,55 @@ def build_app(summon: Summon) -> Any:
             app.add_api_route(route_path, _handle_without_body, **route_kwargs)
 
     return app
+
+
+def _transport_response_model(definition: Any) -> Any:
+    """Audit and serialize validated annotated outputs without replaying validators.
+
+    The runtime owns application validation. The transport uses the registered
+    schema only for JSON schema generation and serialization, retaining the inert
+    storage audit before serialization. Ordinary/unregistered outputs keep FastAPI's
+    existing validation behavior.
+    """
+    annotation = (
+        getattr(definition, "output_annotation", None) or definition.output_model
+    )
+    if not (
+        isinstance(definition, _CompiledEndpoint)
+        and get_origin(annotation) is Annotated
+        and definition.output_adapter is not None
+        and definition.output_auditor is not None
+    ):
+        return annotation
+
+    from pydantic import GetPydanticSchema
+    from pydantic_core import core_schema
+
+    original_schema: Any = definition.output_adapter.core_schema
+    if original_schema.get("type") == "definitions":
+        original_schema = original_schema["schema"]
+    audit = definition.output_auditor
+
+    def transport_schema(source: Any, handler: Any) -> Any:
+        handler(source)  # Register model definitions with Pydantic's schema generator.
+        # The original schema remains the serialization and documentation authority;
+        # only admission is replaced with an inert audit of already-validated storage.
+        schema = core_schema.no_info_plain_validator_function(
+            audit,
+            json_schema_input_schema=original_schema,
+            serialization=core_schema.wrap_serializer_function_ser_schema(
+                lambda value, serialize: serialize(value), schema=original_schema
+            ),
+            metadata={
+                **original_schema.get("metadata", {}),
+                "pydantic_js_annotation_functions": [
+                    lambda schema, json_handler: json_handler(original_schema)
+                ],
+            },
+        )
+        return schema
+
+    return Annotated[annotation, GetPydanticSchema(transport_schema)]
 
 
 def _reject_invalid_operation_ids(endpoints: list[Any]) -> None:

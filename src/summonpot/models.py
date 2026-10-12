@@ -141,3 +141,9 @@ class EndpointDef:
 
     operation_id: str = ""
     """Stable OpenAPI operationId. Set by Summon at registration."""
+
+    input_annotation: Any = None
+    """Full request annotation, including Annotated metadata."""
+
+    output_annotation: Any = None
+    """Full response annotation, including Annotated metadata."""

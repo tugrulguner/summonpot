@@ -189,13 +189,15 @@ class Summon:
 
             # Extract parameters from function signature
             sig = inspect.signature(func)
+            from summonpot.tools import _reject_unbound_receiver
+
+            _reject_unbound_receiver(func, sig)
             hints = safe_get_type_hints(func)
             parameters: list[ParamDef] = []
             dependency_tools: list[ToolDef] = []
             input_model: type[BaseModel] | None = None
+            input_annotation: Any = None
             for pname, param in sig.parameters.items():
-                if pname in ("self", "cls"):
-                    continue
                 if isinstance(param.default, Dependency):
                     # `.callable` unwraps an Operation contract; a bare callable
                     # passes through unchanged, so existing endpoints are untouched.
@@ -211,7 +213,8 @@ class Summon:
                     annotation, where=f"parameter {pname!r}", endpoint=endpoint_name
                 )
                 if _is_pydantic_model(annotation):
-                    input_model = annotation
+                    input_model = _unwrap_annotated(annotation)
+                    input_annotation = annotation
                 type_str = get_type_str(pname, param, hints)
                 is_required = param.default is inspect.Parameter.empty
                 parameters.append(
@@ -259,7 +262,12 @@ class Summon:
             reject_unresolved(
                 return_hint, where="the return type", endpoint=endpoint_name
             )
-            output_model = return_hint if _is_pydantic_model(return_hint) else None
+            output_model = (
+                _unwrap_annotated(return_hint)
+                if _is_pydantic_model(return_hint)
+                else None
+            )
+            output_annotation = return_hint if output_model is not None else None
             if return_hint is inspect.Parameter.empty or return_hint is None:
                 return_type = "str"
             else:
@@ -376,6 +384,8 @@ class Summon:
                 method=normalized_method,
                 path_parameter_names=path_parameter_names,
                 operation_id=operation_id,
+                input_annotation=input_annotation,
+                output_annotation=output_annotation,
             )
             _register_endpoint(endpoint)
             self._routes[route] = endpoint_name
@@ -500,4 +510,5 @@ SUPPORTED_METHODS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"})
 
 
 def _is_pydantic_model(annotation: Any) -> bool:
+    annotation = _unwrap_annotated(annotation)
     return isinstance(annotation, type) and issubclass(annotation, BaseModel)
