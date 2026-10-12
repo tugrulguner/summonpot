@@ -57,6 +57,35 @@ try {
   assert.deepEqual(outcomeEvents.map(x => [x.properties.project, x.properties.mode]), [['summonpot','bounded-operation'],['summonpot','bounded-operation']]);
   assert.equal(outcomeEvents[0].properties.attempt_id, outcomeEvents[1].properties.attempt_id);
   assert.ok(!JSON.stringify(requests).includes('customer-7'), 'editable customer identifier must not leave the browser');
+  // Exercise the real SDK, not a capture stub, at the same post-operation boundary.
+  await page.evaluate(() => {
+    const node = document.querySelector('#customer-name');
+    const descriptor = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
+    let writes = 0;
+    Object.defineProperty(node, 'textContent', {
+      configurable: true,
+      get() { return descriptor.get.call(this); },
+      set(value) {
+        if (++writes === 2) { delete this.textContent; throw new Error('CANARY_PRESENTATION_FAILURE'); }
+        descriptor.set.call(this, value);
+      },
+    });
+  });
+  await page.getByRole('button', { name: 'Run contract', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('#rejection')?.textContent.includes('Try running again'));
+  await page.getByRole('button', { name: 'Run contract', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('#status')?.textContent === 'LOCAL CONTRACT PREVIEW');
+  const allOutcomes = () => requests.flatMap(x => (Array.isArray(x.payload?.batch) ? x.payload.batch : Array.isArray(x.payload) ? x.payload : [x.payload]).filter(Boolean)).filter(x => x.event === 'playground_preview_started' || x.event === 'playground_preview_completed');
+  const deadline = Date.now() + 20_000;
+  while (allOutcomes().length < 6 && Date.now() < deadline) await page.waitForTimeout(100);
+  const paired = allOutcomes();
+  assert.equal(paired.length, 6, 'real SDK must deliver three complete invocation pairs');
+  assert.deepEqual(paired.filter(x => x.event === 'playground_preview_completed').map(x => [x.properties.result, x.properties.failure_class]), [['success', undefined], ['failed', 'execution'], ['success', undefined]]);
+  const starts = paired.filter(x => x.event === 'playground_preview_started');
+  assert.equal(new Set(starts.map(x => x.properties.attempt_id)).size, 3);
+  for (const start of starts) assert.equal(paired.filter(x => x.event === 'playground_preview_completed' && x.properties.attempt_id === start.properties.attempt_id).length, 1);
+  assert.ok(!JSON.stringify(requests).includes('CANARY_PRESENTATION_FAILURE'), 'private exception text must not enter SDK envelopes');
+
   await page.goto(`${origin}/quick-start/?utm_source=CANARY_NAV&gclid=CANARY_NAV_GCLID#CANARY_NAV_HASH`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(4000);
   const afterNavigation = requests.flatMap(x => (Array.isArray(x.payload?.batch) ? x.payload.batch : Array.isArray(x.payload) ? x.payload : [x.payload]).filter(Boolean));

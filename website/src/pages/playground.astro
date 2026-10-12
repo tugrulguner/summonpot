@@ -146,17 +146,27 @@ ${endpoint}`;
       if (!/^customer-(7|9)$/.test(customerId)) { reject('Rejected: choose an approved customer ID (customer-7 or customer-9). The request owns this ID.'); return; }
       if (format !== 'summary' && format !== 'detailed') { reject('Rejected: format is outside the declared AgentChoice values.'); return; }
       const attempt = outcomes.start('bounded-operation');
-      output('trace-input').textContent = `FromRequest · customer_id=${customerId}`;
-      output('trace-choice').textContent = `AgentChoice · ${format} (visitor-selected preview)`; output('trace-result').textContent = 'Operation result · running';
-      const labels = ['request','choice','operation','response'];
-      for (let i = 0; i < labels.length; i++) { document.querySelector(`[data-step="${labels[i]}"]`)?.classList.add('active'); await new Promise<void>((resolve) => { const timer = window.setTimeout(resolve, 240); pendingTimers.push({ timer, cancel: resolve }); }); if (version !== runVersion) { outcomes.complete(attempt, 'failed', 'cancelled'); return; } }
-      const record = customerId === 'customer-7' ? { name: 'Ada', status: 'active' } : { name: 'Grace', status: 'paused' };
-      output('bound-customer-id').textContent = customerId;
-      output('customer-name').textContent = record.name; output('customer-status').textContent = record.status; output('customer-format').textContent = String(format);
-      output('trace-result').textContent = `Operation result · ${customerId} / ${record.name} / ${record.status} / ${format}`;
-      output('result-title').textContent = `${record.name} · ${record.status}`; output('status').textContent = 'LOCAL CONTRACT PREVIEW';
-      output('result-copy').textContent = format === 'summary' ? `${record.name} is ${record.status}.` : `${record.name} (${customerId}) — status: ${record.status}; format: detailed.`;
-      outcomes.complete(attempt, 'success');
+      try {
+        output('trace-input').textContent = `FromRequest · customer_id=${customerId}`;
+        output('trace-choice').textContent = `AgentChoice · ${format} (visitor-selected preview)`; output('trace-result').textContent = 'Operation result · running';
+        const labels = ['request','choice','operation','response'];
+        for (let i = 0; i < labels.length; i++) { document.querySelector(`[data-step="${labels[i]}"]`)?.classList.add('active'); await new Promise<void>((resolve) => { const timer = window.setTimeout(resolve, 240); pendingTimers.push({ timer, cancel: resolve }); }); if (version !== runVersion) { outcomes.complete(attempt, 'failed', 'cancelled'); return; } }
+        const record = customerId === 'customer-7' ? { name: 'Ada', status: 'active' } : { name: 'Grace', status: 'paused' };
+        output('bound-customer-id').textContent = customerId;
+        output('customer-name').textContent = record.name; output('customer-status').textContent = record.status; output('customer-format').textContent = String(format);
+        output('trace-result').textContent = `Operation result · ${customerId} / ${record.name} / ${record.status} / ${format}`;
+        output('result-title').textContent = `${record.name} · ${record.status}`; output('status').textContent = 'LOCAL CONTRACT PREVIEW';
+        output('result-copy').textContent = format === 'summary' ? `${record.name} is ${record.status}.` : `${record.name} (${customerId}) — status: ${record.status}; format: detailed.`;
+        outcomes.complete(attempt, 'success');
+      } catch {
+        outcomes.complete(attempt, 'failed', 'execution');
+        // The result surface itself may be broken; feedback must not lose the completion.
+        try {
+          resetSteps();
+          output('status').textContent = 'PREVIEW FAILED';
+          reject('Preview failed: the local result could not be displayed. Try running again.');
+        } catch { /* Keep the bounded failure recorded even if feedback cannot render. */ }
+      }
     });
     form.addEventListener('input', () => { cancelRun(); clearPresentation(); });
     document.querySelector<HTMLButtonElement>('#reset')!.addEventListener('click', () => { cancelRun(); HTMLFormElement.prototype.reset.call(form); clearPresentation(); });

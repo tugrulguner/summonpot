@@ -146,6 +146,33 @@ try {
   await page.waitForTimeout(1050);
   check(await cleared(page), "cancelled timers changed reset state");
 
+  // Fail only at post-operation presentation, not during stale-output clearing.
+  await page.evaluate(() => {
+    window.__previewOutcomes = [];
+    window.posthog = { capture(event, properties) { window.__previewOutcomes.push({ event, properties }); } };
+    const name = document.querySelector('#customer-name');
+    const descriptor = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
+    let writes = 0;
+    Object.defineProperty(name, 'textContent', {
+      configurable: true,
+      get() { return descriptor.get.call(this); },
+      set(value) {
+        if (++writes === 2) { delete this.textContent; throw new Error('PRIVATE_PRESENTATION_FAILURE'); }
+        descriptor.set.call(this, value);
+      },
+    });
+  });
+  await run();
+  check(await page.waitForFunction(() => window.__previewOutcomes.length === 2, {}, { timeout: 2500 }).then(() => true, () => false), 'presentation failure must emit one start and one completion');
+  const failedAttempt = await page.evaluate(() => window.__previewOutcomes);
+  check(failedAttempt.length === 2 && failedAttempt[0].event === 'playground_preview_started' && failedAttempt[1].event === 'playground_preview_completed' && failedAttempt[1].properties.result === 'failed' && failedAttempt[1].properties.failure_class === 'execution' && failedAttempt[0].properties.attempt_id === failedAttempt[1].properties.attempt_id, 'presentation failure must pair exactly once as failed/execution, never success');
+  check((await page.locator('#rejection').textContent()).includes('Try running again'), 'presentation failure must provide bounded retry feedback');
+  check(!JSON.stringify(failedAttempt).includes('PRIVATE_PRESENTATION_FAILURE'), 'presentation exception text must not enter analytics');
+  await run();
+  await waitDone();
+  const retriedAttempts = await page.evaluate(() => window.__previewOutcomes);
+  check(retriedAttempts.length === 4 && retriedAttempts[3].properties.result === 'success' && retriedAttempts[2].properties.attempt_id === retriedAttempts[3].properties.attempt_id && retriedAttempts[0].properties.attempt_id !== retriedAttempts[2].properties.attempt_id, 'valid retry must have a distinct matched success attempt');
+
   // Analytics start/completion may throw; the browser-local operation must still succeed.
   await page.evaluate(() => { window.posthog = { capture() { throw new Error("analytics offline"); } }; });
   await run();
