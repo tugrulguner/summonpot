@@ -579,6 +579,42 @@ class Runtime:
             check_deadline()
             return result
 
+        # Resolve only the application-owned prefix. The same run, deadline and
+        # reservations remain authoritative if a real choice needs the agent.
+        if plan.result_dependent_order is not None:
+            for identity in plan.result_dependent_order:
+                tool = plan.tools[identity]
+                supplied: dict[str, Any] = {}
+                bindings = _choice_bindings(tool)
+                if bindings:
+                    async with run.lock:
+                        _ensure_choice_sets(tool, run, plan.tools)
+                        binding = bindings[0]
+                        choices = run.choice_sets[(tool.identity, binding.argument)]
+                    check_deadline()
+                    if len(choices) > 1:
+                        break
+                    supplied[binding.argument] = choices[0][0]
+                await _invoke_bound_operation(
+                    tool,
+                    run,
+                    supplied,
+                    redact_application_error=_http_error_boundary.get(),
+                )
+                check_deadline()
+            else:
+                assert plan.response_producer is not None
+                output = run.states[plan.response_producer].result
+                if plan.output_auditor is not None:
+                    try:
+                        output = plan.output_auditor(output)
+                    except Exception:
+                        raise _OperationOutputError(
+                            "Endpoint output did not satisfy its declared contract."
+                        ) from None
+                check_deadline()
+                return output
+
         agent = self._agent_for(endpoint)
         message = self._build_user_message(plan, request)
         check_deadline()

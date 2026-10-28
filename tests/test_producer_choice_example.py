@@ -141,7 +141,7 @@ def test_empty_candidates_returns_409_before_decision(tmp_path, monkeypatch) -> 
             },
         )
     assert response.status_code == 409
-    assert requests == [["find_candidates"]]
+    assert requests == []  # Empty domains are rejected before model resolution.
     with sqlite3.connect(path) as db:
         assert db.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 0
 

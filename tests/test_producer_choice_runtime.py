@@ -11,6 +11,20 @@ from summonpot import AgentChoice, Exactly, FromRequest, Operation, Required, Su
 from summonpot.runtime import Runtime
 
 
+@pytest.fixture(autouse=True)
+def preserve_agent_choice_protocol_coverage(monkeypatch):
+    """Keep historical agent adversaries on the agent compatibility executor."""
+    import summonpot._execution as execution
+
+    compile_endpoint = execution._compile_endpoint
+
+    def agent_plan(endpoint, **kwargs):
+        kwargs["allow_direct"] = False
+        return compile_endpoint(endpoint, **kwargs)
+
+    monkeypatch.setattr(execution, "_compile_endpoint", agent_plan)
+
+
 class Request(BaseModel):
     query: str
 

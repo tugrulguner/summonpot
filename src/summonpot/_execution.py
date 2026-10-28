@@ -181,6 +181,7 @@ class _CompiledEndpoint:
     direct_tool: int | None
     response_producer: int | None = None
     direct_chain_order: tuple[int, ...] | None = None
+    result_dependent_order: tuple[int, ...] | None = None
     context: _CompiledContext | None = field(default=None, repr=False)
 
 
@@ -1144,6 +1145,30 @@ def _compile_endpoint(
         direct_tool=direct_index,
         response_producer=(chain_indices[-1] if chain_indices else None),
         direct_chain_order=direct_chain_order,
+        result_dependent_order=(
+            chain_indices
+            if allow_direct
+            and chain_indices is not None
+            and endpoint.input_model is not None
+            and any(
+                type(binding.source) is FromRequest
+                for tool in tools
+                for binding in tool.bindings
+            )
+            and sum(
+                type(binding.source) is AgentChoice
+                for tool in tools
+                for binding in tool.bindings
+            )
+            == 1
+            and all(
+                type(binding.source) is not AgentChoice
+                or binding.producer_identity is not None
+                for tool in tools
+                for binding in tool.bindings
+            )
+            else None
+        ),
         context=context,
     )
 
