@@ -41,7 +41,7 @@ Use `make format` before committing.
   execution-engine configuration surface.
 - An endpoint with a Pydantic request model and one fully resolved required `Exactly(1)`
   operation with at least one `FromRequest` binding,
-  only `FromRequest` or immutable identity-stable callable defaults, and exact output
+  remaining inputs from `FromRequest`, authenticated `FromContext` (from 0.13.0), or immutable identity-stable callable defaults, and exact output
   identity executes directly without a model.
   A direct `AgentChoice` in the same admitted shape remains model-backed.
 - Registration rejects invalid declarations before traffic when the failure is knowable.

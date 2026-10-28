@@ -347,7 +347,8 @@ The capability set is closed. For one required typed operation with explicit `Ex
 runtime injects `FromRequest` values, removes them and callable defaults from any
 model-visible tool schema, validates the declared operation output, and rejects a second
 start. If the endpoint uses a Pydantic request model, has at least one `FromRequest`
-binding, uses only `FromRequest` or supported immutable callable defaults, and that output
+binding, resolves remaining inputs from `FromRequest`, authenticated `FromContext` (from
+0.13.0), or supported immutable callable defaults, and that output
 is exactly the endpoint response model,
 Summonpot executes the operation directly. Otherwise direct `AgentChoice` arguments remain
 visible to the agent. Request values on agentic paths still appear in the agent's user
@@ -446,8 +447,8 @@ subclass, and Python's numeric widening permits `int` or `bool` to feed `float`.
 > oversized sets fail with a fixed redacted 409 before model decision or downstream work.
 > Chains with choices remain agent-mediated; eligible fully resolved chains run model-free
 > from 0.12.0 under the exact predicate above. Both return the unique terminal operation's
-> canonical validated result. Current unreleased source also admits application-authenticated
-> `FromContext` under the contract below. Broader call bounds and graphs and broader
+> canonical validated result. From version 0.13.0, application-authenticated
+> `FromContext` is admitted under the contract below. Broader call bounds and graphs and broader
 > deterministic compilation remain planned. Binding sources must be
 > exact built-in vocabulary types; user-defined subclasses are rejected too. Bare callable
 > dependencies without an explicit `Operation` contract remain compatible. `Operation(fn)`
@@ -460,8 +461,7 @@ A uniquely ready required operation can feed the next step without asking the mo
 
 The chain accepts `FromRequest`, `FromResult`, supported immutable defaults, and
 producer-backed `AgentChoice(from_result=producer)` for a producer output of
-`list[ConcreteModel]` only. Published v0.12.0 does not support context bindings; current
-unreleased source adds authenticated `FromContext` as described below. Direct unbounded
+`list[ConcreteModel]` only. Version 0.12.0 did not support context bindings; authenticated `FromContext` is included from version 0.13.0 as described below. Direct unbounded
 choices remain unsupported inside chains. Candidate
 lists are limited to 128 items and 65,536 JSON characters per binding. Inert projections
 and opaque request-local tokens are exposed, never the canonical results; projection
@@ -483,7 +483,7 @@ and the [producer-constrained inventory choice example](examples/12_producer_cho
 for real persisted receipts and independent database checks. These application-owned
 operations do not imply a framework database adapter. This feature is included from version 0.11.0; historical v0.10.0 does not include it.
 
-### Authenticated application context (unreleased)
+### Authenticated application context (included from version 0.13.0)
 
 Use `Summon(context=authenticate)` to register a plain sync or async function taking one
 HTTP request and returning its annotated Pydantic principal. The model must have
@@ -522,7 +522,7 @@ Application outputs can intentionally disclose values and remain application-own
 credential policy, operation authorization, and tenant-scoped database queries. See the
 [runnable SQLite notes example](examples/13_authenticated_context/README.md) for verified
 bearer tokens, two independent tenants, persisted receipts, and idempotency. This feature is
-not included in published v0.12.0.
+not included in version 0.12.0.
 
 ## How it works today
 
@@ -583,7 +583,7 @@ Summonpot chooses its current execution path without adding a second endpoint AP
 
 | Contract state | Current execution |
 |---|---|
-| Pydantic request model, one required `Exactly(1)` operation, at least one `FromRequest` binding, only `FromRequest` or immutable identity-stable defaults, exact response-model output | Execute directly without a model |
+| Pydantic request model, one required `Exactly(1)` operation, at least one `FromRequest` binding, other inputs from `FromRequest`, authenticated `FromContext` (from 0.13.0), or immutable identity-stable defaults, exact response-model output | Execute directly without a model |
 | A direct `AgentChoice` remains in the admitted single-operation shape | Use the agent runtime with the enforced operation contract |
 | Eligible fully resolved sequential chain meeting every 0.12.0 predicate above | Model-free sequential execution; return the canonical terminal result |
 | Supported sequential chain with producer-backed `AgentChoice` | Agent-mediated readiness and result binding; return the canonical terminal result |

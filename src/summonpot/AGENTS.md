@@ -51,7 +51,7 @@ the one breaking change in 0.3.0 that surfaces under traffic rather than at impo
 
 **Keep the direct-execution predicate exact.** The shipped direct path requires a Pydantic
 request model, one required `Exactly(1)` operation, at least one `FromRequest` binding, only
-`FromRequest` or supported immutable callable defaults, and exact operation-output identity
+`FromRequest`, authenticated `FromContext` (from 0.13.0), or supported immutable callable defaults, and exact operation-output identity
 with the endpoint response model. From 0.12.0, model-free execution also covers uniquely
 ordered chains of two or more required `Exactly(1)` operations with the same Pydantic request
 and at-least-one-`FromRequest` requirements, only `FromRequest`/`FromResult` bindings or
@@ -59,6 +59,13 @@ supported immutable defaults, and an exact full terminal-response annotation. An
 `AgentChoice` remains agent-mediated. Preserve one permitted start per operation per request before application
 code. Never describe that local reservation as exactly-once completion, distributed
 deduplication, rollback, or cancellation.
+
+From 0.13.0, authenticated `FromContext` also resolves inputs in those admitted single
+operations and chains without relaxing request/output eligibility. Snapshot the provider
+and immutable canonical principal, preflight every context receiver before effects, keep
+context out of model input, and reject unsupported principal validation hooks. HTTP
+authentication requires standard `Runtime.call`; context-unused custom runtimes remain
+compatible. Context-only declarations remain agent-mediated.
 
 **`functools.wraps` is not enough to describe a capability.** It produces a usable
 schema only for a plain function; for a partial or a callable instance it leaves the

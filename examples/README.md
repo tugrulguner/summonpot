@@ -45,7 +45,7 @@ operation-output validation, and one permitted start. Level 7 runs that shipped 
 When the endpoint uses a Pydantic request model, the operation has at least one
 `FromRequest` binding, uses only `FromRequest` or supported immutable callable defaults,
 and its output exactly matches the endpoint response model, Summonpot executes it directly
-without a model; Level 8 runs that path. Version 0.11.0 also admits a sequential `Required(..., calls=Exactly(1))` chain of two or more operations, with exactly one ready operation at every step, linked by `FromResult` or `after` and using `FromRequest`/`FromResult`, supported immutable defaults, and optionally producer-backed `AgentChoice(from_result=...)` from `list[ConcreteModel]`. It has no context or broader bounds. At the historical v0.11.0 boundary, every supported chain executes through the agent runtime. The unique terminal operation output annotation must exactly match the endpoint response annotation; its canonical validated result is returned. `FromResult` implies readiness; optional `after` adds success-ordering. Intermediate canonical results are hidden from the model (completion acknowledgments only). Unsupported graphs fail closed. Sequential chain support starts in 0.11.0; historical v0.10.0 does not include it.
+without a model; Level 8 runs that path. Version 0.11.0 also admits a sequential `Required(..., calls=Exactly(1))` chain of two or more operations, with exactly one ready operation at every step, linked by `FromResult` or `after` and using `FromRequest`/`FromResult`, supported immutable defaults, and optionally producer-backed `AgentChoice(from_result=...)` from `list[ConcreteModel]`. At the historical v0.11.0 boundary, every supported chain executes through the agent runtime. The unique terminal operation output annotation must exactly match the endpoint response annotation; its canonical validated result is returned. `FromResult` implies readiness; optional `after` adds success-ordering. Intermediate canonical results are hidden from the model (completion acknowledgments only). Unsupported graphs fail closed. Sequential chain support starts in 0.11.0; historical v0.10.0 does not include it.
 
 From 0.12.0, fully resolved chains run without a model only with a Pydantic request,
 at least one `FromRequest` binding, two or more required `Exactly(1)` operations with
@@ -55,7 +55,7 @@ keeps its chain agent-mediated. The v0.11.0 boundary above is historical.
 
 ## Progression
 
-Current unreleased source adds [authenticated tenant context](13_authenticated_context/README.md)
+Included from version 0.13.0: [authenticated tenant context](13_authenticated_context/README.md)
 as level 13. It verifies application-owned bearer credentials and injects `FromContext`
 without putting identity in caller JSON or model arguments. The SQLite example runs
 model-free and independently verifies tenant-scoped writes and idempotency. Published
@@ -262,6 +262,7 @@ The examples do not claim these planned features exist:
 - broader multi-operation graph and model-free execution;
 - SQLAlchemy or SQLite operation adapters;
 - streaming responses;
-- built-in authentication.
+
+Authenticated context is an application-owned credential hook, not built-in login or authorization.
 
 For local development, bind to `127.0.0.1`. Before exposing a service, put authentication in front of it and configure runtime limits because every reachable request can spend provider credit.

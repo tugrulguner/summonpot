@@ -7,7 +7,7 @@ path a computable property rather than a guess.
 This module is declaration vocabulary. Registration validates every contract before
 serving. The runtime currently enforces one required ``Exactly(1)`` operation and a uniquely
 ordered sequential chain. Producer-backed choices are supported only in those chains;
-authenticated context injection is supported in unreleased source for those shapes.
+authenticated context injection is supported from version 0.13.0 for those shapes.
 Broader graph execution remains later work.
 """
 

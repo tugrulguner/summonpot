@@ -17,15 +17,26 @@ def test_authenticated_context_docs_preserve_trust_boundary_and_release_history(
         assert "0.12.0" in text
         assert "tenant" in text.lower()
         assert "model" in text.lower()
+    for path in files:
+        normalized = " ".join(path.read_text().split())
+        assert "included from version 0.13.0" in normalized, path
+        assert "unreleased source" not in normalized.lower(), path
     skill = files[-1].read_text()
     for phrase in (
         "secrets.compare_digest",
         "frozen=True",
         'extra="forbid"',
-        "not part of published 0.12.0",
+        "included from version 0.13.0",
+        "This was not part of version 0.12.0.",
         "trusted application code",
         "tenant isolation",
         "runtime timeout",
+        "provider protects every declared Summon",
+        "preflighted before any operation",
+        "standard `Runtime.call`",
+        "login",
+        "authorization",
+        "tenant isolation",
     ):
         assert phrase in skill
 

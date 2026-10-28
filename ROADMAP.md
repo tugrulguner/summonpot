@@ -53,7 +53,7 @@ The current release line provides:
   and string patterns at registration.
 - Single-operation deterministic execution when the endpoint uses a Pydantic request model,
   that slice has no `AgentChoice`, contains at
-  least one `FromRequest` binding, uses only `FromRequest` or immutable identity-stable
+  least one `FromRequest` binding, uses `FromRequest`, authenticated `FromContext` (from 0.13.0), or immutable identity-stable
   callable defaults, and the operation output is exactly the endpoint response model:
   Summonpot executes directly without resolving or constructing a model.
 - Declarative call bounds and ordering references without adding decorator configuration.
@@ -188,6 +188,32 @@ Version 0.11.0 completes this subset of milestone 2, not the broader milestone. 
 
 From version 0.12.0, a Pydantic request endpoint executes a uniquely ordered chain of required `Exactly(1)` operations directly when the chain is fully resolved. The chain has at least two operations, exactly one required `Exactly(1)` operation is ready at each step, and every argument resolves through `FromRequest`, validated `FromResult`, or supported immutable callable defaults. At least one `FromRequest` binding is required. The terminal operation declares the endpoint's exact full response annotation, and its validated result is returned unchanged. No model is resolved or constructed, and there is no fallback after execution starts. Any `AgentChoice`, including producer-backed choices, keeps the chain agent-mediated. Unsupported shapes remain rejected. Historical v0.11.0 chains remain agent-mediated.
 
+### 0.13.0 boundary: authenticated application context
+
+Authenticated context is included from version 0.13.0 through `Summon(context=authenticate)` and canonical `FromContext` bindings
+to the admitted single required `Exactly(1)` operation and uniquely ordered required
+`Exactly(1)` chain shapes. The application verifies credentials and returns a frozen,
+closed Pydantic principal with supported immutable fields. Principal admission is a
+non-transforming structural check; unsupported validation/lifecycle hooks and transforming
+configuration are rejected instead of changing an authenticated identity.
+
+The provider is captured at registration, runs once for each declared HTTP endpoint request
+inside the runtime deadline after transport validation, and protects endpoints even without
+a context binding. Documentation/OpenAPI routes are outside this hook. Authentication denial
+returns fixed 401; invalid context or unexpected provider failures return fixed redacted 500.
+All context receiving constraints, including later chain steps, are preflighted before any
+operation or model starts. The context snapshot is request-local and hidden from model input;
+application outputs can intentionally disclose values and remain application-owned.
+
+Authenticated `FromContext` can join a fully resolved model-free path, but the existing
+Pydantic request, at-least-one-`FromRequest`, immutable-default, and exact terminal response
+requirements remain. `AgentChoice` stays agent-mediated. Raw `Runtime.call(...,
+context=principal)` is trusted server code only; authenticated HTTP requires standard
+`Runtime.call` admission and rejects replacement call methods. Login, authorization,
+tenant-scoped database queries, cross-request idempotency, and transactions remain
+application responsibilities. Broader bounds, graphs, adapters, recovery, and persistent
+memory remain planned. Historical 0.12.0 does not include authenticated context.
+
 ## Next milestones
 
 The ordering below prioritizes complete, enforceable contracts before expanding execution.
@@ -293,7 +319,7 @@ the agent runtime; `AgentChoice` in the original single-operation form is unchan
 
 ### 4. Authenticated application context
 
-Authenticated application context (implemented in current unreleased source; not included in published 0.12.0):
+Completed in version 0.13.0 under the authenticated-context boundary above; not included in version 0.12.0:
 
 - An application-owned sync/async provider is called for every HTTP request and returns a validated immutable principal; HTTP request JSON is never authority.
 - Context types and missing/authentication failures are handled before operations or model resolution and within the runtime deadline.

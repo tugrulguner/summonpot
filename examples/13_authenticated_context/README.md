@@ -9,7 +9,7 @@ without changing the stored row. This example does not add a typed HTTP conflict
 
 ## Run
 
-This feature is unreleased and is not in published v0.12.0. From the repository root,
+Authenticated `FromContext` is included from version 0.13.0; historical v0.12.0 does not include it. From the repository root,
 install the locked serving/CLI environment before running the example:
 
 ```sh

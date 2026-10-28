@@ -194,7 +194,7 @@ canonical result context. The selected token is mapped locally to that exact can
 validated member; Python equality is not authority. Projection respects field exclusions
 and aliases without application serializers. Empty, unavailable, or oversized
 sets fail with a fixed redacted 409 before model decision and before downstream work;
-there is no extra model request. `FromContext` is supported only in the narrow authenticated-context slice described below; that feature is unreleased source behavior. Unsupported graphs
+there is no extra model request. `FromContext` is supported only in the narrow authenticated-context slice described below, included from version 0.13.0. Unsupported graphs
 fail closed. A two-or-more candidate choice still uses the agent runtime; it is not a
 model-free execution path.
 
@@ -234,7 +234,7 @@ execution begins. Multi-operation chains are admitted only as a supported sequen
 `FromRequest`/`FromResult` and supported immutable callable defaults. These fully resolved
 chains run without model resolution and return the unique terminal operation's canonical
 validated result; a producer-backed `AgentChoice` keeps its chain agent-mediated.
-authenticated `FromContext` outside the supported narrow shapes, unsupported choice containers, broader bounds and unsupported graphs are
+`FromContext` outside the supported narrow shapes, unsupported choice containers, broader bounds and unsupported graphs are
 rejected during registration. Direct `AgentChoice` remains supported in the existing
 single-operation form. Bare `Depends(fn)` and `Required(fn)` calls keep their implicit
 legacy bounds; explicit unsupported call bounds are not admitted.
@@ -327,9 +327,9 @@ and mutable defaults keep the endpoint agent-backed; copy hooks are not proof of
 immutability. Scalar request declarations also remain agent-backed.
 
 
-## Authenticated application context (unreleased source feature)
+## Authenticated application context (included from version 0.13.0)
 
-Current unreleased source supports `FromContext` only on a single required operation with `calls=Exactly(1)`, and an admitted uniquely ordered required `Exactly(1)` chain. This is not part of published 0.12.0. It is application-authenticated context, not built-in login or authorization.
+Included from version 0.13.0, authenticated application context supports `FromContext` only on a single required operation with `calls=Exactly(1)`, and an admitted uniquely ordered required `Exactly(1)` chain. This was not part of version 0.12.0. It is application-authenticated context, not built-in login or authorization.
 
 ```python
 import os

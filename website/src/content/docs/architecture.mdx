@@ -38,6 +38,15 @@ One fully resolved `Exactly(1)` operation can execute directly only in a narrow 
 
 From 0.12.0, model-free execution also covers uniquely ordered chains of at least two required `Exactly(1)` operations with a Pydantic request, at least one `FromRequest` binding, only `FromRequest`/`FromResult` bindings or supported immutable defaults, and the terminal operation's exact full endpoint response annotation. The runtime returns its canonical validated terminal result. Any `AgentChoice` keeps the chain agent-mediated. Historical v0.11.0 chains remain agent-mediated.
 
+From version 0.13.0, authenticated `FromContext` may also resolve arguments in the admitted
+single operation or uniquely ordered chain. The existing Pydantic request, at-least-one-
+`FromRequest`, immutable-default, and exact full response requirements still apply to
+model-free execution; context-only declarations remain agent-mediated. The application
+verifies credentials with `Summon(context=authenticate)` and supplies a frozen, closed,
+immutable principal. The runtime snapshots canonical values without replaying principal
+validation hooks, preflights all context receivers before effects, and keeps context out
+of model inputs. See the [authenticated context contract](/reference/operations/#authenticated-application-context-included-from-version-0130).
+
 Other supported declarations retain the provider-neutral agent runtime. Unsupported explicit contract shapes fail at registration rather than quietly accepting unenforced model-supplied arguments. Broader graph and deterministic compiler shapes remain planned.
 
 ## Safe integration checklist
