@@ -243,8 +243,9 @@ def test_prefix_deadline_prevents_consumer_and_model(monkeypatch, slow_sync):
 
 @pytest.mark.parametrize("count", [1, 2])
 def test_choice_and_suffix_share_validated_objects_and_one_run(monkeypatch, count):
-    import summonpot.runtime as runtime_module
     from pydantic import BaseModel
+
+    import summonpot.runtime as runtime_module
 
     class Selected(BaseModel):
         identifier: str
