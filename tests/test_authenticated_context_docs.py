@@ -20,7 +20,19 @@ def test_authenticated_context_docs_preserve_trust_boundary_and_release_history(
     for path in files:
         normalized = " ".join(path.read_text().split())
         assert "included from version 0.13.0" in normalized, path
-        assert "unreleased source" not in normalized.lower(), path
+    # The result-dependent optimization is an independent unreleased source change;
+    # it must not move the historical authenticated-context release boundary.
+    for path in (files[0], files[1], files[2], files[3], files[4]):
+        normalized = " ".join(path.read_text().split())
+        context = normalized.split(
+            "authenticated application context (included from version 0.13.0)", 1
+        )[-1]
+        context = context.split("## ", 1)[0]
+        assert "unreleased source" not in context.lower(), path
+    for path in (files[0], files[1], files[2], files[3], files[4]):
+        text = path.read_text().lower()
+        if "unreleased source" in text:
+            assert "result-dependent" in text or "result dependent" in text, path
     skill = files[-1].read_text()
     for phrase in (
         "secrets.compare_digest",

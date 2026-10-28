@@ -233,10 +233,7 @@ work begins at milestone 2.
 
 ### 2. Result-dependent execution with one producer-backed choice
 
-Status: the 0.11.0 sequential-chain and 0.11.0 producer-choice slices are shipped; the
-0.12.0 fully resolved-chain optimization is also shipped. This next slice extends that
-existing linear chain by one producer-backed choice while preserving the same endpoint
-contract and operation authority.
+Status: the 0.11.0 sequential-chain and producer-choice slices, the 0.12.0 fully resolved-chain optimization, and the 0.13.0 authenticated-context boundary are published historical behavior. The result-dependent optimization below is present in current source but **unreleased**; published v0.13.0 chains with producer-backed choices remain agent-mediated, including singleton domains. It extends that existing linear chain without changing the public endpoint contract or operation authority.
 
 - Use `FromResult` to pass only a producer's locally validated output into a downstream operation; the data dependency itself establishes result readiness. Keep the terminal operation the explicit final-response producer and return its canonical validated result.
 - Make the complete chain eligible only when it is the supported linear required-operation shape; do not set or promise a public maximum chain length.
@@ -245,12 +242,12 @@ contract and operation authority.
 - For exactly one candidate, select its canonical validated member locally and continue without resolving or constructing a model.
 - For multiple candidates, resolve the configured model lazily at that choice boundary, expose only bounded inert descriptions and opaque request-local tokens, and verify token membership locally before binding the exact canonical candidate.
 - On the singleton path, execute the fully resolved suffix without a model. On the multiple-candidate path, continue the suffix through the existing agent-mediated chain behavior. Keep the terminal operation as the canonical final-response producer; do not accept model-authored success claims as a substitute.
-- Require a Pydantic request, at least one `FromRequest` binding, exactly one producer-backed choice argument across the entire eligible chain, supported immutable defaults and request/result/authenticated-context bindings, and exact full terminal response annotation identity. Preserve candidate count and inert-evidence size limits even for singleton domains; local selection must pass the same canonical-member and receiving-constraint checks.
+- Require a Pydantic request, at least one `FromRequest` binding, an existing uniquely ordered chain of required `Exactly(1)` operations with at least two operations, exactly one producer-backed choice argument across the entire chain and no other choice, supported immutable defaults plus request/result/authenticated-context bindings, and exact full terminal response annotation identity. Producer must return the supported concrete-model list and precede the consumer. This narrows optimization eligibility only: existing admitted declarations outside it keep their existing agent-mediated route. Preserve the 128-candidate and 65,536-character evidence limits even for singleton domains; local selection must pass canonical-member and receiving checks.
 - Carry the same authenticated context, validated request, results, reservations, stable tokens and absolute deadline across the model handoff. Never replay the prefix or fabricate model history. Document that prefix effects can now precede a provider-configuration failure on the multiple-candidate path; lazy model resolution does not make the prefix side-effect-free or provide rollback.
 - Preserve legacy declarations outside this optimization: bare callable capabilities and supported explicit declarations that do not meet the new eligibility predicate retain their existing agent-mediated execution path. Unsupported explicit contracts remain rejected at registration.
 - Test zero candidates, one candidate with zero model resolution/construction/calls, and multiple candidates using the same configured endpoint/provider. Assert producer effects occur before model resolution; model resolution occurs once and only for the multi-candidate case; token forgery, stale tokens, output failure, timeout, and downstream failure cannot authorize or replay effects.
 
-This slice does not generalize the linear chain, introduce repeated call bounds, or claim rollback, cross-request idempotency, or endpoint-wide transactions. Version 0.11.0 chains remain agent-mediated; version 0.12.0's fully resolved-chain predicate remains unchanged. The existing 0.11.0/0.12.0 boundaries above are historical and are not broadened retroactively.
+This source change is unreleased and does not alter the published v0.11.0, v0.12.0, or v0.13.0 boundaries: each retains its historical behavior, including agent mediation for producer-backed choices. Outside this narrow optimization eligibility, the existing supported agent-mediated execution is preserved. No recurring bounds, rollback, cross-request idempotency, or endpoint-wide transactions are introduced.
 
 ### 3. Bounded orchestration with multiple choices and repeated calls
 

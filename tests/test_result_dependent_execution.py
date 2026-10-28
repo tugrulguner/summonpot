@@ -9,7 +9,15 @@ from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 from test_producer_choice_runtime import Candidate, Receipt, Request, choice_app
 
-from summonpot import AgentChoice, Exactly, FromRequest, Operation, Required, Summon
+from summonpot import (
+    AgentChoice,
+    Exactly,
+    FromRequest,
+    FromResult,
+    Operation,
+    Required,
+    Summon,
+)
 from summonpot._execution import _register_endpoint
 from summonpot.runtime import Runtime, _ChoiceUnavailableError
 from summonpot.server import build_app
@@ -231,3 +239,86 @@ def test_prefix_deadline_prevents_consumer_and_model(monkeypatch, slow_sync):
         response = client.post("/deadline", json={"query": "slow"})
     assert response.status_code == 504
     assert events == ["prefix"]
+
+
+@pytest.mark.parametrize("count", [1, 2])
+def test_choice_and_suffix_share_validated_objects_and_one_run(monkeypatch, count):
+    import summonpot.runtime as runtime_module
+    from pydantic import BaseModel
+
+    class Selected(BaseModel):
+        identifier: str
+
+    events = []
+    observed_runs = []
+    validated = {}
+
+    def find(query: str) -> list[Candidate]:
+        events.append("find")
+        return [Candidate(identifier=str(i), label="candidate") for i in range(count)]
+
+    producer = Operation(
+        find, bind={"query": FromRequest("query")}, output=list[Candidate]
+    )
+
+    def choose(item: Candidate) -> Selected:
+        events.append("choose")
+        assert item is validated["producer"][0]
+        return Selected(identifier=item.identifier)
+
+    choice = Operation(
+        choose, bind={"item": AgentChoice(from_result=producer)}, output=Selected
+    )
+
+    def finish(identifier: str) -> Receipt:
+        events.append("finish")
+        return Receipt(identifier=identifier)
+
+    terminal = Operation(
+        finish, bind={"identifier": FromResult(choice, "identifier")}, output=Receipt
+    )
+    app = Summon("suffix")
+
+    @app("/suffix")
+    def endpoint(
+        request: Request,
+        found=Required(producer, calls=Exactly(1)),
+        selected=Required(choice, calls=Exactly(1)),
+        result=Required(terminal, calls=Exactly(1)),
+    ) -> Receipt:
+        """Choose a declared candidate and return its finished receipt."""
+        ...
+
+    original = runtime_module._invoke_bound_operation
+
+    async def record(tool, run, supplied, **kwargs):
+        observed_runs.append(run)
+        result = await original(tool, run, supplied, **kwargs)
+        if tool.name == "find":
+            validated["producer"] = result
+        return result
+
+    monkeypatch.setattr(runtime_module, "_invoke_bound_operation", record)
+    callbacks = []
+
+    def model(messages, info):
+        names = [tool.name for tool in info.function_tools]
+        callbacks.append(names)
+        if names == ["choose"]:
+            token = info.function_tools[0].parameters_json_schema["properties"]["item"][
+                "enum"
+            ][0]
+            return ModelResponse(parts=[ToolCallPart("choose", {"item": token})])
+        if names == ["finish"]:
+            return ModelResponse(parts=[ToolCallPart("finish", {})])
+        return ModelResponse(parts=[TextPart("model text cannot replace receipt")])
+
+    result = asyncio.run(
+        Runtime(model=FunctionModel(model)).call(app.endpoints[0], {"query": "suffix"})
+    )
+    assert result == Receipt(identifier="0")
+    assert events == ["find", "choose", "finish"]
+    assert len(observed_runs) == 3 and all(
+        run is observed_runs[0] for run in observed_runs
+    )
+    assert callbacks == ([] if count == 1 else [["choose"], ["finish"], []])

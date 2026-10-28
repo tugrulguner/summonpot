@@ -181,7 +181,9 @@ def test_initial_result_dependent_execution_acceptance_is_explicit():
         "### 2. Result-dependent execution with one producer-backed choice", 1
     )[1].split("### 3.", 1)[0]
     for requirement in (
-        "existing linear chain by one producer-backed choice",
+        "present in current source but **unreleased**",
+        "existing uniquely ordered chain of required `Exactly(1)` operations",
+        "exactly one producer-backed choice argument",
         "before resolving a model",
         "no candidates",
         "without resolving or constructing a model",
@@ -192,9 +194,10 @@ def test_initial_result_dependent_execution_acceptance_is_explicit():
         "cannot authorize or replay effects",
     ):
         assert requirement in initial
-    assert "Version 0.11.0 chains remain agent-mediated" in initial
+    assert "published v0.11.0, v0.12.0, or v0.13.0 boundaries" in initial
     assert (
-        "version 0.12.0's fully resolved-chain predicate remains unchanged" in initial
+        "published v0.13.0 chains with producer-backed choices remain agent-mediated"
+        in initial
     )
 
 

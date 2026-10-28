@@ -6,6 +6,10 @@ The order write uses a fresh SQLite connection per call and `BEGIN IMMEDIATE`. I
 
 Choice domains are bounded by the runtime: an empty or over-128-item candidate list, or projected evidence over 65,536 characters, is unavailable and maps to HTTP 409 before the choice step. The example intentionally does not claim unbounded search, live provider credentials, or a live-provider test. Production runs use normal `SUMMONPOT_MODEL` configuration. The tests install a keyless scripted Pydantic AI `FunctionModel` solely to exercise the real runtime/tool schema/HTTP/SQLite path deterministically; it parses the candidate evidence and selects the requested matching candidate, rather than inventing a result.
 
+## Execution boundary
+
+Published v0.13.0 always uses the configured agent runtime for this producer-backed choice, including when a query yields a single candidate. Current source has an **unreleased** narrow optimization for a uniquely ordered required `Exactly(1)` chain with exactly one producer-backed `AgentChoice(from_result=...)` argument across the whole chain and no other choice. It still requires a Pydantic request, at least one `FromRequest` binding, supported immutable defaults and request/result/authenticated-context sources, an exact full terminal response annotation, and the producer before its consumer. Empty, unavailable, or oversized domains fail before model resolution or downstream work. A singleton is bound locally and its fully resolved suffix runs without a model. Two or more candidates trigger model resolution only after the resolved prefix; that run retains the existing agent-mediated suffix without replaying the prefix. Existing candidate/evidence limits remain 128 and 65,536 characters, including singleton domains. Prefix operations may have effects before a later provider configuration failure; there is no rollback claim. Other declarations keep their existing behavior.
+
 ## Run
 
 From the repository root with Python 3.13 and the committed lockfile:

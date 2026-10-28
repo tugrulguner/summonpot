@@ -68,7 +68,12 @@ def test_readme_states_the_current_runtime_boundary_before_positioning():
     assert "uniquely ordered required `exactly(1)` chains" in introduction
     assert "at least one `fromrequest` binding" in introduction
     assert "endpoint's exact full response annotation" in introduction
-    assert "remain agent-mediated, as do bare legacy capabilities" in introduction
+    assert (
+        "remain agent-mediated except for the narrow unreleased result-dependent route"
+        in introduction
+    )
+    assert "bare legacy capabilities remain agent-mediated" in introduction
+    assert "published v0.13.0 behavior" in introduction
     assert "unsupported explicit contract shapes fail at registration" in introduction
     assert "broader graphs remain on the [roadmap](roadmap.md)" in introduction
 

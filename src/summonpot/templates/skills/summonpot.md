@@ -15,12 +15,7 @@ model with the same Pydantic request and at-least-one-`FromRequest` requirements
 resolved through request/result/authenticated-context bindings or supported immutable
 defaults, and an exact full terminal output annotation matching the endpoint response.
 Context-only and scalar-request declarations remain agent-mediated, as does any direct
-`AgentChoice`. Chains with producer-backed `AgentChoice` remain agent-mediated. Bare legacy
-capabilities still use the provider-neutral agent runtime. Unsupported explicit contracts
-are rejected before serving. Version 0.11.0 supports sequential chains with exactly one
-ready operation at each step; that release's chains are agent-mediated. From version 0.12.0, fully resolved uniquely ordered chains run model-free; chains with
-agent-owned choices remain agent-mediated. Broader multi-operation deterministic execution
-and graph execution remain planned. Historical v0.10.0 does not include the 0.11.0 agent-mediated chain either.
+`AgentChoice`. Published v0.13.0 chains with producer-backed `AgentChoice` remain agent-mediated, even for a singleton. Current source additionally contains an **unreleased** narrow result-dependent route: an existing uniquely ordered chain of required `Exactly(1)` operations, Pydantic request with at least one `FromRequest`, exactly one producer-backed choice argument across the whole chain and no other choice, supported immutable defaults and request/result/authenticated-context bindings, and exact full terminal annotation. Empty/unavailable/oversized domains fail before model/downstream; singleton binds the canonical validated item locally and runs the suffix without a model; two or more candidates resolve the model only after the prefix and retain the existing agent-mediated suffix, without replay. The 128-item/65,536-character evidence limits remain on all paths. Other producer choices keep their existing agent route. Prefix effects may occur before a later provider-configuration failure; no rollback is implied. Bare legacy capabilities still use the provider-neutral agent runtime. Unsupported explicit contracts are rejected before serving. Version 0.11.0 supports sequential chains with exactly one ready operation at each step; that release's chains are agent-mediated. From version 0.12.0, fully resolved uniquely ordered chains run model-free; chains with agent-owned choices remain agent-mediated. Broader multi-operation deterministic execution and graph execution remain planned. Historical v0.10.0 does not include the 0.11.0 agent-mediated chain either.
 The framework
 owns execution, including any agent loop. **The ellipsis is a complete declaration body**,
 not an implementation waiting to be written. Calling the decorated declaration directly is
@@ -184,7 +179,7 @@ successful predecessor completion. From version 0.12.0, fully resolved chains ru
 at least one `FromRequest` binding, a unique required `Exactly(1)` sequence, only
 `FromRequest`/`FromResult` bindings or supported immutable callable defaults, and the
 terminal operation's exact full endpoint response annotation. Its validated terminal result
-is returned unchanged. Any `AgentChoice` remains agent-mediated. Historical v0.11.0 chains
+is returned unchanged. In published v0.13.0, any `AgentChoice` keeps its chain agent-mediated. The unreleased narrow result-dependent exception above applies only to one producer-backed choice in the otherwise eligible chain; all other choices remain agent-mediated. Historical v0.11.0 chains
 remain agent-mediated. Their unique terminal operation's full output
 annotation must exactly equal the endpoint response annotation. Summonpot returns the
 canonical validated terminal result, not model-authored claims. Intermediate canonical

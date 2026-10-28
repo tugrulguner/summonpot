@@ -32,7 +32,27 @@ def test_context_release_boundary_reaches_every_current_surface(relative):
     text = " ".join((ROOT / relative).read_text().split())
     assert "FromContext" in text and "0.13.0" in text, relative
     assert "feature is unreleased" not in text, relative
-    assert "unreleased source" not in text, relative
+    if relative in {"README.md", "examples/README.md"}:
+        # These surfaces now document a separate, explicitly unreleased result-dependent
+        # optimization. Keep the authenticated-context claim tied to its 0.13.0 section.
+        if relative == "README.md":
+            context_section = text.lower().split(
+                "authenticated application context (included from version 0.13.0)", 1
+            )[1]
+        else:
+            context_section = text.lower().split(
+                "from 0.13.0, authenticated `fromcontext`", 1
+            )[1]
+        context_section = context_section.split("## ", 1)[0]
+        assert "unreleased source" not in context_section, relative
+        if relative == "README.md":
+            assert "unreleased result-dependent route" in text, relative
+        else:
+            assert "unreleased source" in text and "singleton local route" in text, (
+                relative
+            )
+    else:
+        assert "unreleased source" not in text, relative
 
 
 @pytest.mark.parametrize(
