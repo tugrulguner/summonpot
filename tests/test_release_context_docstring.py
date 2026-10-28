@@ -35,6 +35,38 @@ def test_context_release_boundary_reaches_every_current_surface(relative):
     assert "unreleased source" not in text, relative
 
 
+@pytest.mark.parametrize(
+    ("relative", "start", "end"),
+    [
+        (
+            "src/summonpot/templates/skills/summonpot.md",
+            "# summonpot",
+            "## The endpoint shape",
+        ),
+        ("examples/README.md", "Bare `Depends", "## Progression"),
+        (
+            "website/src/content/docs/reference/operations.mdx",
+            "| Shape | Current execution |",
+            "## Output and error behavior",
+        ),
+    ],
+)
+def test_current_execution_summaries_include_context_direct_eligibility(
+    relative, start, end
+):
+    text = (ROOT / relative).read_text().split(start, 1)[1].split(end, 1)[0]
+    normalized = " ".join(text.split())
+    for term in (
+        "FromContext",
+        "0.13.0",
+        "Pydantic request",
+        "FromRequest",
+        "exact",
+        "AgentChoice",
+    ):
+        assert term in normalized, (relative, term)
+
+
 def test_roadmap_has_a_distinct_013_boundary():
     assert (
         "### 0.13.0 boundary: authenticated application context"

@@ -39,11 +39,13 @@ Then open `http://127.0.0.1:8000/docs` or call it with `curl`.
 
 Bare `Depends(...)` and `Required(...)` capabilities still receive model-selected
 arguments. The bound runtime is deliberately narrower: an endpoint with exactly one
-required typed operation, `Exactly(1)`, and only `FromRequest`, direct `AgentChoice`, or
+required typed operation, `Exactly(1)`, and only `FromRequest`, authenticated `FromContext`
+(from 0.13.0), direct `AgentChoice`, or
 defaulted arguments receives trusted request injection, a filtered model schema, local
 operation-output validation, and one permitted start. Level 7 runs that shipped path.
 When the endpoint uses a Pydantic request model, the operation has at least one
-`FromRequest` binding, uses only `FromRequest` or supported immutable callable defaults,
+`FromRequest` binding, resolves all inputs through `FromRequest`, authenticated `FromContext`
+(from 0.13.0), or supported immutable callable defaults,
 and its output exactly matches the endpoint response model, Summonpot executes it directly
 without a model; Level 8 runs that path. Version 0.11.0 also admits a sequential `Required(..., calls=Exactly(1))` chain of two or more operations, with exactly one ready operation at every step, linked by `FromResult` or `after` and using `FromRequest`/`FromResult`, supported immutable defaults, and optionally producer-backed `AgentChoice(from_result=...)` from `list[ConcreteModel]`. At the historical v0.11.0 boundary, every supported chain executes through the agent runtime. The unique terminal operation output annotation must exactly match the endpoint response annotation; its canonical validated result is returned. `FromResult` implies readiness; optional `after` adds success-ordering. Intermediate canonical results are hidden from the model (completion acknowledgments only). Unsupported graphs fail closed. Sequential chain support starts in 0.11.0; historical v0.10.0 does not include it.
 
@@ -52,6 +54,11 @@ at least one `FromRequest` binding, two or more required `Exactly(1)` operations
 unique readiness, only `FromRequest`/`FromResult` sources or supported immutable defaults,
 and the terminal operation's exact full endpoint response annotation. Any `AgentChoice`
 keeps its chain agent-mediated. The v0.11.0 boundary above is historical.
+From 0.13.0, authenticated `FromContext` may also resolve inputs in those admitted direct
+single-operation and chain paths. The Pydantic request, at least one `FromRequest`,
+immutable-default, unique-readiness, and exact full response-annotation requirements
+remain; context-only or scalar-request declarations and any declared `AgentChoice` remain
+agent-mediated. Level 13 demonstrates that authenticated direct path.
 
 ## Progression
 
