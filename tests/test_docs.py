@@ -152,9 +152,13 @@ def test_roadmap_advances_after_the_narrow_no_model_slice():
 
     shipped_direct = roadmap.index("single-operation deterministic execution")
     hardening = roadmap.index("### 1. Contract enforcement and input/output hardening")
-    result_chain = roadmap.index("### 2. Validated result chains and failure semantics")
-    compiler = roadmap.index("### 6. Broader deterministic execution compiler")
-    database = roadmap.index("### 7. Exact database operations")
+    result_chain = roadmap.index(
+        "### 2. Result-dependent execution with one producer-backed choice"
+    )
+    compiler = roadmap.index("### 4. Broader private execution compiler")
+    database = roadmap.index(
+        "### 5. Exact bounded database operations and transaction boundaries"
+    )
 
     assert shipped_direct < hardening < result_chain < compiler < database
     assert "exactly one required `Exactly(1)` operation" in roadmap
@@ -182,7 +186,8 @@ def test_public_positioning_centers_endpoint_contract_and_owned_orchestration():
     assert "terminal operation the explicit final-response producer" in roadmap
     assert "data dependency itself establishes result readiness" in roadmap
     assert "agent-mediated" in roadmap
-    assert "broader model-free multi-operation compiler remains planned" in roadmap
+    assert "Broader private execution compiler" in roadmap
+    assert "beyond the required single-start slices" in roadmap
     assert "maximum chain length" in roadmap
 
 

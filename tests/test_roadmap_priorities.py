@@ -11,7 +11,7 @@ def test_v010_boundary_completes_milestone_one_before_execution_expansion():
     shipped = " ".join(text.split("## Next milestones", 1)[0].split())
     planned = text.split("## Next milestones", 1)[1].split("## Non-goals", 1)[0]
     headings = re.findall(r"^### (\d+)\. (.+)$", planned, re.MULTILINE)
-    assert [int(number) for number, _ in headings] == list(range(1, 10))
+    assert [int(number) for number, _ in headings] == list(range(1, 8))
     assert headings[0][1] == "Contract enforcement and input/output hardening"
     assert "planned acceptance criteria, not claims" in planned
 
@@ -72,7 +72,7 @@ def test_count_type_validation_is_shipped_not_future_runtime_enforcement():
         assert requirement in shipped
         assert requirement not in hardening
     assert "unsupported runtime bounds fail before serving" not in hardening
-    assert "### 5. Broader bounds and private path classification" in planned
+    assert "### 4. Broader private execution compiler" in planned
     assert "invalid source/count rejection" not in planned
 
 
@@ -125,7 +125,7 @@ def test_context_slices_require_their_actual_execution_prerequisites():
     assert "Keep canonical request state and the invocation ledger separate" in basic
     assert "Defer result eviction and result-backed summarization to A2" in basic
     assert (
-        "Only after validated result chains and producer-constrained choices (milestones 2\N{EN DASH}3)"
+        "Only after result-dependent execution and broader orchestration (milestones 2\N{EN DASH}3)"
         in results
     )
     for requirement in (
@@ -141,17 +141,79 @@ def test_context_slices_require_their_actual_execution_prerequisites():
 
 def test_chain_failure_semantics_are_not_deferred_to_adapters():
     text = ROADMAP.read_text(encoding="utf-8")
-    chain = " ".join(text.split("### 2.", 1)[1].split("### 3.", 1)[0].split())
+    orchestration = " ".join(text.split("### 3.", 1)[1].split("### 4.", 1)[0].split())
     for requirement in (
-        "Failure semantics ship with the chain",
-        "partial completion",
-        "uncertain outcome after timeout",
-        "final-output retries must not replay effects",
-        "Required use alone does not prove",
-        "Preserve application-provided idempotency keys",
-        "Execution remains sequential initially",
+        "validated successes and starts respectively",
+        "retain reservations for failed, cancelled, or uncertain starts",
+        "Model retries cannot replay an effect",
+        "one unambiguous terminal operation/result",
+        "partial completion and timeout uncertainty",
     ):
-        assert requirement in chain
+        assert requirement in orchestration
+
+
+def test_future_execution_milestones_follow_the_approved_dependency_order():
+    text = ROADMAP.read_text(encoding="utf-8")
+    planned = text.split("## Next milestones", 1)[1].split(
+        "## Agent execution and context track", 1
+    )[0]
+    headings = re.findall(r"^### (\d+)\. (.+)$", planned, re.MULTILINE)
+    assert [int(number) for number, _ in headings] == list(range(1, 8))
+    names = [name for _, name in headings]
+    assert names[1:] == [
+        "Result-dependent execution with one producer-backed choice",
+        "Bounded orchestration with multiple choices and repeated calls",
+        "Broader private execution compiler",
+        "Exact bounded database operations and transaction boundaries",
+        "Concrete recovery and long-running execution",
+        "Optional execution harnesses",
+    ]
+
+
+def test_initial_result_dependent_execution_acceptance_is_explicit():
+    text = " ".join(ROADMAP.read_text(encoding="utf-8").split())
+    initial = text.split(
+        "### 2. Result-dependent execution with one producer-backed choice", 1
+    )[1].split("### 3.", 1)[0]
+    for requirement in (
+        "existing linear chain by one producer-backed choice",
+        "before resolving a model",
+        "no candidates",
+        "without resolving or constructing a model",
+        "multiple candidates",
+        "same configured endpoint/provider",
+        "retain their existing agent-mediated execution path",
+        "token forgery",
+        "cannot authorize or replay effects",
+    ):
+        assert requirement in initial
+    assert "Version 0.11.0 chains remain agent-mediated" in initial
+    assert (
+        "version 0.12.0's fully resolved-chain predicate remains unchanged" in initial
+    )
+
+
+def test_historical_release_boundaries_are_retained_and_not_retroactively_broadened():
+    text = ROADMAP.read_text(encoding="utf-8")
+    shipped = text.split("## Next milestones", 1)[0]
+    for boundary in (
+        "0.5.0",
+        "0.6.0",
+        "0.7.0",
+        "0.8.0",
+        "0.9.0",
+        "0.10.0",
+        "0.11.0",
+        "0.12.0",
+        "0.13.0",
+    ):
+        assert f"### {boundary} boundary" in shipped
+    assert "Historical v0.11.0 chains remain agent-mediated." in shipped
+    assert (
+        "Any `AgentChoice`, including producer-backed choices, keeps the chain agent-mediated."
+        in shipped
+    )
+    assert "Historical 0.12.0 does not include authenticated context." in shipped
 
 
 def test_agent_context_track_preserves_declarative_authority():
@@ -165,7 +227,7 @@ def test_agent_context_track_preserves_declarative_authority():
         "endpoint body remains `...`",
         "not yet shipped Summonpot features",
         "With milestone 1's boundary hardening now complete in 0.10.0",
-        "Only after authenticated application context (milestone 4)",
+        "Only after authenticated application context is available (included from 0.13.0)",
         "Keep stateless requests the default",
         "compaction summaries non-authoritative",
         "Search does not add capabilities",
