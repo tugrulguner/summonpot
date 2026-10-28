@@ -369,7 +369,7 @@ extend A1 with result-backed context:
 
 - Keep canonical request/result state separate from model-visible working context and
   persistent memory. `FromContext` is not a prompt-history or memory-injection feature;
-  authenticated application context still requires milestone 4.
+  authenticated application context is already available under the 0.13.0 boundary above.
 - Assemble only the relevant, permitted evidence for the next legal decision. Start with
   bounded projections, pagination, and scoped retrieval of declared operation results;
   preserve exact canonical values for `FromResult` and producer-constrained choices.

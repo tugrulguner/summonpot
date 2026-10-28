@@ -119,6 +119,11 @@ def test_context_slices_require_their_actual_execution_prerequisites():
     text = " ".join(ROADMAP.read_text(encoding="utf-8").split())
     basic = text.split("#### A1.", 1)[1].split("#### A2.", 1)[0]
     results = text.split("#### A2.", 1)[1].split("### B.", 1)[0]
+    assert "authenticated application context still requires milestone 4" not in text
+    assert (
+        "authenticated application context is already available under the 0.13.0 boundary above"
+        in results
+    )
     assert "With milestone 1's boundary hardening now complete in 0.10.0" in basic
     assert "without waiting for milestones 2\N{EN DASH}3" in basic
     assert "Budget the complete model request" in basic
