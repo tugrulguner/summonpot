@@ -70,6 +70,8 @@ Immutable defaults are exact built-in `None`, `bool`, `int`, `float`, `complex`,
 | Shape | Current execution |
 |---|---|
 | Complete sole required operation meeting every direct predicate | Runs the operation directly; no model resolution/construction/call. |
+| Admitted sole operation or uniquely ordered required `Exactly(1)` chain with authenticated `FromContext` (from 0.13.0), a Pydantic request, at least one `FromRequest`, all remaining inputs resolved through supported bindings/immutable defaults, and exact full terminal response annotation | Model-free execution after authentication and all context receiving checks, provided no `AgentChoice` remains. |
+| Otherwise admitted context-only or scalar-request declaration | Agent-mediated; authenticated context does not remove the Pydantic request and `FromRequest` direct-eligibility requirements. |
 | Complete sole required operation with a direct `AgentChoice` | Agent-backed runtime; only declared choice values are model supplied. |
 | Bare legacy callable dependency | Existing provider-neutral agent path. |
 | Unsupported/incomplete explicit `Operation` contract | Rejected during registration. |

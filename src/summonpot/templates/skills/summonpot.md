@@ -5,13 +5,17 @@ layer. The endpoint remains the stable public abstraction while its contract com
 exact application behavior with explicitly bounded agentic decisions. You declare the
 request model, the goal, the exact capabilities, and the response model.
 
-One fully resolved `Exactly(1)` operation path executes without a model when the endpoint
-uses a Pydantic request model and it has at least one `FromRequest` binding, uses only
-`FromRequest` or supported immutable identity-stable callable defaults, and the operation
-output is exactly the endpoint response model. Uniquely ordered sequential required
-`Exactly(1)` chains also execute without a model when they have at least one `FromRequest`
-binding and all arguments resolve through request/result bindings or supported immutable
-defaults. Chains with producer-backed `AgentChoice` remain agent-mediated. Bare legacy
+One fully resolved `Exactly(1)` operation path, with the operation required as the sole declared capability,
+executes without a model when the endpoint uses a Pydantic request model, has at least one
+`FromRequest` binding, and resolves every input through `FromRequest`, authenticated
+`FromContext` (from version 0.13.0), or supported immutable identity-stable callable defaults.
+The operation output is exactly the endpoint response model, including its full annotated
+contract. Uniquely ordered sequential required `Exactly(1)` chains also execute without a
+model with the same Pydantic request and at-least-one-`FromRequest` requirements, all inputs
+resolved through request/result/authenticated-context bindings or supported immutable
+defaults, and an exact full terminal output annotation matching the endpoint response.
+Context-only and scalar-request declarations remain agent-mediated, as does any direct
+`AgentChoice`. Chains with producer-backed `AgentChoice` remain agent-mediated. Bare legacy
 capabilities still use the provider-neutral agent runtime. Unsupported explicit contracts
 are rejected before serving. Version 0.11.0 supports sequential chains with exactly one
 ready operation at each step; that release's chains are agent-mediated. From version 0.12.0, fully resolved uniquely ordered chains run model-free; chains with
