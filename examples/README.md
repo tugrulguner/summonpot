@@ -27,8 +27,8 @@ export SUMMONPOT_MODEL="openrouter:google/gemini-3.7-flash"
 
 Level 8's fully resolved operation requires no provider model or credentials. From 0.12.0,
 the fully resolved chains in levels 10 and 11 also run without a model. Level 12 demonstrates
-the existing producer-choice agent path; its singleton local route is an unreleased source
-optimization. Published v0.13.0 still runs all level-12 choices through the configured agent runtime.
+the producer-choice path. Its singleton local route is included from version 0.14.0; published
+v0.13.0 ran all level-12 choices through the configured agent runtime.
 
 Keep secrets in your environment or secret manager—never in an example file. Start any example through the CLI:
 
@@ -54,7 +54,7 @@ From 0.12.0, fully resolved chains run without a model only with a Pydantic requ
 at least one `FromRequest` binding, two or more required `Exactly(1)` operations with
 unique readiness, only `FromRequest`/`FromResult` sources or supported immutable defaults,
 and the terminal operation's exact full endpoint response annotation. Any `AgentChoice`
-keeps its chain agent-mediated in published v0.13.0. Current unreleased source additionally
+kept its chain agent-mediated in published v0.13.0. From version 0.14.0, the runtime additionally
 permits exactly one producer-backed choice across an otherwise eligible chain: zero candidates
 fails before model/downstream, singleton binds locally and runs the suffix model-free, and
 multiple candidates resolve the model after the prefix and retain the agent-mediated suffix.

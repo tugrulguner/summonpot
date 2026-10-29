@@ -18,3 +18,20 @@ for (const [name, path] of [
     assert.match(html, /65,536/);
   });
 }
+
+
+test('homepage and operation reference describe the 0.14.0 execution boundary', async () => {
+  const homepage = await readFile(new URL('../dist/index.html', import.meta.url), 'utf8');
+  const reference = await readFile(new URL('../dist/reference/operations/index.html', import.meta.url), 'utf8');
+  for (const html of [homepage, reference]) {
+    assert.match(html, /0\.14\.0/);
+    assert.match(html, /exactly one[^.]{0,120}(producer-backed choice|AgentChoice)/i);
+    assert.match(html, /Pydantic request/i);
+    assert.match(html, /FromRequest/i);
+    assert.match(html, /historical v0\.13\.0/i);
+    assert.doesNotMatch(html, /unreleased source|unreleased result-dependent/i);
+  }
+  assert.match(reference, /128/);
+  assert.match(reference, /65,536/);
+  assert.match(reference, /provider-configuration failure/i);
+});

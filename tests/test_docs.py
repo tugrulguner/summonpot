@@ -183,8 +183,8 @@ def test_public_positioning_centers_endpoint_contract_and_owned_orchestration():
         assert "exact application-owned operations" in surface
         assert "Summonpot orchestrates" in surface
         assert "bounded choice" in surface
-    assert "terminal operation the explicit final-response producer" in roadmap
-    assert "data dependency itself establishes result readiness" in roadmap
+    assert "terminal operation remains the explicit final-response producer" in roadmap
+    assert "data dependency establishes result readiness" in roadmap
     assert "agent-mediated" in roadmap
     assert "Broader private execution compiler" in roadmap
     assert "beyond the required single-start slices" in roadmap

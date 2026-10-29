@@ -129,10 +129,7 @@ def test_context_slices_require_their_actual_execution_prerequisites():
     assert "Budget the complete model request" in basic
     assert "Keep canonical request state and the invocation ledger separate" in basic
     assert "Defer result eviction and result-backed summarization to A2" in basic
-    assert (
-        "Only after result-dependent execution and broader orchestration (milestones 2\N{EN DASH}3)"
-        in results
-    )
+    assert "Only after broader orchestration (milestone 3)" in results
     for requirement in (
         "scoped retrieval of declared operation results",
         "preserve exact canonical values for `FromResult` and producer-constrained choices",
@@ -181,20 +178,20 @@ def test_initial_result_dependent_execution_acceptance_is_explicit():
         "### 2. Result-dependent execution with one producer-backed choice", 1
     )[1].split("### 3.", 1)[0]
     for requirement in (
-        "present in current source but **unreleased**",
-        "existing uniquely ordered chain of required `Exactly(1)` operations",
+        "Completed in 0.14.0",
+        "existing uniquely ordered chain of at least two required `Exactly(1)` operations",
         "exactly one producer-backed choice argument",
-        "before resolving a model",
+        "before model resolution",
         "no candidates",
         "without resolving or constructing a model",
         "multiple candidates",
-        "same configured endpoint/provider",
-        "retain their existing agent-mediated execution path",
+        "same endpoint/provider",
+        "all other admitted declarations keep their existing agent-mediated route",
         "token forgery",
         "cannot authorize or replay effects",
     ):
         assert requirement in initial
-    assert "published v0.11.0, v0.12.0, or v0.13.0 boundaries" in initial
+    assert "historical v0.11.0, v0.12.0, or v0.13.0 boundaries" in initial
     assert (
         "published v0.13.0 chains with producer-backed choices remain agent-mediated"
         in initial
@@ -216,6 +213,10 @@ def test_historical_release_boundaries_are_retained_and_not_retroactively_broade
         "0.13.0",
     ):
         assert f"### {boundary} boundary" in shipped
+    assert (
+        "### 0.14.0 boundary: result-dependent execution with one producer-backed choice"
+        in shipped
+    )
     assert "Historical v0.11.0 chains remain agent-mediated." in shipped
     assert (
         "Any `AgentChoice`, including producer-backed choices, keeps the chain agent-mediated."

@@ -33,7 +33,7 @@ def test_context_release_boundary_reaches_every_current_surface(relative):
     assert "FromContext" in text and "0.13.0" in text, relative
     assert "feature is unreleased" not in text, relative
     if relative in {"README.md", "examples/README.md"}:
-        # These surfaces now document a separate, explicitly unreleased result-dependent
+        # These surfaces now document a separate versioned result-dependent
         # optimization. Keep the authenticated-context claim tied to its 0.13.0 section.
         if relative == "README.md":
             context_section = text.lower().split(
@@ -46,11 +46,14 @@ def test_context_release_boundary_reaches_every_current_surface(relative):
         context_section = context_section.split("## ", 1)[0]
         assert "unreleased source" not in context_section, relative
         if relative == "README.md":
-            assert "unreleased result-dependent route" in text, relative
-        else:
-            assert "unreleased source" in text and "singleton local route" in text, (
+            assert "result-dependent route is included from version 0.14.0" in text, (
                 relative
             )
+        else:
+            assert (
+                "included from version 0.14.0" in text
+                and "singleton local route" in text
+            ), relative
     else:
         assert "unreleased source" not in text, relative
 
@@ -88,9 +91,11 @@ def test_current_execution_summaries_include_context_direct_eligibility(
 
 
 def test_roadmap_has_a_distinct_013_boundary():
+    roadmap = (ROOT / "ROADMAP.md").read_text()
+    assert "### 0.13.0 boundary: authenticated application context" in roadmap
     assert (
-        "### 0.13.0 boundary: authenticated application context"
-        in (ROOT / "ROADMAP.md").read_text()
+        "### 0.14.0 boundary: result-dependent execution with one producer-backed choice"
+        in roadmap
     )
 
 

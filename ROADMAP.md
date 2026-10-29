@@ -214,12 +214,17 @@ tenant-scoped database queries, cross-request idempotency, and transactions rema
 application responsibilities. Broader bounds, graphs, adapters, recovery, and persistent
 memory remain planned. Historical 0.12.0 does not include authenticated context.
 
+### 0.14.0 boundary: result-dependent execution with one producer-backed choice
+
+Version 0.14.0 includes the narrow single-choice result-dependent optimization described below. It requires an otherwise eligible uniquely ordered required `Exactly(1)` chain, a Pydantic request with at least one `FromRequest` binding, exactly one producer-backed choice and no other choice, supported immutable defaults and request/result/authenticated-context bindings, and exact full terminal response annotation identity. Historical v0.13.0 behavior remains agent-mediated for every producer-backed choice.
+
 ## Next milestones
 
 The ordering below prioritizes complete, enforceable contracts before expanding execution.
 These are planned acceptance criteria, not claims that the current release enforces them or
-promised release dates. Milestone 1 is completed in the 0.10.0 boundary above; the numbered
-sequence below preserves its follow-on milestones. No milestone adds an executor selection flag,
+promised release dates. Milestone 1 was completed in the 0.10.0 boundary. The release boundaries
+above complete the narrow milestone 2 slice for 0.14.0; broader orchestration and graph work
+remain planned. No milestone adds an executor selection flag,
 public graph, or handler body.
 
 ### 1. Contract enforcement and input/output hardening
@@ -233,25 +238,25 @@ work begins at milestone 2.
 
 ### 2. Result-dependent execution with one producer-backed choice
 
-Status: the 0.11.0 sequential-chain and producer-choice slices, the 0.12.0 fully resolved-chain optimization, and the 0.13.0 authenticated-context boundary are published historical behavior. The result-dependent optimization below is present in current source but **unreleased**; published v0.13.0 chains with producer-backed choices remain agent-mediated, including singleton domains. It extends that existing linear chain without changing the public endpoint contract or operation authority.
+Completed in 0.14.0 (included from version 0.14.0): the narrow result-dependent optimization for one producer-backed choice in an otherwise eligible sequential chain. The 0.11.0, 0.12.0, and 0.13.0 boundaries above retain their historical semantics; in particular, published v0.13.0 chains with producer-backed choices remain agent-mediated, including singleton domains.
 
-- Use `FromResult` to pass only a producer's locally validated output into a downstream operation; the data dependency itself establishes result readiness. Keep the terminal operation the explicit final-response producer and return its canonical validated result.
-- Make the complete chain eligible only when it is the supported linear required-operation shape; do not set or promise a public maximum chain length.
-- Extend the eligible linear required-`Exactly(1)` chain by exactly one producer-backed choice using `AgentChoice(from_result=producer)`, where the producer returns `list[ConcreteModel]`. Keep the selection scoped to the complete eligible chain, not a separately exposed subgraph.
-- Validate and execute every uniquely ready prefix operation before resolving a model. If a producer returns no candidates, return the existing fixed redacted unavailable-choice response before resolving a model or starting downstream work.
-- For exactly one candidate, select its canonical validated member locally and continue without resolving or constructing a model.
-- For multiple candidates, resolve the configured model lazily at that choice boundary, expose only bounded inert descriptions and opaque request-local tokens, and verify token membership locally before binding the exact canonical candidate.
-- On the singleton path, execute the fully resolved suffix without a model. On the multiple-candidate path, continue the suffix through the existing agent-mediated chain behavior. Keep the terminal operation as the canonical final-response producer; do not accept model-authored success claims as a substitute.
-- Require a Pydantic request, at least one `FromRequest` binding, an existing uniquely ordered chain of required `Exactly(1)` operations with at least two operations, exactly one producer-backed choice argument across the entire chain and no other choice, supported immutable defaults plus request/result/authenticated-context bindings, and exact full terminal response annotation identity. Producer must return the supported concrete-model list and precede the consumer. This narrows optimization eligibility only: existing admitted declarations outside it keep their existing agent-mediated route. Preserve the 128-candidate and 65,536-character evidence limits even for singleton domains; local selection must pass canonical-member and receiving checks.
-- Carry the same authenticated context, validated request, results, reservations, stable tokens and absolute deadline across the model handoff. Never replay the prefix or fabricate model history. Document that prefix effects can now precede a provider-configuration failure on the multiple-candidate path; lazy model resolution does not make the prefix side-effect-free or provide rollback.
-- Preserve legacy declarations outside this optimization: bare callable capabilities and supported explicit declarations that do not meet the new eligibility predicate retain their existing agent-mediated execution path. Unsupported explicit contracts remain rejected at registration.
-- Test zero candidates, one candidate with zero model resolution/construction/calls, and multiple candidates using the same configured endpoint/provider. Assert producer effects occur before model resolution; model resolution occurs once and only for the multi-candidate case; token forgery, stale tokens, output failure, timeout, and downstream failure cannot authorize or replay effects.
+The shipped 0.14.0 contract uses `FromResult` to pass only a producer's locally validated output into a downstream operation; the data dependency establishes result readiness. The terminal operation remains the explicit final-response producer and returns its canonical validated result.
+The complete chain is eligible only in the supported linear required-operation shape; there is no public maximum chain length.
+Exactly one producer-backed choice using `AgentChoice(from_result=producer)` is supported in the eligible linear required-`Exactly(1)` chain, with producer output `list[ConcreteModel]`. Selection remains scoped to the complete eligible chain, not a separately exposed subgraph.
+Every uniquely ready prefix operation executes before model resolution. If a producer returns no candidates, the existing fixed redacted unavailable-choice response occurs before model resolution or downstream work.
+For exactly one candidate, Summonpot selects the canonical validated member locally and continues without resolving or constructing a model.
+For multiple candidates, the configured model resolves lazily at that choice boundary; only bounded inert descriptions and opaque request-local tokens are exposed, with local membership verification before binding the exact canonical candidate.
+On the singleton path the fully resolved suffix executes without a model. With multiple candidates, the suffix continues through the existing agent-mediated chain in the same run. The terminal operation remains the canonical final-response producer; model-authored success claims are not a substitute.
+Eligibility requires a Pydantic request with at least one `FromRequest` binding, an existing uniquely ordered chain of at least two required `Exactly(1)` operations, exactly one producer-backed choice argument across the chain and no other choice, supported immutable defaults plus request/result/authenticated-context bindings, and exact full terminal response annotation identity. The producer must return the supported concrete-model list and precede the consumer. This narrows optimization eligibility only; all other admitted declarations keep their existing agent-mediated route. The 128-candidate and 65,536-character evidence limits apply even to singleton domains, and local selection passes canonical-member and receiving checks.
+The same authenticated context, validated request, results, reservations, stable tokens and absolute deadline carry across the model handoff. The prefix is not replayed and model history is not fabricated. Prefix effects may precede provider-configuration failure on the multiple-candidate path; lazy model resolution does not make the prefix side-effect-free or provide rollback.
+Bare callable capabilities and supported explicit declarations outside this optimization retain their existing agent-mediated path. Unsupported explicit contracts remain rejected at registration.
+Regression coverage verifies zero candidates, singleton execution with zero model resolution/construction/calls, and multiple candidates using the same endpoint/provider; producer effects precede model resolution, model resolution occurs only once for multiple candidates, and token forgery, stale tokens, output failure, timeout and downstream failure cannot authorize or replay effects.
 
-This source change is unreleased and does not alter the published v0.11.0, v0.12.0, or v0.13.0 boundaries: each retains its historical behavior, including agent mediation for producer-backed choices. Outside this narrow optimization eligibility, the existing supported agent-mediated execution is preserved. No recurring bounds, rollback, cross-request idempotency, or endpoint-wide transactions are introduced.
+This 0.14.0 optimization does not alter the historical v0.11.0, v0.12.0, or v0.13.0 boundaries: each retains its historical behavior, including agent mediation for producer-backed choices. Outside this narrow optimization eligibility, the existing supported agent-mediated execution is preserved. No recurring bounds, rollback, cross-request idempotency, or endpoint-wide transactions are introduced.
 
 ### 3. Bounded orchestration with multiple choices and repeated calls
 
-After the single-choice linear slice is stable, broaden orchestration to multiple declared choices and finite repeated calls with explicit result semantics:
+With the 0.14.0 single-choice linear slice complete, broaden orchestration to multiple declared choices and finite repeated calls with explicit result semantics:
 
 - Define how each invocation is identified, how each validated result is selected and referenced, and how result provenance is preserved across repeated calls.
 - Enforce declared minimum and maximum call bounds against validated successes and starts respectively; reserve maximum capacity before application code and retain reservations for failed, cancelled, or uncertain starts.
@@ -361,7 +366,7 @@ result-chain retrieval or producer-constrained choices:
 
 #### A2. Result-backed context and compaction
 
-Only after result-dependent execution and broader orchestration (milestones 2–3),
+Only after broader orchestration (milestone 3),
 extend A1 with result-backed context:
 
 - Keep canonical request/result state separate from model-visible working context and
@@ -382,7 +387,7 @@ extend A1 with result-backed context:
 
 ### B. Readiness-aware tool discovery and evidence selection
 
-Build on result-dependent execution and broader orchestration (milestones 2–3):
+Build on broader orchestration (milestone 3):
 
 - Expose or progressively discover only operations already declared and currently legal to
   invoke. Search does not add capabilities, select providers, or authorize an invocation.

@@ -10,6 +10,13 @@ release assembles them here — run `make changelog-draft` to preview them.
 
 <!-- towncrier release notes start -->
 
+## [0.14.0] - 2026-10-29
+
+### Added
+
+- Include a narrow result-dependent execution path for eligible sequential chains with exactly one producer-backed choice. Empty or oversized domains fail before model resolution and downstream work; a singleton runs its suffix without a model, while multiple candidates lazily start the existing agent path after the prefix. Preserve the 128-candidate and 65,536-character limits; prefix effects are not rolled back if provider configuration fails. Historical v0.13.0 producer-choice chains remain agent-mediated.
+
+
 ## [0.13.0] - 2026-10-28
 
 ### Added

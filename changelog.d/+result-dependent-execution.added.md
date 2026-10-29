@@ -1,1 +1,0 @@
-The source adds a narrow result-dependent execution route for eligible sequential chains with one producer-backed choice. Existing published v0.13.0 behavior remains unchanged: producer-choice chains are agent-mediated. The new behavior is documented as unreleased, including singleton local selection, lazy multi-candidate model handoff, existing bounds, and prefix-effect timing.

@@ -70,7 +70,7 @@ clear error; serve the application or invoke its generated HTTP route instead.
 > [!IMPORTANT]
 > The supported single-operation `Exactly(1)` path executes without resolving or constructing
 > a model. From version 0.12.0, uniquely ordered required `Exactly(1)` chains of at least two operations run model-free only with a Pydantic request, at least one `FromRequest` binding, all arguments bound through `FromRequest`/`FromResult` or supported immutable defaults, and a terminal operation declaring the endpoint's exact full response annotation. Chains with `AgentChoice()`
-> remain agent-mediated except for the narrow unreleased result-dependent route described below; bare legacy capabilities remain agent-mediated. That source-only route requires an existing uniquely ordered chain of required `Exactly(1)` operations, a Pydantic request with at least one `FromRequest`, exactly one producer-backed choice argument across the entire chain and no other choice, supported immutable defaults and request/result/authenticated-context bindings, and an exact full terminal response annotation. Empty/unavailable/oversized domains fail before model resolution or downstream work; a singleton binds locally and runs its fully resolved suffix without a model; two-or-more candidates resolve the model only after the prefix and retain the agent-mediated suffix without replay. Existing 128-candidate/65,536-character bounds apply on every outcome. Prefix effects may precede later provider-configuration failure; no rollback is implied. This does not change published v0.13.0 behavior. Unsupported explicit contract shapes
+> remain agent-mediated except for the narrow result-dependent path included from version 0.14.0, described below; bare legacy capabilities remain agent-mediated. This narrow 0.14.0 eligibility requires an existing uniquely ordered chain of required `Exactly(1)` operations, a Pydantic request with at least one `FromRequest`, exactly one producer-backed choice argument across the entire chain and no other choice, supported immutable defaults and request/result/authenticated-context bindings, and an exact full terminal response annotation. Empty/unavailable/oversized domains fail before model resolution or downstream work; a singleton binds locally and runs its fully resolved suffix without a model; two-or-more candidates resolve the model only after the prefix and retain the agent-mediated suffix without replay. Existing 128-candidate/65,536-character bounds apply on every outcome. Prefix effects may precede later provider-configuration failure; no rollback is implied. The result-dependent route is included from version 0.14.0; historical v0.13.0 behavior remains agent-mediated for all producer-backed choices. Unsupported explicit contract shapes
 > fail at registration. Broader graphs remain on the [roadmap](ROADMAP.md), not shipped behavior.
 
 ## Why summonpot?
@@ -194,7 +194,7 @@ routing, and OpenAPI under Summonpot.
   response model. This path does not resolve, construct, or call a model.
 - **Sequential required-operation chains** with `Exactly(1)` bounds and unique readiness,
   bound by validated `FromRequest`/`FromResult` values and supported immutable defaults.
-  Included from version 0.12.0, eligible fully resolved chains execute without model resolution. Current unreleased source additionally executes a qualifying chain locally for a singleton producer-backed choice; two-or-more candidates retain the existing agent-mediated suffix. Other producer-backed choices remain agent-mediated. Both return the validated terminal operation result.
+  Included from version 0.12.0, eligible fully resolved chains execute without model resolution. Included from version 0.14.0, one qualifying producer-backed choice in an otherwise eligible chain executes locally for a singleton; two-or-more candidates retain the existing agent-mediated suffix. Other producer-backed choices remain agent-mediated. Both return the validated terminal operation result.
 - **Registration-time contract validation** that rejects missing sources, invalid result
   references, unsupported choices, and provably incompatible types before serving.
 - **Provider-neutral model selection** for OpenAI, Anthropic, Google, Groq, Mistral,
@@ -474,8 +474,7 @@ outside model context.
 
 Version 0.11.0 runs every supported chain through the agent runtime. From 0.12.0, fully
 resolved chains meeting the Pydantic-request, request-binding, immutable-source, unique-order,
-and exact terminal-response predicates above execute without a model. The additional
-result-dependent route is **unreleased source behavior**, not part of published v0.13.0: it
+and exact terminal-response predicates above execute without a model. The result-dependent route is **included from version 0.14.0**; historical published v0.13.0 behavior remains unchanged: it
 requires exactly one `AgentChoice(from_result=...)` argument across the whole otherwise fully
 resolved eligible chain, a Pydantic request with at least one `FromRequest`, and the same
 terminal response contract. Empty/unavailable/oversized domains fail before model resolution
@@ -591,7 +590,7 @@ Summonpot chooses its current execution path without adding a second endpoint AP
 | Pydantic request model, one required `Exactly(1)` operation, at least one `FromRequest` binding, other inputs from `FromRequest`, authenticated `FromContext` (from 0.13.0), or immutable identity-stable defaults, exact response-model output | Execute directly without a model |
 | A direct `AgentChoice` remains in the admitted single-operation shape | Use the agent runtime with the enforced operation contract |
 | Eligible fully resolved sequential chain meeting every 0.12.0 predicate above | Model-free sequential execution; return the canonical terminal result |
-| Supported sequential chain with producer-backed `AgentChoice` | Published v0.13.0: agent-mediated. Current unreleased source: only exactly one choice in an otherwise eligible chain gets local singleton suffix; multi-candidate choice resolves model after prefix and retains agent suffix |
+| Supported sequential chain with producer-backed `AgentChoice` | Included from version 0.14.0: exactly one choice in an otherwise eligible chain gets local singleton suffix; multi-candidate choice resolves model after prefix and retains agent suffix. Historical v0.13.0 behavior remains agent-mediated for all such choices |
 | Bare callable capabilities with implicit marker bounds | Use the legacy agent runtime |
 | Unsupported explicit binding, ordering, bound, output, or multi-operation shape | Reject during registration |
 

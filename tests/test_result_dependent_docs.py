@@ -10,20 +10,26 @@ def section(text: str, start: str, end: str) -> str:
     return tail.split(end, 1)[0]
 
 
-def test_readme_execution_summary_states_narrow_unreleased_exception() -> None:
+def test_readme_execution_summary_states_narrow_versioned_exception() -> None:
     text = (ROOT / "README.md").read_text()
     summary = section(text, "> [!IMPORTANT]", "## Why summonpot?")
-    assert "unreleased" in summary
+    assert "included from version 0.14.0" in summary
     assert "Pydantic request" in summary and "FromRequest" in summary
     assert "singleton" in summary and "two-or-more" in summary
-    assert "published v0.13.0 behavior" in summary and "unreleased" in summary
-    assert "remain agent-mediated except for the narrow unreleased" in summary
+    assert (
+        "historical v0.13.0 behavior" in summary
+        and "included from version 0.14.0" in summary
+    )
+    assert (
+        "remain agent-mediated except for the narrow result-dependent path included from version 0.14.0"
+        in summary
+    )
 
     table = section(
         text, "| Contract state | Current execution |", "Broader graph execution"
     )
-    assert "Published v0.13.0: agent-mediated" in table
-    assert "Current unreleased source" in table
+    assert "Historical v0.13.0 behavior remains agent-mediated" in table
+    assert "Included from version 0.14.0" in table
     assert "exactly one choice" in table
     assert "multi-candidate" in table
 
@@ -34,31 +40,35 @@ def test_roadmap_and_detail_preserve_published_boundary_and_effect_timing() -> N
         roadmap, "### 2. Result-dependent execution", "### 3. Bounded orchestration"
     )
     for expected in (
-        "unreleased",
+        "included from version 0.14.0",
         "published v0.13.0",
         "exactly one producer-backed choice",
         "no other choice",
         "128-candidate",
         "65,536-character",
         "provider-configuration failure",
-        "existing agent-mediated execution",
+        "all other admitted declarations keep their existing agent-mediated route",
     ):
         assert expected in milestone
 
     guide = (ROOT / "docs/declarative-capabilities.md").read_text()
-    execution = section(guide, "## Deterministic and agentic execution", "## ")
+    execution = guide.split("From 0.12.0, fully resolved chains run model-free", 1)[
+        1
+    ].split("## What the boundary does and does not cover", 1)[0]
     assert "published v0.13.0" in execution
-    assert "unreleased" in execution
+    assert "0.14.0" in execution
     assert "singleton" in execution and "multiple candidates" in execution
     assert "no rollback" in execution
 
 
 def test_example_index_and_runnable_example_describe_behavior_not_results() -> None:
     index = (ROOT / "examples/README.md").read_text()
-    boundary = section(index, "From 0.12.0, fully resolved chains", "## ")
+    boundary = index.split("From 0.12.0, fully resolved chains run without a model", 1)[
+        1
+    ].split("## Progression", 1)[0]
     for expected in (
         "published v0.13.0",
-        "unreleased",
+        "0.14.0",
         "singleton",
         "multiple candidates",
         "128-item/65,536-character",
@@ -69,7 +79,7 @@ def test_example_index_and_runnable_example_describe_behavior_not_results() -> N
     execution = section(example, "## Execution boundary", "## Run")
     for expected in (
         "Published v0.13.0",
-        "unreleased",
+        "0.14.0",
         "exactly one",
         "singleton",
         "Two or more",
@@ -88,7 +98,7 @@ def test_packaged_skill_opening_teaches_current_narrow_route_with_historical_cav
     opening = section(skill, "summonpot modernizes", "## The endpoint shape").lower()
     for expected in (
         "published v0.13.0",
-        "unreleased",
+        "included from version 0.14.0",
         "exactly one producer-backed choice",
         "Pydantic request",
         "FromRequest",
@@ -101,9 +111,12 @@ def test_packaged_skill_opening_teaches_current_narrow_route_with_historical_cav
     assert "other producer choices keep their existing agent route" in opening
 
 
-def test_changelog_fragment_has_valid_orphan_name_and_added_section() -> None:
-    fragments = list((ROOT / "changelog.d").glob("*result-dependent-execution*.md"))
-    assert len(fragments) == 1
-    assert fragments[0].name.endswith(".added.md")
-    assert fragments[0].stem.split("+", 1)[-1]
-    assert "result-dependent" in fragments[0].read_text().lower()
+def test_changelog_release_section_contains_consumed_fragment() -> None:
+    changelog = (ROOT / "CHANGELOG.md").read_text()
+    release = section(changelog, "## [0.14.0]", "## [0.13.0]")
+    assert "result-dependent execution" in release.lower()
+    assert not list(
+        p
+        for p in (ROOT / "changelog.d").iterdir()
+        if p.is_file() and p.name != "README.md"
+    )
