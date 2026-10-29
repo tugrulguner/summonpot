@@ -55,7 +55,10 @@ def test_context_release_boundary_reaches_every_current_surface(relative):
                 and "singleton local route" in text
             ), relative
     else:
-        assert "unreleased source" not in text, relative
+        context_section = text.split(
+            "Authenticated application context (included from version 0.13.0)", 1
+        )[-1].split("## ", 1)[0]
+        assert "unreleased source" not in context_section, relative
 
 
 @pytest.mark.parametrize(

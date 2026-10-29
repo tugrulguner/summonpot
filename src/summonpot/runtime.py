@@ -589,12 +589,22 @@ class Runtime:
                 if bindings:
                     async with run.lock:
                         _ensure_choice_sets(tool, run, plan.tools)
-                        binding = bindings[0]
-                        choices = run.choice_sets[(tool.identity, binding.argument)]
+                        domains = tuple(
+                            (
+                                binding,
+                                run.choice_sets[(tool.identity, binding.argument)],
+                            )
+                            for binding in bindings
+                        )
                     check_deadline()
-                    if len(choices) > 1:
+                    if any(len(choices) > 1 for _, choices in domains):
                         break
-                    supplied[binding.argument] = choices[0][0]
+                    supplied.update(
+                        {
+                            binding.argument: choices[0][0]
+                            for binding, choices in domains
+                        }
+                    )
                 await _invoke_bound_operation(
                     tool,
                     run,

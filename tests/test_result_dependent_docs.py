@@ -16,6 +16,8 @@ def test_readme_execution_summary_states_narrow_versioned_exception() -> None:
     assert "included from version 0.14.0" in summary
     assert "Pydantic request" in summary and "FromRequest" in summary
     assert "singleton" in summary and "two-or-more" in summary
+    assert "current source (unreleased)" in summary.lower()
+    assert "one or more" in summary
     assert (
         "historical v0.13.0 behavior" in summary
         and "included from version 0.14.0" in summary
@@ -59,6 +61,39 @@ def test_roadmap_and_detail_preserve_published_boundary_and_effect_timing() -> N
     assert "0.14.0" in execution
     assert "singleton" in execution and "multiple candidates" in execution
     assert "no rollback" in execution
+    current_source = guide.split("Current source (unreleased)", 1)[1]
+    for expected in (
+        "one or more",
+        "before model resolution or consumer start",
+        "one-way handoff",
+        "per binding",
+        "no promise of zero prior model calls",
+    ):
+        assert expected in current_source
+
+
+def test_current_source_multiple_choice_roadmap_is_partial_and_explicit() -> None:
+    roadmap = (ROOT / "ROADMAP.md").read_text()
+    source = section(
+        roadmap, "## Current source, not yet released", "## Next milestones"
+    )
+    for expected in (
+        "partial slice of milestone 3",
+        "one or more",
+        "before model resolution",
+        "no return to framework-local execution",
+        "per binding",
+        "provider-configuration failure",
+        "allow_direct=False",
+    ):
+        assert expected in source
+    milestone = section(
+        roadmap,
+        "### 3. Bounded orchestration",
+        "### 4. Broader private",
+    )
+    assert "partially implemented, not complete" in milestone
+    assert "finite repeated calls" in milestone
 
 
 def test_example_index_and_runnable_example_describe_behavior_not_results() -> None:
@@ -115,8 +150,11 @@ def test_changelog_release_section_contains_consumed_fragment() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text()
     release = section(changelog, "## [0.14.0]", "## [0.13.0]")
     assert "result-dependent execution" in release.lower()
-    assert not list(
+    fragments = [
         p
         for p in (ROOT / "changelog.d").iterdir()
         if p.is_file() and p.name != "README.md"
-    )
+    ]
+    assert len(fragments) == 1
+    assert fragments[0].name == "+multiple-producer-choices.added.md"
+    assert fragments[0].read_text().strip()

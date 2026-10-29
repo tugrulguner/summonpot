@@ -76,7 +76,7 @@ Immutable defaults are exact built-in `None`, `bool`, `int`, `float`, `complex`,
 | Bare legacy callable dependency | Existing provider-neutral agent path. |
 | Unsupported/incomplete explicit `Operation` contract | Rejected during registration. |
 | Fully resolved sequential chain meeting every 0.12.0 predicate above | Model-free sequential execution; canonical terminal result returned. |
-| Supported sequential chain with producer-backed `AgentChoice` | From version 0.14.0: exactly one eligible choice gets local singleton execution; multiple candidates use lazy model handoff. Historical v0.13.0 chains remain agent-mediated. |
+| Supported sequential chain with producer-backed `AgentChoice` | v0.14.0: exactly one choice gets singleton-local or multi-candidate lazy handoff. Current source (unreleased): one or more choices are checked at each ready consumer; all-singleton domains run locally, any multi-candidate domain triggers one-way handoff. Historical v0.13.0 remains agent-mediated. |
 | Unsupported graph or explicit contract | Rejected during registration. |
 
 No runtime fallback to a model occurs after direct execution begins. One reserved start is not exactly-once completion: failures and side effects are application concerns.
@@ -112,6 +112,8 @@ Two or more candidates trigger lazy model resolution at the choice boundary. Onl
 
 Other supported declarations outside this optimization retain their existing path. Direct single-operation `AgentChoice`, published v0.13.0 behavior, and existing model-free paths are unchanged. Multiple choice points, broader graphs, and repeated calls are not enabled by this optimization.
 
+
+Current source (unreleased) supports one or more producer-backed choice bindings in this same otherwise eligible chain. At each ready consumer all binding domains are checked before model resolution or consumer start; all-singleton domains bind canonical tokens locally, while any multi-candidate domain triggers one-way handoff to the existing agent-mediated suffix. There is no local resumption or prefix replay. The same request/principal, ledger, deadline, and tokens remain authoritative. Bounds are 128 candidates and 65,536 evidence characters per binding, not aggregate context or Cartesian-product limits. Empty/unavailable/oversized domains reject before first handoff; after handoff, prior model calls may already have occurred. Prefix effects may precede provider-configuration failure; no rollback is implied. This is a partial, unreleased source slice of milestone 3, not the historical v0.14.0 feature boundary.
 ## Planned vocabulary
 
 `FromContext` outside the narrow supported slice, primitive or untyped collection choices, direct unbounded choices inside chains, broader call bounds, broader graph shapes, and deterministic compilation beyond the supported sequential slice remain unsupported. `FromResult`, `after`, and producer-backed choices work only in the uniquely ordered sequential chain described above. Eligible fully resolved chains run model-free from 0.12.0; any `AgentChoice` normally remains agent-mediated; see the result-dependent source exception included from version 0.14.0 above. Started, failed, or uncertain operations are not replayed in the same run, but this is not rollback or exactly-once external effects.

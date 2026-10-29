@@ -85,6 +85,12 @@ CASES = (
         {"customerId": "customer-7"},
     ),
     ExampleCase(
+        "13_multiple_producer_choices/app.py",
+        "POST",
+        "/orders",
+        {"category": "coffee", "quantity": 1, "idempotency_key": "smoke-order"},
+    ),
+    ExampleCase(
         "13_authenticated_context/app.py",
         "POST",
         "/notes",
@@ -256,6 +262,11 @@ def _verify_case(case: ExampleCase, examples_root: Path, workdir: Path) -> None:
         SUMMONPOT_TICKET_LOG=str(workdir / "tickets.jsonl"),
     )
     auth_headers: dict[str, str] = {}
+    if case.source == "13_multiple_producer_choices/app.py":
+        environment.update(
+            MULTIPLE_CHOICE_DB=str(workdir / "multiple-choice.sqlite3"),
+            SUMMONPOT_MODEL="invalid:no-provider",
+        )
     if case.source == "13_authenticated_context/app.py":
         token = secrets.token_urlsafe(32)
         environment.update(
@@ -289,6 +300,22 @@ def _verify_case(case: ExampleCase, examples_root: Path, workdir: Path) -> None:
         if success != 200:
             raise AssertionError(f"{case.source} success returned {success}: {body!r}")
         json.loads(body)
+        if case.source == "13_multiple_producer_choices/app.py":
+            with sqlite3.connect(environment["MULTIPLE_CHOICE_DB"]) as db:
+                rows = db.execute(
+                    "SELECT product_id,delivery_id,quantity,total_cents,remaining_stock FROM orders WHERE idempotency_key=?",
+                    ("smoke-order",),
+                ).fetchall()
+                stock = db.execute(
+                    "SELECT stock FROM products WHERE product_id='coffee'"
+                ).fetchone()
+            if len(rows) != 1 or rows[0][0:3] != ("coffee", "coffee-ground", 1):
+                raise AssertionError(f"SQLite receipt mismatch: {rows!r}")
+            if rows[0][3:] != (350, 4) or stock != (4,):
+                raise AssertionError(
+                    f"SQLite stock/total mismatch: {rows!r}, {stock!r}"
+                )
+
         if auth_headers:
             denied, _ = _request(base_url, case.method, case.path, payload=case.payload)
             assert denied == 401

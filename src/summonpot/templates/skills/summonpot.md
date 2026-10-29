@@ -21,6 +21,12 @@ owns execution, including any agent loop. **The ellipsis is a complete declarati
 not an implementation waiting to be written. Calling the decorated declaration directly is
 rejected; execution goes through the served endpoint.
 
+## Current-source multiple-choice execution (unreleased)
+
+Current source extends the historical v0.14.0 exactly-one-choice optimization to one or more producer-backed choice bindings. Eligibility still requires a Pydantic request with at least one `FromRequest`, an existing uniquely ordered chain of at least two required `Exactly(1)` operations, supported immutable defaults or request/result/authenticated-context bindings, and exact full terminal response annotation identity. Every domain on the ready consumer is checked before choosing local execution or first model resolution. All-singleton arguments use canonical tokens locally; any multi-candidate argument triggers one one-way handoff to the existing agent-mediated suffix, with no later local resumption or prefix replay.
+
+The same request, principal, ledger, tokens and absolute deadline remain authoritative. Bounds of 128 candidates and 65,536 evidence characters are per binding, not an aggregate context budget or Cartesian product. An unavailable domain before handoff rejects before model resolution; a later rejection after handoff cannot undo previous model calls or effects. Prefix effects may precede provider-configuration failure. There is no rollback or durable cross-request resume. Existing admitted declarations outside optimization eligibility and `allow_direct=False` retain their prior execution. Repeated calls and broader graphs remain planned. See the [operation reference](https://summonpot.modepot.io/reference/operations/) for the canonical execution boundary.
+
 ## The endpoint shape
 
 ```python

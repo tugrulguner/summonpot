@@ -218,6 +218,12 @@ memory remain planned. Historical 0.12.0 does not include authenticated context.
 
 Version 0.14.0 includes the narrow single-choice result-dependent optimization described below. It requires an otherwise eligible uniquely ordered required `Exactly(1)` chain, a Pydantic request with at least one `FromRequest` binding, exactly one producer-backed choice and no other choice, supported immutable defaults and request/result/authenticated-context bindings, and exact full terminal response annotation identity. Historical v0.13.0 behavior remains agent-mediated for every producer-backed choice.
 
+## Current source, not yet released
+
+The working source extends the 0.14.0 optimization to one or more producer-backed choice bindings across an otherwise eligible uniquely ordered chain. This is an unreleased partial slice of milestone 3; it does not change the historical v0.14.0 release boundary above. The exact eligibility remains a Pydantic request with at least one `FromRequest`, at least two required `Exactly(1)` operations, supported immutable defaults and request/result/authenticated-context bindings, and exact full terminal response annotation identity.
+
+At each ready consumer, check every binding domain before model resolution or consumer start. All singleton domains bind their canonical tokens locally. Any multi-candidate domain causes one-way handoff to the existing agent-mediated suffix; there is no return to framework-local execution. Preserve the same request/principal, ledger, deadline, and tokens; never replay the prefix. An unavailable/empty/oversized binding rejects before the first handoff, but after handoff no zero-prior-model-calls guarantee applies. Limits remain 128 candidates and 65,536 evidence characters per binding—not an aggregate context or Cartesian-product bound. Prefix effects can precede provider-configuration failure; no rollback or cross-request replay guarantee is added. Wider admitted declarations continue on their prior agent-mediated route, including `allow_direct=False`.
+
 ## Next milestones
 
 The ordering below prioritizes complete, enforceable contracts before expanding execution.
@@ -256,7 +262,7 @@ This 0.14.0 optimization does not alter the historical v0.11.0, v0.12.0, or v0.1
 
 ### 3. Bounded orchestration with multiple choices and repeated calls
 
-With the 0.14.0 single-choice linear slice complete, broaden orchestration to multiple declared choices and finite repeated calls with explicit result semantics:
+The current source implements only the multiple producer-backed choice-binding slice described above. This milestone is **partially implemented, not complete**. The remaining planned work broadens orchestration to finite repeated calls with explicit result semantics:
 
 - Define how each invocation is identified, how each validated result is selected and referenced, and how result provenance is preserved across repeated calls.
 - Enforce declared minimum and maximum call bounds against validated successes and starts respectively; reserve maximum capacity before application code and retain reservations for failed, cancelled, or uncertain starts.

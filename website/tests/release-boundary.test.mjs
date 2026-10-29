@@ -29,7 +29,10 @@ test('homepage and operation reference describe the 0.14.0 execution boundary', 
     assert.match(html, /Pydantic request/i);
     assert.match(html, /FromRequest/i);
     assert.match(html, /historical v0\.13\.0/i);
-    assert.doesNotMatch(html, /unreleased source|unreleased result-dependent/i);
+    assert.match(html, /current source \(unreleased\)/i);
+    assert.match(html, /one or more producer-backed/i);
+    assert.match(html, /one-way handoff|hands off once/i);
+    assert.doesNotMatch(html, /0\.14\.0[^<.]{0,80}(?:includes|ships) multiple choices/i);
   }
   assert.match(reference, /128/);
   assert.match(reference, /65,536/);

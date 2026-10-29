@@ -33,6 +33,7 @@ EXAMPLES = [
     ("11_linear_result_chain/app.py", "/reservations", "post"),
     ("12_producer_choice/app.py", "/orders", "post"),
     ("13_authenticated_context/app.py", "/notes", "post"),
+    ("13_multiple_producer_choices/app.py", "/orders", "post"),
 ]
 
 
@@ -44,8 +45,9 @@ def _load_example(relative_path: str, monkeypatch):
 
 @pytest.mark.parametrize(("relative_path", "route", "method"), EXAMPLES)
 def test_every_example_builds_its_advertised_openapi_route(
-    relative_path, route, method, monkeypatch
+    relative_path, route, method, monkeypatch, tmp_path
 ):
+    monkeypatch.setenv("MULTIPLE_CHOICE_DB", str(tmp_path / "multiple-choice.sqlite3"))
     summon = _load_example(relative_path, monkeypatch)
 
     schema = build_app(summon).openapi()
@@ -247,7 +249,7 @@ def test_cli_launches_every_example_through_real_http():
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "verified 10 example applications" in result.stdout
+    assert "verified 11 example applications" in result.stdout
 
 
 def test_release_smoke_verifies_installed_cli_version():

@@ -1160,7 +1160,7 @@ def _compile_endpoint(
                 for tool in tools
                 for binding in tool.bindings
             )
-            == 1
+            >= 1
             and all(
                 type(binding.source) is not AgentChoice
                 or binding.producer_identity is not None
