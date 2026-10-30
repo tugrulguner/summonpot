@@ -31,7 +31,9 @@ test('homepage and operation reference describe the 0.14.0 execution boundary', 
     assert.match(html, /historical v0\.13\.0/i);
     assert.match(html, /current source \(unreleased\)/i);
     assert.match(html, /one or more producer-backed/i);
-    assert.match(html, /one-way handoff|hands off once/i);
+    assert.match(html, /framework-owned progression/i);
+    assert.match(html, /without a final model acknowledgment/i);
+    assert.match(html, /tool_calls_limit/);
     assert.doesNotMatch(html, /0\.14\.0[^<.]{0,80}(?:includes|ships) multiple choices/i);
   }
   assert.match(reference, /128/);

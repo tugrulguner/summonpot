@@ -10,6 +10,21 @@ from summonpot import AgentChoice, Exactly, FromRequest, Operation, Required, Su
 from summonpot.runtime import Runtime
 
 
+@pytest.fixture(autouse=True)
+def _historical_agent_tool_compatibility(monkeypatch):
+    """Keep these pre-progression historical agent-flow tests on the explicit legacy route."""
+    from pydantic_ai.usage import UsageLimits
+
+    original_init = Runtime.__init__
+
+    def init_with_legacy_tool_budget(self, *args, **kwargs):
+        if kwargs.get("usage_limits") is None:
+            kwargs["usage_limits"] = UsageLimits(tool_calls_limit=100)
+        original_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(Runtime, "__init__", init_with_legacy_tool_budget)
+
+
 def test_provider_failure_after_two_local_operations_preserves_the_prefix(monkeypatch):
     events = []
     app = staged_chain((1, 2), events)

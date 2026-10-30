@@ -68,10 +68,11 @@ def test_readme_states_the_current_runtime_boundary_before_positioning():
     assert "uniquely ordered required `exactly(1)` chains" in introduction
     assert "at least one `fromrequest` binding" in introduction
     assert "endpoint's exact full response annotation" in introduction
-    assert (
-        "remain agent-mediated except for the narrow result-dependent path included from version 0.14.0"
-        in introduction
-    )
+    assert "result-dependent route is included from version 0.14.0" in introduction
+    assert "framework-owned progression" in introduction
+    assert "no business-operation tools" in introduction
+    assert "without a final model acknowledgment" in introduction
+    assert "explicit `tool_calls_limit`" in introduction
     assert "bare legacy capabilities remain agent-mediated" in introduction
     assert "historical v0.13.0 behavior" in introduction
     assert "unsupported explicit contract shapes fail at registration" in introduction

@@ -52,15 +52,21 @@ without a model; Level 8 runs that path. Version 0.11.0 also admits a sequential
 
 From 0.12.0, fully resolved chains run without a model only with a Pydantic request,
 at least one `FromRequest` binding, two or more required `Exactly(1)` operations with
-unique readiness, only `FromRequest`/`FromResult` sources or supported immutable defaults,
-and the terminal operation's exact full endpoint response annotation. Any `AgentChoice`
-kept its chain agent-mediated in published v0.13.0. From version 0.14.0, the runtime additionally
-The released 0.14.0 optimization permits exactly one producer-backed choice across an otherwise eligible chain: zero candidates
-fails before model/downstream, singleton binds locally and runs the suffix model-free, and
-multiple candidates resolve the model after the prefix and retain the agent-mediated suffix.
-It still requires a Pydantic request, at least one `FromRequest`, supported immutable inputs,
-unique order, exact full terminal annotation, and existing 128-item/65,536-character bounds.
-Other supported declarations retain their existing route. Current source (unreleased) extends the optimization to one or more producer-backed bindings, checking every domain at each ready consumer before consumer start/model resolution. All-singleton domains execute locally; any multi-candidate domain causes one-way handoff to the agent-mediated suffix, without local resumption or replay. Bounds remain per binding (128 candidates/65,536 evidence characters), not aggregate context or Cartesian-product limits. Prefix effects may precede provider-configuration failure. This is partial milestone 3; v0.14.0 remains the exactly-one-choice release. The v0.11.0 boundary above is historical.
+unique readiness, supported request/result/context sources or immutable defaults, and the
+terminal operation's exact full endpoint response annotation. Published v0.13.0 kept every
+producer-backed choice agent-mediated. Version 0.14.0 includes exactly one producer-backed
+choice across the eligible chain: a singleton binds locally; multiple candidates hand off
+after the prefix. Current source (unreleased) extends optimization eligibility to one or
+more producer-backed choices. Summonpot checks all domains before each consumer starts,
+progresses singleton choices locally, and asks a private selector with no business tools
+only for ambiguous tokens. The shared invocation kernel continues the chain and returns
+the canonical terminal result without a final model acknowledgment. Request/principal,
+usage budget, reservations and deadline are shared; model resolution is lazy and once per
+request. Per-binding limits remain 128 candidates and 65,536 evidence characters. Explicit
+`tool_calls_limit`, `allow_direct=False`, and other noneligible declarations keep their
+existing route. Prefix effects are not rolled back; no durable cross-request resume or
+effect replay is added. This is a partial milestone 3 slice, not completion; historical
+v0.14.0 remains exactly-one-choice. See the [full current-source contract](../docs/declarative-capabilities.md#current-source-framework-owned-decision-progression-unreleased).
 From 0.13.0, authenticated `FromContext` may also resolve inputs in those admitted direct
 single-operation and chain paths. The Pydantic request, at least one `FromRequest`,
 immutable-default, unique-readiness, and exact full response-annotation requirements
@@ -269,11 +275,11 @@ choice is locally token-bound to one canonical producer result. The tests exerci
 real runtime, HTTP, and SQLite path with a keyless scripted model; the example's production
 run uses the configured provider.
 
-### 14. Multiple producer-backed choices (current source, unreleased)
+### 13. Multiple producer-backed choices (current source, unreleased)
 
 Directory: [`13_multiple_producer_choices/`](13_multiple_producer_choices/)
 
-Shows the current-source extension to multiple producer-backed choice bindings in one eligible sequential chain. This is not part of the v0.14.0 release boundary.
+Shows framework-owned progression across multiple producer-backed choice bindings in one eligible sequential chain. This is not part of the v0.14.0 release boundary. See the [execution boundary](13_multiple_producer_choices/README.md#execution-boundary).
 
 ## What is intentionally not shown as shipped
 

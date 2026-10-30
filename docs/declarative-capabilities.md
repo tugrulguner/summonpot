@@ -116,6 +116,46 @@ credential-free direct slice, [`07_bound_operation.py`](../examples/07_bound_ope
 for the agent-backed enforced slice, and [`06_support_service`](../examples/06_support_service/app.py)
 for a multi-file service using compatible bare callable dependencies.
 
+## Current source: framework-owned decision progression (unreleased)
+
+This is the current source extension, not behavior in published v0.14.0. The released
+v0.14.0 optimization remains exactly one producer-backed choice argument across an
+otherwise eligible chain, with no other choice. The current source supports one or more
+producer-backed choices in an otherwise eligible uniquely ordered chain of at least two
+required `Exactly(1)` operations. It still requires a Pydantic request with at least one
+`FromRequest`, supported request/result/authenticated-context bindings or immutable
+defaults, and the exact full terminal operation/endpoint response annotation. The choice
+producers must be supported `list[ConcreteModel]` operations preceding their consumers.
+
+Summonpot advances execution between decision boundaries. It checks **every** producer-backed
+domain for the next consumer before selecting or starting that consumer. Empty, unavailable,
+or oversized domains fail with the existing redacted conflict; singleton domains bind their
+canonical member locally. Only ambiguous binding slots reach a private decision selector,
+which sees the fixed goal, safe projected request data and bounded inert per-slot evidence.
+It has no business-function tools, database access, ledger, implicit principal or authority
+to finish the endpoint. The strict selector returns opaque tokens only; local membership,
+receiving constraints, readiness and reservation checks precede the operation start in the
+shared invocation kernel. Multiple ambiguous arguments at one consumer are selected together.
+Progression repeats locally at subsequent frontiers, and the unique terminal operation's
+canonical validated result is returned immediately without a model-authored completion.
+
+The request, authenticated context, exact results, reservations, token domains, effective
+usage limits and absolute deadline remain request-local and shared across every frontier and
+correction. The configured model resolves lazily once at the first ambiguity. Corrections
+consume the shared request/token/cost budgets and deadline; they cannot replay an effect,
+reset the deadline or renew candidate authority. The per-binding caps remain 128 candidates and
+65,536 evidence characters; these are not aggregate prompt/context or Cartesian-product
+limits. Projection is bounded and inert; it does not imply secrecy for caller request data or
+application outputs intentionally disclosed by operations.
+
+This unreleased route is unavailable when an explicit `tool_calls_limit` is configured,
+because decision-only structured output reports no business function calls; that setting
+retains the supported legacy agent suffix. `allow_direct=False` likewise preserves the
+existing compatibility route. Declarations outside optimization eligibility retain their
+previous supported behavior. Prefix effects may precede lazy provider-configuration failure;
+there is no rollback, effect replay, durable cross-request resume, repeated-call support,
+general graph compiler or public selector. Historical release sections are unchanged.
+
 ## Deterministic and agentic execution
 
 Capabilities are deterministic operations in both modes. The difference is whether execution still has an unresolved legal choice:
@@ -134,7 +174,7 @@ at least one argument is bound from `FromRequest`, every remaining argument come
 `FromRequest` or an immutable identity-stable callable default, and its declared output is
 the endpoint output model by exact identity, the runtime executes that operation directly
 before model resolution. There is no model fallback after direct execution starts.
-From 0.12.0, fully resolved chains run model-free only with a Pydantic request and at least one `FromRequest`, uniquely ordered required `Exactly(1)` steps, supported request/result/authenticated-context sources and immutable defaults, and an exact full terminal response annotation. Any `AgentChoice` in a published v0.13.0 chain remains agent-mediated. Included from version 0.14.0, a narrow result-dependent path is shipped for exactly one producer-backed choice argument across the entire otherwise eligible chain, with no other choice. A singleton binds locally; multiple candidates cause lazy model handoff after the prefix. Current source (unreleased) generalizes this optimization to one or more such bindings; each must use a supported concrete-model list producer preceding its consumer; and all other inputs locally resolved. At each ready consumer, every domain is checked before model resolution or consumer start. Empty/unavailable/oversized domains fail with the existing redacted conflict; all-singleton domains bind locally, while any multi-candidate domain makes one-way handoff to the existing agent-mediated suffix. This current-source extension has not shipped. The same request/principal, ledger, deadline, and tokens carry across handoff; the prefix is not replayed and local execution does not resume. The 128-candidate/65,536-character limits are per binding, not aggregate context or Cartesian-product limits. Before the first handoff an unavailable binding prevents model resolution; after handoff there is no promise of zero prior model calls. Prefix effects can precede provider-configuration failure; no rollback is implied. This narrows optimization eligibility only: other supported declarations keep their existing agent-mediated route. `after` supplies independent success ordering. Broader graphs remain unsupported.
+From 0.12.0, fully resolved chains run model-free only with a Pydantic request and at least one `FromRequest`, uniquely ordered required `Exactly(1)` steps, supported request/result/authenticated-context sources and immutable defaults, and an exact full terminal response annotation. Any `AgentChoice` in a published v0.13.0 chain remains agent-mediated. Included from version 0.14.0, a narrow result-dependent path is shipped for exactly one producer-backed choice argument across the entire otherwise eligible chain, with no other choice. A singleton binds locally; multiple candidates cause lazy model handoff after the prefix. Current source (unreleased) supports one or more producer-backed choices with framework-owned progression. In an otherwise eligible uniquely ordered required `Exactly(1)` chain, a Pydantic request, at least one `FromRequest`, supported request/result/authenticated-context bindings or immutable defaults, and exact full terminal response annotation identity remain required. All current consumer domains are checked before selection or start. Singleton bindings resolve locally; a decision-only selector returns ambiguous tokens with no business-operation tools. The shared kernel validates and invokes the operation, then continues locally until another genuine decision is needed. The canonical terminal result returns without a final model acknowledgment. Request/principal, reservations, token domains, usage budgets and one deadline remain request-local across frontiers and corrections. Explicit `tool_calls_limit` retains the previous one-way agent suffix; `allow_direct=False` and other noneligible declarations retain their existing route. Limits remain 128 candidates and 65,536 evidence characters per binding, not an aggregate prompt/context budget. Prefix effects may precede provider-configuration failure; no rollback, effect replay or durable resume is added. Historical v0.14.0 remains exactly-one-choice. See the [operation reference](https://summonpot.modepot.io/reference/operations/) for details.
 A direct `AgentChoice` in the admitted shape uses the provider-neutral agent loop. An
 unsupported explicit declaration fails before serving; bare callable dependencies keep their
 legacy agent behavior. `Operation(fn)` is still an explicit contract and is rejected because

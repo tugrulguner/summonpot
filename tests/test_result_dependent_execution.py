@@ -23,6 +23,21 @@ from summonpot.runtime import Runtime, _ChoiceUnavailableError
 from summonpot.server import build_app
 
 
+@pytest.fixture(autouse=True)
+def _historical_agent_tool_compatibility(monkeypatch):
+    """Keep these pre-progression historical agent-flow tests on the explicit legacy route."""
+    from pydantic_ai.usage import UsageLimits
+
+    original_init = Runtime.__init__
+
+    def init_with_legacy_tool_budget(self, *args, **kwargs):
+        if kwargs.get("usage_limits") is None:
+            kwargs["usage_limits"] = UsageLimits(tool_calls_limit=100)
+        original_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(Runtime, "__init__", init_with_legacy_tool_budget)
+
+
 def test_singleton_chain_never_resolves_or_constructs_a_model(monkeypatch):
     events = []
     app, _ = choice_app(events, candidates=[Candidate(identifier="A", label="only")])

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
+from pydantic_ai.messages import ModelResponse, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 
 from summonpot.runtime import Runtime
@@ -95,26 +95,26 @@ def test_multi_candidate_full_http_selection_persists_receipt_and_stock(tmp_path
     calls = []
 
     def select_from_real_tool_schema(messages, info):
-        visible = [tool.name for tool in info.function_tools]
-        calls.append(
-            [(tool.name, tool.parameters_json_schema) for tool in info.function_tools]
-        )
-        if "compatible_deliveries" in visible:
-            tool = info.function_tools[0]
-            token = tool.parameters_json_schema["properties"]["product"]["enum"][0]
-            return ModelResponse(parts=[ToolCallPart(tool.name, {"product": token})])
-        if "persist_order" in visible:
-            tool = next(t for t in info.function_tools if t.name == "persist_order")
-            args = {
-                key: field["enum"][0]
-                for key, field in tool.parameters_json_schema["properties"].items()
-                if "enum" in field
-            }
-            assert set(args) == {"product", "delivery"}
-            assert "quantity" not in tool.parameters_json_schema["properties"]
-            assert "idempotency_key" not in tool.parameters_json_schema["properties"]
-            return ModelResponse(parts=[ToolCallPart("persist_order", args)])
-        return ModelResponse(parts=[TextPart("untrusted text is not the receipt")])
+        import json
+
+        from pydantic_ai.messages import ModelRequest, UserPromptPart
+
+        assert info.function_tools == []
+        assert len(info.output_tools) == 1
+        tool = info.output_tools[0]
+        calls.append(tool.parameters_json_schema)
+        prompts = [
+            part.content
+            for message in messages
+            if isinstance(message, ModelRequest)
+            for part in message.parts
+            if isinstance(part, UserPromptPart) and isinstance(part.content, str)
+        ]
+        domains = json.loads(prompts[0].splitlines()[-1])
+        assert "quantity" not in tool.parameters_json_schema["properties"]
+        assert "idempotency_key" not in tool.parameters_json_schema["properties"]
+        args = {slot: data["candidates"][0]["token"] for slot, data in domains.items()}
+        return ModelResponse(parts=[ToolCallPart(tool.name, args)])
 
     module.summon._runtime = Runtime(model=FunctionModel(select_from_real_tool_schema))
     with TestClient(
