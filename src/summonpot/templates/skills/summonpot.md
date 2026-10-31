@@ -25,6 +25,10 @@ rejected; execution goes through the served endpoint.
 
 For the full current-source contract—including selector authority, prechecks, shared request-wide accounting, compatibility behavior and explicit non-goals—see the [framework-owned progression reference](https://summonpot.modepot.io/reference/operations/). In short, all domains at each ready consumer are checked before selection/start; only opaque tokens for ambiguous slots reach a private selector with no business tools. Singleton choices and later resolved operations progress through the shared invocation kernel; the canonical terminal result ends execution without a final model acknowledgment. This source extension is unreleased; historical v0.14.0 remains exactly-one-choice.
 
+
+
+Current source (unreleased) adds bounded repetition of one required typed operation only: finite positive bounds (`minimum >= 1`, `maximum > 1`), Pydantic request with at least one `FromRequest`, and closed direct `Literal[str]` choices. Summonpot owns sequential calls and finish, validates each selector decision locally, shares usage and deadline, lazily resolves one model, and returns the final successful canonical invocation result; any failure aborts. At maximum it finalizes without acknowledgment. An explicit `tool_calls_limit` fails before provider resolution or application effects, with no legacy repeated-call fallback. Evidence is capped at 65,536 characters per decision, not an aggregate prompt budget; caller request/evidence may be intentionally disclosed but principal/full ledger are not implicitly exposed. This does not add producers, `FromResult`, `after`, another capability, zero-minimum/unbounded bounds, implicit batching, or general graphs. Existing Exactly(1) and producer-choice paths stay unchanged; historical v0.14.0 remains unchanged. Milestone 3 is partial; repeated-result addressing in chains remains next. See https://summonpot.modepot.io/reference/operations/#current-source-bounded-repeated-calls-unreleased for the canonical contract.
+
 ## The endpoint shape
 
 ```python

@@ -271,6 +271,9 @@ The current source implements only the multiple producer-backed choice-binding s
 
 This milestone expands the legal orchestration contract; it does not itself promise a general graph compiler, arbitrary parallelism, durable execution, rollback, or exactly-once effects.
 
+
+The current-source bounded repeated-call slice is partial progress in this milestone, not completion. It covers only one required typed operation with positive finite bounds, explicit closed string choices, framework-owned sequential invocation, and final-success response ownership. Explicit repeated-result addressing in supported chains remains the next step. This does not add implicit batches or general graph execution.
+
 ### 4. Broader private execution compiler
 
 - Extend private compilation beyond the required single-start slices only after milestone 3 settles invocation and result semantics. Preserve the least-powerful sufficient execution rule:

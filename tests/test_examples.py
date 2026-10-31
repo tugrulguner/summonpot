@@ -34,6 +34,7 @@ EXAMPLES = [
     ("12_producer_choice/app.py", "/orders", "post"),
     ("13_authenticated_context/app.py", "/notes", "post"),
     ("13_multiple_producer_choices/app.py", "/orders", "post"),
+    ("14_bounded_audit/app.py", "/audits", "post"),
 ]
 
 
@@ -249,7 +250,7 @@ def test_cli_launches_every_example_through_real_http():
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "verified 11 example applications" in result.stdout
+    assert "verified 12 example applications" in result.stdout
 
 
 def test_release_smoke_verifies_installed_cli_version():

@@ -156,6 +156,7 @@ def test_changelog_release_section_contains_consumed_fragment() -> None:
         for p in (ROOT / "changelog.d").iterdir()
         if p.is_file() and p.name != "README.md"
     ]
-    assert len(fragments) == 2
+    assert len(fragments) == 3
     assert any(p.name == "+framework-owned-progression.added.md" for p in fragments)
+    assert any(p.name == "+bounded-repeated-calls.added.md" for p in fragments)
     assert all(p.read_text().strip() for p in fragments)

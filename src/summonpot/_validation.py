@@ -400,6 +400,53 @@ def _enforced_contract_tool_index(tools: Sequence[Any]) -> int | None:
     return 0
 
 
+def _repeated_contract_tool_index(tools: Sequence[Any]) -> int | None:
+    """Recognize the closed sole-operation finite-repetition contract, not a graph."""
+    if len(tools) != 1:
+        return None
+    tool = tools[0]
+    contract, bounds = tool.contract, tool.bounds
+    if (
+        not tool.required
+        or contract is None
+        or contract.bind is None
+        or contract.output is None
+        or contract.after
+        or bounds is None
+        or bounds.maximum is None
+        or bounds.maximum <= 1
+        or bounds.minimum < 1
+        or bounds.minimum > bounds.maximum
+    ):
+        return None
+    annotations = {
+        parameter.name: parameter.annotation for parameter in tool.parameters
+    }
+    saw_choice = saw_request = False
+    for name, source in contract.bind.items():
+        if type(source) is AgentChoice and source.from_result is None:
+            annotation = annotations.get(name)
+            if get_origin(annotation) is not Literal:
+                return None
+            values = get_args(annotation)
+            if not values or not all(type(value) is str for value in values):
+                return None
+            saw_choice = True
+        elif type(source) is FromRequest:
+            saw_request = True
+        elif type(source) is not FromContext:
+            return None
+    for name, parameter in inspect.signature(tool.fn).parameters.items():
+        if parameter.kind in _VARIADIC:
+            return None
+        if name not in contract.bind and (
+            parameter.default is inspect.Parameter.empty
+            or not _immutable_chain_default(parameter.default)
+        ):
+            return None
+    return 0 if saw_choice and saw_request else None
+
+
 def _chain_contract_tool_indices(tools: Sequence[Any]) -> tuple[int, ...] | None:
     """Identify a totally ordered required Exactly(1) chain, in execution order."""
     if len(tools) < 2:
@@ -503,6 +550,7 @@ def _immutable_chain_default(value: Any) -> bool:
 def _validate_runtime_admission(*, endpoint: str, tools: list[Any]) -> None:
     """Reject explicit contracts that would fall onto unenforced agent execution."""
     enforced = _enforced_contract_tool_index(tools)
+    repeated = _repeated_contract_tool_index(tools)
     chain = _chain_contract_tool_indices(tools)
     for index, tool in enumerate(tools):
         contract = tool.contract
@@ -525,14 +573,19 @@ def _validate_runtime_admission(*, endpoint: str, tools: list[Any]) -> None:
             and tool.bounds.maximum == 1
         )
 
-        if explicit_bounds and not bounds_are_exactly_once:
+        if explicit_bounds and not bounds_are_exactly_once and index != repeated:
             raise TypeError(
                 f"Endpoint {endpoint!r}: capability {tool.name!r}: Summonpot "
                 "cannot enforce the declared call bound. The current bound runtime "
                 "supports required typed operations with calls=Exactly(1) in the "
                 "single-operation or supported uniquely ordered sequential shape."
             )
-        if explicit_contract and index != enforced and not (chain and index in chain):
+        if (
+            explicit_contract
+            and index != enforced
+            and index != repeated
+            and not (chain and index in chain)
+        ):
             raise TypeError(
                 f"Endpoint {endpoint!r}: capability {tool.name!r} would leave its "
                 "explicit contract unenforced on the agent runtime. The current "
@@ -541,7 +594,12 @@ def _validate_runtime_admission(*, endpoint: str, tools: list[Any]) -> None:
                 "required Exactly(1) operations in a supported sequential chain with "
                 "FromRequest/FromResult bindings and a unique terminal response producer."
             )
-        if explicit_bounds and index != enforced and not (chain and index in chain):
+        if (
+            explicit_bounds
+            and index != enforced
+            and index != repeated
+            and not (chain and index in chain)
+        ):
             raise TypeError(
                 f"Endpoint {endpoint!r}: capability {tool.name!r}: Summonpot "
                 "cannot enforce the declared call bound. Add a complete typed Operation "

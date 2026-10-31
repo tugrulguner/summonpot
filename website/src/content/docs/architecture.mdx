@@ -3,6 +3,10 @@ title: Architecture & safety boundaries
 description: How one endpoint contract bounds execution, decisions, and outputs.
 ---
 
+## Current-source bounded repeated calls (unreleased)
+
+One required typed operation may run a finite positive number of times (`1 <= minimum <= maximum`, `maximum > 1`) with a Pydantic request, at least one `FromRequest`, direct closed `Literal[str]` `AgentChoice` inputs, supported request/context bindings or immutable defaults, and exact full operation-output/endpoint-response annotation identity. Summonpot owns sequential decisions; business functions are not selector tools. It locally validates selections, shares one usage budget and deadline, resolves the model lazily, auto-finishes at maximum, and returns only the final successful canonical result; any failure aborts. Previous-result evidence is limited to 65,536 characters per decision, not an aggregate prompt budget. Explicit `tool_calls_limit` fails before provider/effects. No producer choices, `FromResult`, `after`, zero-minimum/unbounded bounds, implicit batch, or general graph. Existing Exactly(1) and producer-choice routes remain unchanged. Published v0.14.0 is untouched; milestone 3 remains partial and repeated-result addressing in chains remains next. See the [canonical contract](/reference/operations/).
+
 ## One public abstraction
 
 Summonpot modernizes APIs for the AI era without replacing an endpoint with a separate agent layer. A declaration combines a validated request model, fixed goal, explicit application-owned capabilities, and typed response. The same contract generates HTTP routes and OpenAPI.

@@ -73,6 +73,12 @@ immutable-default, unique-readiness, and exact full response-annotation requirem
 remain; context-only or scalar-request declarations and any declared `AgentChoice` remain
 agent-mediated. Level 13 demonstrates that authenticated direct path.
 
+## 14. Bounded repeated calls: audit (current source, unreleased)
+
+Directory: `14_bounded_audit/`
+
+The inventory audit demonstrates one required typed SQLite operation called sequentially within positive finite bounds (minimum at least one, maximum greater than one), with a Pydantic request, `FromRequest`, and closed string choices. Summonpot owns selection/finish; at maximum it returns the final successful canonical snapshot without another model acknowledgment. Any invocation failure aborts. The example's real SQLite operations and checks verify persisted findings. This is not an implicit batch or general graph, and it does not alter published v0.14.0. See the [unreleased contract](../docs/bounded-repeated-calls.added.md); repeated-result addressing in chains remains next.
+
 ## Progression
 
 Included from version 0.13.0: [authenticated tenant context](13_authenticated_context/README.md)

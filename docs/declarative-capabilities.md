@@ -156,6 +156,30 @@ previous supported behavior. Prefix effects may precede lazy provider-configurat
 there is no rollback, effect replay, durable cross-request resume, repeated-call support,
 general graph compiler or public selector. Historical release sections are unchanged.
 
+## Current source: bounded repeated calls (unreleased)
+
+The minimum is the effective bound after existing marker normalization: `Required(op, calls=AtMost(3))` still requires at least one validated success. Optional/zero-success execution is not admitted.
+
+The repeated-call slice admits one explicitly required, typed operation with finite positive
+bounds `1 <= minimum <= maximum` and `maximum > 1`, a Pydantic request with at least one
+`FromRequest`, and at least one direct `AgentChoice` bound to closed `Literal[str]` choices.
+Remaining inputs use supported request/context bindings or immutable defaults, and the
+operation's full output annotation exactly matches the endpoint response annotation. No
+producer choice, `FromResult`, ordering, second capability, zero minimum, unbounded call,
+implicit batch, or general graph is included. Existing exactly-once and producer-choice
+routes retain their current behavior. See the [bounded repeated-calls contract](bounded-repeated-calls.added.md).
+
+Summonpot owns sequential invocation and the finish decision; business functions are not
+provider tools. Selector arguments are locally validated. Starts are bounded atomically,
+minimum counts validated successes, and reaching the maximum finalizes automatically without
+a model acknowledgment. The response is the canonical result of the final successful
+invocation only; any invocation failure aborts, with no earlier-success fallback or aggregate
+collector. One shared usage budget and deadline span decisions; model resolution is lazy.
+The new shape rejects explicit `tool_calls_limit` before provider resolution or application
+effects, with no repeated-call fallback. Previous-result evidence is capped at 65,536
+characters per decision; bounded caller request data and declared evidence may be disclosed
+to the selector, but no principal or full result ledger is implicitly exposed.
+
 ## Deterministic and agentic execution
 
 Capabilities are deterministic operations in both modes. The difference is whether execution still has an unresolved legal choice:

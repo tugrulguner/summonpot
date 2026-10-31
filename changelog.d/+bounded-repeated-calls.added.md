@@ -1,0 +1,1 @@
+Add an unreleased finite-bound repeated-call route for one required typed operation with a Pydantic request, request binding, and closed string choices. The framework owns sequential decisions and returns only the final successful canonical operation result; published release behavior is unchanged. See the bounded repeated-calls contract in the declarative capability guide.

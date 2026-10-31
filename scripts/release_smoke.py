@@ -96,6 +96,12 @@ CASES = (
         "/notes",
         {"note_id": "smoke", "text": "persisted note", "idempotency_key": "smoke-key"},
     ),
+    ExampleCase(
+        "14_bounded_audit/app.py",
+        "POST",
+        "/audits",
+        {"audit_id": "smoke-audit"},
+    ),
 )
 
 
@@ -244,6 +250,33 @@ summon = example.summon
     return wrapper
 
 
+def _bounded_audit_smoke_wrapper(source: Path, workdir: Path) -> Path:
+    """Use real repeated runtime with a keyless, decision-only provider fixture."""
+    wrapper = workdir / "bounded_audit_smoke_app.py"
+    wrapper.write_text(
+        f"""import sys,json
+sys.path.append({str(source.parent)!r})
+import app as example
+from pydantic_ai.messages import ModelResponse,ModelRequest,UserPromptPart,ToolCallPart
+from pydantic_ai.models.function import FunctionModel
+from summonpot.runtime import Runtime
+
+def choose(messages,info):
+    assert not info.function_tools
+    assert len(info.output_tools)==1
+    assert set(info.output_tools[0].parameters_json_schema['properties'])=={{'decision','argument_0'}}
+    prompts=[p.content for m in messages if isinstance(m,ModelRequest) for p in m.parts if isinstance(p,UserPromptPart) and isinstance(p.content,str)]
+    starts=json.loads(prompts[0])['starts']
+    payload={{'decision':'invoke','argument_0':('stock','prices')[starts]}} if starts<2 else {{'decision':'finish'}}
+    return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name,payload)])
+example.summon._runtime=Runtime(model=FunctionModel(choose))
+summon=example.summon
+""",
+        encoding="utf-8",
+    )
+    return wrapper
+
+
 def _verify_case(case: ExampleCase, examples_root: Path, workdir: Path) -> None:
     source = (examples_root / case.source).resolve()
     if not source.is_file():
@@ -251,6 +284,8 @@ def _verify_case(case: ExampleCase, examples_root: Path, workdir: Path) -> None:
     served_source = (
         _support_smoke_wrapper(source, workdir)
         if case.source == "06_support_service/app.py"
+        else _bounded_audit_smoke_wrapper(source, workdir)
+        if case.source == "14_bounded_audit/app.py"
         else source
     )
 
@@ -262,6 +297,8 @@ def _verify_case(case: ExampleCase, examples_root: Path, workdir: Path) -> None:
         SUMMONPOT_TICKET_LOG=str(workdir / "tickets.jsonl"),
     )
     auth_headers: dict[str, str] = {}
+    if case.source == "14_bounded_audit/app.py":
+        environment["BOUNDED_AUDIT_DB"] = str(workdir / "bounded-audit.sqlite3")
     if case.source == "13_multiple_producer_choices/app.py":
         environment.update(
             MULTIPLE_CHOICE_DB=str(workdir / "multiple-choice.sqlite3"),
