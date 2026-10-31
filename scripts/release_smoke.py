@@ -136,6 +136,9 @@ CASES = (
         "/audits",
         {"audit_id": "smoke-audit"},
     ),
+    ExampleCase(
+        "15_repeated_stage/app.py", "POST", "/audits", {"audit_id": "smoke-stage"}
+    ),
 )
 
 
@@ -358,7 +361,7 @@ def _verify_case(
         _support_smoke_wrapper(source, workdir)
         if case.source == "06_support_service/app.py"
         else _bounded_audit_smoke_wrapper(source, workdir)
-        if case.source == "14_bounded_audit/app.py"
+        if case.source in {"14_bounded_audit/app.py", "15_repeated_stage/app.py"}
         else _fixture_smoke_wrapper(source, workdir, case.payload)
         if case.source == "05_bounded_runtime.py"
         or (case.source == "04_http_methods.py" and case.method == "POST")
@@ -384,6 +387,8 @@ def _verify_case(
         environment["SUMMONPOT_MODEL"] = "invalid:no-provider"
     if case.source == "14_bounded_audit/app.py":
         environment["BOUNDED_AUDIT_DB"] = str(workdir / "bounded-audit.sqlite3")
+    if case.source == "15_repeated_stage/app.py":
+        environment["REPEATED_STAGE_DB"] = str(workdir / "repeated-stage.sqlite3")
     if case.source == "13_multiple_producer_choices/app.py":
         environment.update(
             MULTIPLE_CHOICE_DB=str(workdir / "multiple-choice.sqlite3"),
@@ -423,6 +428,25 @@ def _verify_case(
             raise AssertionError(f"{case.source} success returned {success}: {body!r}")
         response_body = json.loads(body)
         side_effects: list[str] = []
+        if case.source == "15_repeated_stage/app.py":
+            with sqlite3.connect(environment["REPEATED_STAGE_DB"]) as db:
+                reports = db.execute(
+                    "SELECT report_json FROM audit_reports WHERE audit_id=?",
+                    ("smoke-stage",),
+                ).fetchall()
+                checks = db.execute(
+                    "SELECT check_name FROM audit_checks WHERE audit_id=? ORDER BY check_name",
+                    ("smoke-stage",),
+                ).fetchall()
+            assert len(reports) == 1 and json.loads(reports[0][0]) == response_body
+            assert checks == [("prices",), ("stock",)]
+            assert (
+                response_body["checks"] == ["prices", "stock"]
+                and response_body["finding_count"] == 2
+            )
+            side_effects.append(
+                "closed repeated stage and canonical persisted terminal report"
+            )
         if case.source in {"10_result_chain/app.py", "11_linear_result_chain/app.py"}:
             assert case.payload is not None
             with sqlite3.connect(environment["INVENTORY_DB"]) as db:

@@ -36,6 +36,7 @@ EXAMPLES = [
     ("13_authenticated_context/app.py", "/notes", "post"),
     ("13_multiple_producer_choices/app.py", "/orders", "post"),
     ("14_bounded_audit/app.py", "/audits", "post"),
+    ("15_repeated_stage/app.py", "/audits", "post"),
 ]
 
 

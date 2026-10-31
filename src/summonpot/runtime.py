@@ -21,6 +21,7 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 
 from summonpot._context import _ContextError, _resolve_context
 from summonpot._execution import (
+    _ClosedStage,
     _CompiledEndpoint,
     _CompiledTool,
     _EndpointRun,
@@ -281,7 +282,16 @@ async def _invoke_bound_operation(
             producer = run.states[binding.producer_identity]
             if producer.outcome != "succeeded":
                 raise ModelRetry("A predecessor has not completed successfully.")
-            value = producer.result
+            if binding.final_invocation:
+                closed = producer.closed
+                if (
+                    closed is None
+                    or closed.producer_identity != binding.producer_identity
+                ):
+                    raise ModelRetry("The repeated producer stage has not closed.")
+                value = closed.result
+            else:
+                value = producer.result
             if isinstance(value, BaseModel):
                 storage = BaseModel.__dict__["__dict__"].__get__(value, type(value))
                 if type(storage) is not dict or any(
@@ -324,10 +334,16 @@ async def _invoke_bound_operation(
         # Admission is the effect boundary: validation/reservation/lock contention
         # may consume the remaining budget, so check only after acquiring the lock.
         _check_runtime_deadline()
-        if any(run.states[i].outcome != "succeeded" for i in tool.predecessors):
+        if any(
+            run.states[i].outcome != "succeeded"
+            or (run.states[i].requires_closure and run.states[i].closed is None)
+            for i in tool.predecessors
+        ):
             raise ModelRetry("A predecessor has not completed successfully.")
         if tool.repeated and (
-            state.running or state.outcome in ("failed", "outcome_unknown")
+            state.closed is not None
+            or state.running
+            or state.outcome in ("failed", "outcome_unknown")
         ):
             raise _OperationExecutionError(
                 "Repeated operation is not ready for another start."
@@ -812,7 +828,29 @@ class Runtime:
             raise _OperationOutputError(
                 "Repeated execution has no legal terminal result."
             )
-        output = state.invocations[-1].result
+        if plan.repeated_terminal is not None:
+            async with run.lock:
+                _check_runtime_deadline()
+                if (
+                    state.closed is not None
+                    or state.running
+                    or state.succeeded < tool.minimum
+                    or state.outcome != "succeeded"
+                    or state.invocations[-1].outcome != "succeeded"
+                ):
+                    raise _OperationOutputError("Repeated stage has no legal closure.")
+                invocation = state.invocations[-1]
+                state.closed = _ClosedStage(
+                    tool.identity, invocation.ordinal, invocation.result
+                )
+            output = await _invoke_bound_operation(
+                plan.tools[plan.repeated_terminal],
+                run,
+                {},
+                redact_application_error=_http_error_boundary.get(),
+            )
+        else:
+            output = state.invocations[-1].result
         assert plan.output_auditor is not None
         try:
             output = plan.output_auditor(output)

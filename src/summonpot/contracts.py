@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
+from dataclasses import field as dataclass_field
 from types import MappingProxyType
 from typing import Any
 
@@ -46,6 +47,15 @@ class FromResult(ArgumentSource):
 
     operation: Operation
     field: str
+    invocation: str | None = dataclass_field(default=None, kw_only=True)
+
+    def __post_init__(self) -> None:
+        if self.invocation is not None and (
+            type(self.invocation) is not str or self.invocation != "final"
+        ):
+            raise ValueError(
+                "FromResult invocation must be the plain literal 'final' or None."
+            )
 
 
 @dataclass(frozen=True)

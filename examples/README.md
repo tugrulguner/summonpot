@@ -299,7 +299,14 @@ Shows framework-owned progression across multiple producer-backed choice binding
 
 Directory: `14_bounded_audit/`
 
-The inventory audit demonstrates one required typed SQLite operation called sequentially within positive finite bounds (minimum at least one, maximum greater than one), with a Pydantic request, `FromRequest`, and closed string choices. Summonpot owns selection/finish; at maximum it returns the final successful canonical snapshot without another model acknowledgment. Any invocation failure aborts. The example's real SQLite operations and checks verify persisted findings. This is not an implicit batch or general graph, and it does not alter published v0.14.0. See the [unreleased contract](../docs/bounded-repeated-calls.added.md); repeated-result addressing in chains remains next.
+The inventory audit demonstrates one required typed SQLite operation called sequentially within positive finite bounds (minimum at least one, maximum greater than one), with a Pydantic request, `FromRequest`, and closed string choices. Summonpot owns selection/finish; at maximum it returns the final successful canonical snapshot without another model acknowledgment. Any invocation failure aborts. The example's real SQLite operations and checks verify persisted findings. This is not an implicit batch or general graph, and it does not alter published v0.14.0. See the [unreleased contract](../docs/bounded-repeated-calls.added.md).
+
+### 15. Repeated-stage final-result consumer (current source, unreleased)
+
+Directory: [`15_repeated_stage/`](15_repeated_stage/)
+
+Shows one bounded repeated producer closing before a choice-free terminal operation consumes its explicitly addressed final canonical result with `FromResult(..., invocation="final")`. This narrow source shape does not implement repeated consumers or an inspect/correct/verify workflow; published v0.14.0 is unchanged. See the [contract](../docs/repeated-stage-results.added.md).
+
 
 ## What is intentionally not shown as shipped
 

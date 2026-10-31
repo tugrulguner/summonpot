@@ -264,15 +264,20 @@ The current source implements framework-owned producer-choice progression and a 
 
 The repeated-call slice covers one required typed operation with a Pydantic request, at least one `FromRequest`, direct closed string-valued `Literal` choices, supported request/context sources or immutable defaults, exact full operation-output/endpoint-response annotation identity, and positive finite effective bounds. Summonpot owns the sequential loop, reserves starts before application code, counts validated successes for the minimum, retains per-invocation identity/results and failed or uncertain reservations, and returns the final successful canonical invocation result after legal finish or automatic maximum completion. Any later failure aborts; an earlier success is not a fallback response. Explicit function-tool quotas reject this new shape before work rather than silently weakening limits.
 
-The remaining work is specifically **repeated-result addressing and orchestration in chains**, not basic sole-operation repetition:
+The remaining work in milestone 3 is broader than this one admitted two-operation form:
 
-- Define which producer invocation each `FromResult` receiver or producer-backed choice refers to. Do not silently read a mutable latest-result slot, infer aggregation, or let a model invent provenance.
-- Extend readiness and ordering to repeated producers/consumers only after those result references are explicit. Enforce declared minimum and maximum call bounds against validated successes and starts respectively; retain reservations for failed, cancelled, or uncertain starts. Model retries cannot replay an effect or change the fixed endpoint goal.
-- Require one unambiguous terminal operation/result, including its invocation identity, and exact response ownership for repeated chains. Keep model-owned stopping choices separate from model-authored success claims.
-- Exercise repeated producer domains, empty/unavailable sets, bound exhaustion and failures between consumers, with exact result-to-consumer provenance and shared request-wide budgets.
-- Keep execution sequential until concurrency, partial completion and timeout uncertainty, and cancellation have explicit semantics. Recovery must not replay an uncertain effect.
+- Repeated consumers and richer feedback workflows, including inspect/correct/verify; this slice does not implement them.
+- Producer-backed choices from repeated outputs, arbitrary historical invocation references, repeated-result aggregation, and multiple or nested repeated stages.
+- General graphs, cycles, parallel scheduling, durable execution/resumption, rollback, or distributed exactly-once effects.
 
-No optional/zero-success or unbounded execution, implicit batch, general graph compiler, parallel scheduling, durable execution, rollback, or distributed exactly-once effects are added by the completed narrow slice. Existing `Required` marker normalization remains unchanged: its effective minimum is at least one.
+The new narrow contract addresses only `FromResult(..., invocation="final")` from one
+closed repeated producer to its single terminal consumer; see the [focused source contract](docs/repeated-stage-results.added.md). Minimum/maximum semantics enforce declared bounds against
+validated successes and starts respectively; retain reservations for failed, cancelled, or uncertain starts.
+Model retries cannot replay an effect. Every supported extension must preserve
+one unambiguous terminal operation/result and its invocation identity. Keep execution sequential
+until partial completion and timeout uncertainty, cancellation, and recovery have explicit semantics. Existing sole-operation repetition, Exactly(1) chains,
+and producer-choice declarations are not downgraded or reinterpreted. Existing `Required`
+marker normalization remains unchanged: its effective minimum is at least one.
 
 ### 4. Broader private execution compiler
 
