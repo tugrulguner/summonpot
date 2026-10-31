@@ -17,18 +17,25 @@ error; serve the application or invoke the generated HTTP route.
 
 ## Before running
 
-Install Summonpot with the provider and server extras you need. For OpenRouter:
+For a published installation, install the server and CLI extras and whichever provider integration you use. For OpenRouter:
 
 ```bash
 pip install "summonpot[serve,cli,openrouter]"
 export OPENROUTER_API_KEY='<your key>'
-export SUMMONPOT_MODEL="openrouter:google/gemini-3.7-flash"
+export SUMMONPOT_MODEL="openrouter:openai/gpt-4o-mini"
 ```
 
-Level 8's fully resolved operation requires no provider model or credentials. From 0.12.0,
+Examples 2, 4, and 6 use the configured agent runtime and require a working provider/model configuration; deterministic operations do not make their endpoints model-free. Levels 8, 9 checks, 10, 11, authenticated-context 13, and a singleton level-12 candidate set can run without provider configuration on their eligible path. Ambiguous level-12 candidates and level-13 multiple-choice choices need model resolution; level 14 uses model-selected checks. Level 13 authenticated context still requires an application-owned bearer credential. Level 8's fully resolved operation requires no provider model or credentials. From 0.12.0,
 the fully resolved chains in levels 10 and 11 also run without a model. Level 12 demonstrates
 the producer-choice path. Its singleton local route is included from version 0.14.0; published
 v0.13.0 ran all level-12 choices through the configured agent runtime.
+
+For the current checkout (including unreleased levels 13-multiple and 14), use the committed environment instead of installing the published wheel:
+
+```bash
+env -u PYTHONPATH -u VIRTUAL_ENV UV_PYTHON=3.13 uv sync --locked --all-extras
+env -u PYTHONPATH -u VIRTUAL_ENV UV_PYTHON=3.13 uv run summonpot serve examples/basic_app.py --host 127.0.0.1 --port 8000
+```
 
 Keep secrets in your environment or secret manager—never in an example file. Start any example through the CLI:
 
@@ -73,12 +80,6 @@ immutable-default, unique-readiness, and exact full response-annotation requirem
 remain; context-only or scalar-request declarations and any declared `AgentChoice` remain
 agent-mediated. Level 13 demonstrates that authenticated direct path.
 
-## 14. Bounded repeated calls: audit (current source, unreleased)
-
-Directory: `14_bounded_audit/`
-
-The inventory audit demonstrates one required typed SQLite operation called sequentially within positive finite bounds (minimum at least one, maximum greater than one), with a Pydantic request, `FromRequest`, and closed string choices. Summonpot owns selection/finish; at maximum it returns the final successful canonical snapshot without another model acknowledgment. Any invocation failure aborts. The example's real SQLite operations and checks verify persisted findings. This is not an implicit batch or general graph, and it does not alter published v0.14.0. See the [unreleased contract](../docs/bounded-repeated-calls.added.md); repeated-result addressing in chains remains next.
-
 ## Progression
 
 Included from version 0.13.0: [authenticated tenant context](13_authenticated_context/README.md)
@@ -122,7 +123,8 @@ File: `03_agentic_order.py`
 Shows a bounded choice among `Depends(...)` capabilities followed by the required `create_order` write. The executor receives only these exact operations; it receives no filesystem, shell, database connection, or arbitrary code tool.
 
 ```bash
-export SUMMONPOT_ORDER_LOG=/tmp/my-orders.jsonl
+mkdir -p "$HOME/.cache/summonpot/examples"
+export SUMMONPOT_ORDER_LOG="$HOME/.cache/summonpot/examples/order.jsonl"
 summonpot serve examples/03_agentic_order.py --host 127.0.0.1 --port 8000
 
 curl -X POST http://127.0.0.1:8000/orders \
@@ -177,9 +179,9 @@ capabilities split across normal Python modules.
 Each `Required(fn)` uses its implicit marker bound and no explicit `Operation` contract, so
 the provider-neutral agent runtime supplies arguments and the required-use gate demands one
 successful call. Level 6 deliberately does not declare `FromRequest`, `FromResult`,
-`AgentChoice`, `after`, or `Exactly(1)`: those multi-operation semantics are not enforceable
-yet and would be rejected at registration. Levels 7 and 8 demonstrate the one admitted
-typed-operation shape with a filtered model schema and one permitted start.
+`AgentChoice`, `after`, or `Exactly(1)`: this example intentionally uses legacy declarations
+with model-supplied arguments. Levels 7 and 8 introduce typed operation contracts; levels
+10 and 11 show supported typed chains. Unsupported graphs are rejected at registration.
 
 ```bash
 export SUMMONPOT_TICKET_LOG=/tmp/my-support-tickets.jsonl
@@ -263,13 +265,19 @@ and verifies that the application operation never starts.
 
 Directory: `10_result_chain/`
 
-Demonstrates a three-step agent-mediated sequential result chain and an application-owned SQLite inventory. The SQLite code is example application code, not a framework database adapter. Started, failed, or uncertain operations are never replayed in the same run; this does not promise rollback or exactly-once external effects. Cross-request retries require application idempotency.
+Demonstrates a two-operation sequential result chain and an application-owned SQLite inventory. The fully resolved path is model-free from 0.12.0; historical 0.11 chains were agent-mediated. The SQLite code is example application code, not a framework database adapter. Started, failed, or uncertain operations are never replayed in the same run; this does not promise rollback or exactly-once external effects. Cross-request retries require application idempotency.
 
 Producer-backed `AgentChoice(from_result=...)` is limited to these sequential chains and
 selects only from a successful producer's locally validated `list[ConcreteModel]`. It uses
 bounded inert projections and opaque request-local tokens, not canonical result values or
 full canonical-result context. Empty, unavailable, or oversized choice sets fail with a
 fixed redacted 409 before model decision or downstream work.
+
+### 11. Fully resolved linear result chain
+
+Directory: [`11_linear_result_chain/`](11_linear_result_chain/)
+
+Shows a three-operation, fully resolved SQLite reservation chain: read a snapshot, persist a reservation, then read and return the persisted receipt. The direct path is model-free from 0.12.0; application-level idempotency does not provide framework rollback or durable cross-request resume. See its guide for an independent SQLite query.
 
 ### 12. Producer-constrained inventory choice
 
@@ -286,6 +294,12 @@ run uses the configured provider.
 Directory: [`13_multiple_producer_choices/`](13_multiple_producer_choices/)
 
 Shows framework-owned progression across multiple producer-backed choice bindings in one eligible sequential chain. This is not part of the v0.14.0 release boundary. See the [execution boundary](13_multiple_producer_choices/README.md#execution-boundary).
+
+### 14. Bounded repeated calls: audit (current source, unreleased)
+
+Directory: `14_bounded_audit/`
+
+The inventory audit demonstrates one required typed SQLite operation called sequentially within positive finite bounds (minimum at least one, maximum greater than one), with a Pydantic request, `FromRequest`, and closed string choices. Summonpot owns selection/finish; at maximum it returns the final successful canonical snapshot without another model acknowledgment. Any invocation failure aborts. The example's real SQLite operations and checks verify persisted findings. This is not an implicit batch or general graph, and it does not alter published v0.14.0. See the [unreleased contract](../docs/bounded-repeated-calls.added.md); repeated-result addressing in chains remains next.
 
 ## What is intentionally not shown as shipped
 

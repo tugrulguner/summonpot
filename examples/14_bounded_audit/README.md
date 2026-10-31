@@ -13,7 +13,7 @@ Use an isolated database path (recommended for development and tests):
 ```bash
 export BOUNDED_AUDIT_DIR="$(mktemp -d)"
 export BOUNDED_AUDIT_DB="$BOUNDED_AUDIT_DIR/bounded-audit.sqlite3"
-export SUMMONPOT_MODEL="openrouter:google/gemini-3.7-flash"
+export SUMMONPOT_MODEL="openrouter:openai/gpt-4.1-mini"
 summonpot serve examples/14_bounded_audit/app.py --host 127.0.0.1 --port 8000
 ```
 

@@ -49,7 +49,7 @@ def search_products(
 
 
 def reserve_product(customer_id: str, sku: str) -> dict[str, str]:
-    """Reserve an existing catalog product and return the reservation receipt."""
+    """Return a demo receipt for a known catalog product; no stock is held."""
     if sku not in PRODUCTS:
         raise ValueError(f"Unknown product: {sku}")
     return {

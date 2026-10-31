@@ -4,12 +4,10 @@ A small real service: the first required operation reads the requested SKU and i
 
 ## Run it
 
-From the repository root (Python 3.11–3.14 and `uv` installed):
+From the repository root (Python 3.11–3.14 and `uv` installed). The eligible fully resolved chain is model-free from 0.12.0; historical v0.11.0 chains ran through the agent runtime:
 
 ```sh
-uv sync --locked --extra serve --extra cli --extra openai
-export OPENAI_API_KEY=...
-export SUMMONPOT_MODEL=openai:gpt-4o-mini  # or another configured provider:model
+uv sync --locked --extra serve --extra cli
 export INVENTORY_DB="$PWD/inventory.sqlite3"
 uv run summonpot serve examples/10_result_chain/app.py --host 127.0.0.1 --port 8000
 ```

@@ -25,6 +25,7 @@ EXAMPLES = [
     ("04_http_methods.py", "/products", "get"),
     ("04_http_methods.py", "/products", "post"),
     ("05_bounded_runtime.py", "/summaries", "post"),
+    ("05_bounded_runtime.py", "/summaries/fast", "post"),
     ("06_support_service/app.py", "/support", "post"),
     ("07_bound_operation.py", "/customers/view", "post"),
     ("08_direct_execution.py", "/quotes/direct", "post"),
@@ -54,6 +55,29 @@ def test_every_example_builds_its_advertised_openapi_route(
     schema = build_app(summon).openapi()
 
     assert method in schema["paths"][route]
+
+
+def test_smoke_cases_cover_every_advertised_route(monkeypatch, tmp_path):
+    from urllib.parse import urlsplit
+
+    cases = runpy.run_path(str(ROOT / "scripts/release_smoke.py"))["CASES"]
+    expected = set()
+    for index, source in enumerate(sorted({source for source, _, _ in EXAMPLES})):
+        workdir = tmp_path / str(index)
+        workdir.mkdir()
+        for name in (
+            "INVENTORY_DB",
+            "MULTIPLE_CHOICE_DB",
+            "AUTH_CONTEXT_DB",
+            "BOUNDED_AUDIT_DB",
+        ):
+            monkeypatch.setenv(name, str(workdir / (name + ".sqlite3")))
+        app = _load_example(source, monkeypatch)
+        for path, methods in build_app(app).openapi()["paths"].items():
+            expected.update((source, method.upper(), path) for method in methods)
+    actual = {(case.source, case.method, urlsplit(case.path).path) for case in cases}
+    assert len(actual) == len(cases)
+    assert actual == expected
 
 
 def test_example_entrypoint_inventory_is_complete():
@@ -250,7 +274,11 @@ def test_cli_launches_every_example_through_real_http():
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "verified 12 example applications" in result.stdout
+    applications = len({source for source, _, _ in EXAMPLES})
+    assert (
+        f"verified {applications} example applications ({len(EXAMPLES)} HTTP routes)"
+        in result.stdout
+    )
 
 
 def test_release_smoke_verifies_installed_cli_version():

@@ -2,7 +2,7 @@
 
 from typing import Literal, TypedDict
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from summonpot import (
     AgentChoice,
@@ -27,7 +27,10 @@ class CustomerRecord(BaseModel):
 
 class CustomerView(BaseModel):
     customer_id: str
-    display: str
+    display: str = Field(
+        min_length=1,
+        description="Render the returned customer's name and status, not the format label.",
+    )
 
 
 class _Customer(TypedDict):
@@ -72,7 +75,12 @@ def customer_view(
     request: CustomerRequest,
     customer=Required(customer_lookup, calls=Exactly(1)),
 ) -> CustomerView:
-    """Load the requested customer once and return a concise approved view."""
+    """Load the requested customer once, then compose the view from the returned record.
+
+    Copy customer_id from that record. Render its actual name and status in display:
+    for summary use "{name} — {status}"; for detailed include those same facts in a
+    fuller description. The format value is a rendering choice, never display content.
+    """
     ...
 
 
