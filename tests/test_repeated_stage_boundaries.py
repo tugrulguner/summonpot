@@ -108,18 +108,34 @@ def test_terminal_failure_has_no_snapshot_fallback(failure):
     assert events == [("inspect", "audit-1", "stock"), ("report", "audit-1", "stock")]
 
 
-@pytest.mark.parametrize("delay", ["producer_delay", "terminal_delay"])
-def test_one_deadline_spans_stage_and_terminal(delay):
+@pytest.mark.parametrize("operation", ["inspect", "report"])
+def test_one_deadline_spans_stage_and_terminal(operation, monkeypatch):
+    import time
+
+    import summonpot.runtime as kernel
+
     app, runtime, events = stage_app(
         [
             {"decision": "invoke", "argument_0": "stock"},
             {"decision": "finish"},
         ],
-        runtime_options={"timeout": 0.02},
-        producer_delay=0.08 if delay == "producer_delay" else 0,
-        terminal_delay=0.08 if delay == "terminal_delay" else 0,
+        runtime_options={"timeout": 30},
     )
+    original = kernel._call_capability
+    deadlines = []
+
+    async def expire_after_actual_operation(fn, *args, **kwargs):
+        deadlines.append(kernel._runtime_deadline.get())
+        result = await original(fn, *args, **kwargs)
+        if fn.__name__ == operation:
+            # Deterministically exhaust the same absolute budget after the target
+            # really starts/completes, not during slow CI model preparation.
+            kernel._runtime_deadline.set(time.monotonic() - 1)
+        return result
+
+    monkeypatch.setattr(kernel, "_call_capability", expire_after_actual_operation)
     with pytest.raises(TimeoutError):
         run(runtime, app)
     assert events[0] == ("inspect", "audit-1", "stock")
-    assert len(events) == (1 if delay == "producer_delay" else 2)
+    assert len(events) == (1 if operation == "inspect" else 2)
+    assert deadlines[0] is not None and len(set(deadlines)) == 1
