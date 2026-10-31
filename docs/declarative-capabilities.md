@@ -169,7 +169,7 @@ producer choice, `FromResult`, ordering, second capability, zero minimum, unboun
 implicit batch, or general graph is included. Existing exactly-once and producer-choice
 routes retain their current behavior. See the [bounded repeated-calls contract](bounded-repeated-calls.added.md).
 
-Summonpot owns sequential invocation and the finish decision; business functions are not
+Summonpot owns sequential invocation and enforces legal finish decisions; business functions are not
 provider tools. Selector arguments are locally validated. Starts are bounded atomically,
 minimum counts validated successes, and reaching the maximum finalizes automatically without
 a model acknowledgment. The response is the canonical result of the final successful
