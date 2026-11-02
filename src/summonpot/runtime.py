@@ -804,6 +804,17 @@ class Runtime:
         usage = RunUsage()
         limits = self.usage_limits or UsageLimits()
         _check_runtime_deadline()
+        if plan.repeated_order is not None:
+            for identity in plan.repeated_order:
+                if identity == tool.identity:
+                    break
+                await _invoke_bound_operation(
+                    plan.tools[identity],
+                    run,
+                    {},
+                    redact_application_error=_http_error_boundary.get(),
+                )
+                _check_runtime_deadline()
         model = self.model_for(endpoint)
         while state.started < tool.maximum:
             supplied = await self._select_repeated_decision(
@@ -843,12 +854,17 @@ class Runtime:
                 state.closed = _ClosedStage(
                     tool.identity, invocation.ordinal, invocation.result
                 )
-            output = await _invoke_bound_operation(
-                plan.tools[plan.repeated_terminal],
-                run,
-                {},
-                redact_application_error=_http_error_boundary.get(),
-            )
+            assert plan.repeated_order is not None
+            suffix = plan.repeated_order[plan.repeated_order.index(tool.identity) + 1 :]
+            for identity in suffix:
+                await _invoke_bound_operation(
+                    plan.tools[identity],
+                    run,
+                    {},
+                    redact_application_error=_http_error_boundary.get(),
+                )
+                _check_runtime_deadline()
+            output = run.states[plan.repeated_terminal].result
         else:
             output = state.invocations[-1].result
         assert plan.output_auditor is not None

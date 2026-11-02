@@ -1,0 +1,1 @@
+Extend closed repeated stages to uniquely ordered chains with resolved preparation and finalization, chain-wide request bindings, lazy model resolution, and shared request-wide state; add a separate order-review example without changing existing examples.

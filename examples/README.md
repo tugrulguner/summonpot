@@ -308,6 +308,12 @@ Directory: [`15_repeated_stage/`](15_repeated_stage/)
 Shows one bounded repeated producer closing before a choice-free terminal operation consumes its explicitly addressed final canonical result with `FromResult(..., invocation="final")`. This narrow source shape does not implement repeated consumers or an inspect/correct/verify workflow; published v0.14.0 is unchanged. See the [contract](../docs/repeated-stage-results.added.md).
 
 
+### 16. Resolved preparation, repeated checks, verification and finalization
+
+Directory: [`16_stage_chain/`](16_stage_chain/)
+
+Shows the current-source single-stage chain without changing earlier examples. Order loading owns the request bindings; the repeated checks consume validated preparation results. Deterministic verification denies incomplete or failed checks before the final operation persists the report. The model owns only bounded check selection, not approval. This source extension is not yet released and is not in published v0.14.0.
+
 ## What is intentionally not shown as shipped
 
 The examples do not claim these planned features exist:

@@ -447,44 +447,76 @@ def _repeated_contract_tool_index(tools: Sequence[Any]) -> int | None:
     return 0 if saw_choice and saw_request else None
 
 
-def _repeated_stage_indices(tools: Sequence[Any]) -> tuple[int, int] | None:
-    """Admit only a closed repeated producer followed by one resolved terminal."""
-    if len(tools) != 2:
+def _repeated_stage_indices(tools: Sequence[Any]) -> tuple[int, ...] | None:
+    """Order one bounded repeated stage with fully resolved prefix and suffix."""
+    if len(tools) < 2:
         return None
-    for producer_index in range(2):
-        producer = tools[producer_index]
-        if _repeated_contract_tool_index((producer,)) is None:
-            continue
-        terminal_index = 1 - producer_index
-        terminal = tools[terminal_index]
-        contract, bounds = terminal.contract, terminal.bounds
+    repeated = []
+    for index, tool in enumerate(tools):
+        contract, bounds = tool.contract, tool.bounds
         if (
-            not terminal.required
+            not tool.required
             or contract is None
             or contract.bind is None
             or contract.output is None
             or bounds is None
-            or bounds.minimum != 1
-            or bounds.maximum != 1
         ):
-            continue
-        if any(predecessor is not producer.contract for predecessor in contract.after):
-            continue
-        saw_result = False
-        valid = True
-        for source in contract.bind.values():
-            if type(source) is FromResult:
+            return None
+        if (
+            bounds.maximum is not None
+            and bounds.maximum > 1
+            and 1 <= bounds.minimum <= bounds.maximum
+        ):
+            repeated.append(index)
+        elif bounds.minimum != 1 or bounds.maximum != 1:
+            return None
+    if len(repeated) != 1:
+        return None
+    repeated_index = repeated[0]
+    identities = {id(tool.contract): index for index, tool in enumerate(tools)}
+    if len(identities) != len(tools):
+        return None
+    predecessors: list[set[int]] = [set() for _ in tools]
+    successors: list[set[int]] = [set() for _ in tools]
+    saw_request = saw_choice = saw_final = False
+    for index, tool in enumerate(tools):
+        contract = tool.contract
+        assert contract is not None and contract.bind is not None
+        annotations = {
+            parameter.name: parameter.annotation for parameter in tool.parameters
+        }
+        references = list(contract.after)
+        for name, source in contract.bind.items():
+            if type(source) is FromRequest:
+                saw_request = True
+            elif type(source) is FromContext:
+                pass
+            elif type(source) is FromResult:
+                producer = identities.get(id(source.operation))
+                if producer is None or producer == index:
+                    return None
+                if producer == repeated_index:
+                    if source.invocation != "final":
+                        return None
+                    saw_final = True
+                elif source.invocation is not None:
+                    return None
+                references.append(source.operation)
+            elif type(source) is AgentChoice:
+                annotation = annotations.get(name)
+                values = get_args(annotation)
                 if (
-                    source.operation is not producer.contract
-                    or source.invocation != "final"
+                    index != repeated_index
+                    or source.from_result is not None
+                    or get_origin(annotation) is not Literal
+                    or not values
+                    or not all(type(value) is str for value in values)
                 ):
-                    valid = False
-                    break
-                saw_result = True
-            elif type(source) not in (FromRequest, FromContext):
-                valid = False
-                break
-        for name, parameter in inspect.signature(terminal.fn).parameters.items():
+                    return None
+                saw_choice = True
+            else:
+                return None
+        for name, parameter in inspect.signature(tool.fn).parameters.items():
             if parameter.kind in _VARIADIC or (
                 name not in contract.bind
                 and (
@@ -492,10 +524,29 @@ def _repeated_stage_indices(tools: Sequence[Any]) -> tuple[int, int] | None:
                     or not _immutable_chain_default(parameter.default)
                 )
             ):
-                valid = False
-        if valid and saw_result:
-            return producer_index, terminal_index
-    return None
+                return None
+        for reference in references:
+            producer = identities.get(id(reference))
+            if producer is None or producer == index:
+                return None
+            predecessors[index].add(producer)
+            successors[producer].add(index)
+    if not (saw_request and saw_choice and saw_final):
+        return None
+    remaining = set(range(len(tools)))
+    order = []
+    while remaining:
+        ready = [index for index in sorted(remaining) if not predecessors[index]]
+        if len(ready) != 1:
+            return None
+        current = ready[0]
+        remaining.remove(current)
+        order.append(current)
+        for successor in successors[current]:
+            predecessors[successor].discard(current)
+    if order[-1] == repeated_index:
+        return None
+    return tuple(order)
 
 
 def _chain_contract_tool_indices(tools: Sequence[Any]) -> tuple[int, ...] | None:
@@ -612,7 +663,7 @@ def _validate_runtime_admission(*, endpoint: str, tools: list[Any]) -> None:
                     and source.invocation is not None
                     and not (
                         stage is not None
-                        and index == stage[1]
+                        and index in stage
                         and source.invocation == "final"
                     )
                 ):
@@ -643,7 +694,7 @@ def _validate_runtime_admission(*, endpoint: str, tools: list[Any]) -> None:
             explicit_bounds
             and not bounds_are_exactly_once
             and index != repeated
-            and not (stage and index == stage[0])
+            and not (stage and index in stage)
         ):
             raise TypeError(
                 f"Endpoint {endpoint!r}: capability {tool.name!r}: Summonpot "
