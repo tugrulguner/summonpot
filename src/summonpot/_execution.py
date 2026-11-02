@@ -188,6 +188,7 @@ class _CompiledEndpoint:
     result_dependent_order: tuple[int, ...] | None = None
     repeated_tool: int | None = None
     repeated_terminal: int | None = None
+    repeated_order: tuple[int, ...] | None = None
     context: _CompiledContext | None = field(default=None, repr=False)
 
 
@@ -1089,13 +1090,20 @@ def _compile_endpoint(
     enforce_index = _enforced_contract_tool_index(source_tools)
     stage_indices = _repeated_stage_indices(source_tools)
     repeated_index = (
-        stage_indices[0]
+        next(
+            index
+            for index in stage_indices
+            if (bounds := source_tools[index].bounds) is not None
+            and bounds.maximum is not None
+            and bounds.maximum > 1
+        )
         if stage_indices
         else _repeated_contract_tool_index(source_tools)
     )
     if stage_indices is not None:
-        producer_contract = source_tools[stage_indices[0]].contract
-        terminal_contract = source_tools[stage_indices[1]].contract
+        assert repeated_index is not None
+        producer_contract = source_tools[repeated_index].contract
+        terminal_contract = source_tools[stage_indices[-1]].contract
         assert producer_contract is not None and terminal_contract is not None
         response = endpoint.output_annotation or endpoint.output_model
         if (
@@ -1105,6 +1113,11 @@ def _compile_endpoint(
             or not issubclass(producer_contract.output, BaseModel)
             or producer_contract.output is response
             or terminal_contract.output is not response
+            or sum(
+                tool.contract is not None and tool.contract.output is response
+                for tool in source_tools
+            )
+            != 1
         ):
             raise TypeError(
                 "Repeated stages require a Pydantic intermediate and a distinct exact terminal response."
@@ -1204,7 +1217,8 @@ def _compile_endpoint(
         tools=tools,
         direct_tool=direct_index,
         repeated_tool=repeated_index,
-        repeated_terminal=(stage_indices[1] if stage_indices else None),
+        repeated_terminal=(stage_indices[-1] if stage_indices else None),
+        repeated_order=stage_indices,
         response_producer=(chain_indices[-1] if chain_indices else None),
         direct_chain_order=direct_chain_order,
         result_dependent_order=(

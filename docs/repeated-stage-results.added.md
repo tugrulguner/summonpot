@@ -20,6 +20,8 @@ model-selected provenance.
 
 ## Admission
 
+The following is the original two-operation admission form. Current source also admits its composition with resolved prefix/suffix operations under the [single-stage chain predicate](stage-chains.added.md), with `FromRequest` required across the complete chain. No new selector syntax is added.
+
 - Exactly two required typed operations: the repeated producer and a uniquely ordered,
   required `Exactly(1)` terminal consumer. The result dependency establishes readiness;
   any `after` edge must be consistent.

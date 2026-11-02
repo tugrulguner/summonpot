@@ -139,6 +139,9 @@ CASES = (
     ExampleCase(
         "15_repeated_stage/app.py", "POST", "/audits", {"audit_id": "smoke-stage"}
     ),
+    ExampleCase(
+        "16_stage_chain/app.py", "POST", "/reviews", {"order_id": "order-valid"}
+    ),
 )
 
 
@@ -361,7 +364,12 @@ def _verify_case(
         _support_smoke_wrapper(source, workdir)
         if case.source == "06_support_service/app.py"
         else _bounded_audit_smoke_wrapper(source, workdir)
-        if case.source in {"14_bounded_audit/app.py", "15_repeated_stage/app.py"}
+        if case.source
+        in {
+            "14_bounded_audit/app.py",
+            "15_repeated_stage/app.py",
+            "16_stage_chain/app.py",
+        }
         else _fixture_smoke_wrapper(source, workdir, case.payload)
         if case.source == "05_bounded_runtime.py"
         or (case.source == "04_http_methods.py" and case.method == "POST")
@@ -385,6 +393,8 @@ def _verify_case(
         "12_producer_choice/app.py",
     }:
         environment["SUMMONPOT_MODEL"] = "invalid:no-provider"
+    if case.source == "16_stage_chain/app.py":
+        environment["STAGE_CHAIN_DB"] = str(workdir / "stage-chain.sqlite3")
     if case.source == "14_bounded_audit/app.py":
         environment["BOUNDED_AUDIT_DB"] = str(workdir / "bounded-audit.sqlite3")
     if case.source == "15_repeated_stage/app.py":
@@ -428,6 +438,23 @@ def _verify_case(
             raise AssertionError(f"{case.source} success returned {success}: {body!r}")
         response_body = json.loads(body)
         side_effects: list[str] = []
+        if case.source == "16_stage_chain/app.py":
+            with sqlite3.connect(environment["STAGE_CHAIN_DB"]) as db:
+                stored = db.execute(
+                    "SELECT report_json FROM review_reports WHERE review_id='review-valid'"
+                ).fetchall()
+                checks = db.execute(
+                    "SELECT check_name,passed FROM review_checks WHERE review_id='review-valid' ORDER BY check_name"
+                ).fetchall()
+            assert len(stored) == 1 and json.loads(stored[0][0]) == response_body
+            assert checks == [("prices", 1), ("stock", 1)]
+            assert response_body["approved"] is True and response_body["checks"] == [
+                "stock",
+                "prices",
+            ]
+            side_effects.append(
+                "resolved prefix, closed stage, policy verification and canonical SQLite report"
+            )
         if case.source == "15_repeated_stage/app.py":
             with sqlite3.connect(environment["REPEATED_STAGE_DB"]) as db:
                 reports = db.execute(

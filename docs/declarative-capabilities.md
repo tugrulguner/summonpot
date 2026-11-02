@@ -182,6 +182,8 @@ to the selector, but no principal or full result ledger is implicitly exposed.
 
 ## Current source: repeated stage with final-result consumer (unreleased)
 
+This describes the original two-operation form. The single-stage chain section below extends its composition without changing final-invocation addressing.
+
 The current source admits a narrow two-operation sequence: one required repeated producer,
 then one required `Exactly(1)` terminal consumer. The producer uses positive finite bounds
 (`minimum >= 1`, `maximum > 1`), a Pydantic request with at least one `FromRequest`, direct
@@ -206,6 +208,12 @@ aggregated repeated results, arbitrary invocation selectors, repeated consumers,
 choices from repeated results, optional/unbounded/multiple repeated stages, general graphs,
 cycles, parallelism, or durable resume. The inspect/correct/verify workflow is not thereby
 implemented. See the focused [repeated-stage result contract](repeated-stage-results.added.md).
+
+## Current source: one repeated stage in a sequential chain (unreleased)
+
+Current source (unreleased) supports a uniquely ordered chain with one nonterminal bounded repeated operation, an optional resolved prefix and a nonempty resolved suffix. Every other operation is required `Exactly(1)` with no agent choices. A Pydantic request needs at least one `FromRequest` across the whole chain, not necessarily on the repeated operation; supported request/result/authenticated-context bindings and immutable defaults remain required. The repeated operation has positive finite bounds (`minimum >= 1`, `maximum > 1`), direct closed plain-string `Literal` choices and a Pydantic intermediate distinct from the response. Ordinary `FromResult` reads single-invocation results; repeated results require `invocation="final"`, with at least one suffix consumer. Exactly one terminal operation owns the endpoint's exact full response annotation. Prefix operations run before one lazy model resolution; suffix operations run after immutable stage closure without further model decisions or acknowledgment. One principal, ledger, absolute deadline and usage budget span the request. Prefix results/context/ledger are not implicitly projected into model prompts; receiving constraints are checked before each start. Explicit function-tool quotas reject before all work. No feedback cycles, external choices, multiple repeated stages, aggregation, parallelism or durable recovery are added. Published v0.14.0 is unchanged.
+
+The original two-operation shape above remains its zero-prefix, one-consumer case. Meeting the minimum alone never readies downstream work: both final-result bindings and `after` dependencies require the same immutable closure. Prefix effects can precede missing-provider failure; suffix failures can follow committed work without rollback or replay. See the [complete admission and failure contract](stage-chains.added.md).
 
 ## Deterministic and agentic execution
 
