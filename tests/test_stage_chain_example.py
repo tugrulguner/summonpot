@@ -31,6 +31,8 @@ def load_app(tmp_path, decisions):
 
     def choose(messages, info):
         assert not info.function_tools
+        assert info.instructions is not None
+        assert "Run both stock and prices checks" in info.instructions
         turns.append(1)
         return ModelResponse(
             parts=[ToolCallPart(info.output_tools[0].name, next(queue))]

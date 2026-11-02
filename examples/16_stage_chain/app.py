@@ -314,7 +314,11 @@ def review_order(
     verified=Required(verify_op, calls=Exactly(1)),
     report=Required(report_op, calls=Exactly(1)),
 ) -> ReviewReport:
-    """Review an order with bounded stock/price checks and persist a verified decision."""
+    """Run both stock and prices checks before finishing the bounded review.
+
+    Select each check at least once within three invocations. Summonpot then runs
+    deterministic verification and persists the decision; do not decide approval.
+    """
     ...
 
 
