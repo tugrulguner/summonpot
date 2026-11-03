@@ -215,6 +215,10 @@ Current source (unreleased) supports a uniquely ordered chain with one nontermin
 
 The original two-operation shape above remains its zero-prefix, one-consumer case. Meeting the minimum alone never readies downstream work: both final-result bindings and `after` dependencies require the same immutable closure. Prefix effects can precede missing-provider failure; suffix failures can follow committed work without rollback or replay. See the [complete admission and failure contract](stage-chains.added.md).
 
+## Current source: one prefix selection before repetition (unreleased)
+
+Current source (unreleased) also composes exactly one producer-backed choice argument on one required `Exactly(1)` prefix consumer with one nonterminal bounded repeated stage and a resolved suffix. The candidate producer is an earlier single-start operation returning `list[ConcreteModel]`; repeated choices remain direct closed string `Literal` values, and all other operations remain resolved required `Exactly(1)`. Pydantic request/response, chain-wide `FromRequest`, unique ordering, final-invocation addressing and exact terminal response ownership remain required. Empty/unavailable/oversized candidate domains stop before selection or repeated work; a singleton binds locally, while ambiguity uses canonical request-local tokens. Singleton selection still leads to model-backed repeated decisions. One lazy model-configuration lookup, run, principal, ledger, deadline and usage budget span both phases. No business-function tools, reselection after same-run failure, effect replay or final model acknowledgment are added. A fresh request starts a fresh run. Published v0.14.0 is unchanged. See [the complete composed contract](choice-before-stage.added.md).
+
 ## Deterministic and agentic execution
 
 Capabilities are deterministic operations in both modes. The difference is whether execution still has an unresolved legal choice:

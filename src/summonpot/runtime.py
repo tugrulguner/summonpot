@@ -804,18 +804,66 @@ class Runtime:
         usage = RunUsage()
         limits = self.usage_limits or UsageLimits()
         _check_runtime_deadline()
+        decision_model: ModelSpec | None = None
         if plan.repeated_order is not None:
             for identity in plan.repeated_order:
                 if identity == tool.identity:
                     break
+                prefix_tool = plan.tools[identity]
+                supplied: dict[str, Any] = {}
+                bindings = _choice_bindings(prefix_tool)
+                if bindings:
+                    async with run.lock:
+                        _ensure_choice_sets(prefix_tool, run, plan.tools)
+                        domains = tuple(
+                            (
+                                binding,
+                                run.choice_sets[
+                                    (prefix_tool.identity, binding.argument)
+                                ],
+                            )
+                            for binding in bindings
+                        )
+                    _check_runtime_deadline()
+                    if any(not choices for _, choices in domains):
+                        raise _ChoiceUnavailableError(
+                            "Declared candidate domain is unavailable."
+                        )
+                    supplied.update(
+                        {
+                            binding.argument: choices[0][0]
+                            for binding, choices in domains
+                            if len(choices) == 1
+                        }
+                    )
+                    ambiguous = tuple(
+                        (binding, choices)
+                        for binding, choices in domains
+                        if len(choices) > 1
+                    )
+                    if ambiguous:
+                        if decision_model is None:
+                            decision_model = self.model_for(endpoint)
+                        selection = await self._select_choices(
+                            plan,
+                            prefix_tool,
+                            ambiguous,
+                            request,
+                            decision_model,
+                            usage,
+                            limits,
+                        )
+                        supplied.update(selection)
                 await _invoke_bound_operation(
-                    plan.tools[identity],
+                    prefix_tool,
                     run,
-                    {},
+                    supplied,
                     redact_application_error=_http_error_boundary.get(),
                 )
                 _check_runtime_deadline()
-        model = self.model_for(endpoint)
+        if decision_model is None:
+            decision_model = self.model_for(endpoint)
+        model = decision_model
         while state.started < tool.maximum:
             supplied = await self._select_repeated_decision(
                 plan, tool, run, request, model, usage, limits

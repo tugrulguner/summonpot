@@ -479,6 +479,7 @@ def _repeated_stage_indices(tools: Sequence[Any]) -> tuple[int, ...] | None:
     predecessors: list[set[int]] = [set() for _ in tools]
     successors: list[set[int]] = [set() for _ in tools]
     saw_request = saw_choice = saw_final = False
+    prefix_choices = 0
     for index, tool in enumerate(tools):
         contract = tool.contract
         assert contract is not None and contract.bind is not None
@@ -504,16 +505,26 @@ def _repeated_stage_indices(tools: Sequence[Any]) -> tuple[int, ...] | None:
                 references.append(source.operation)
             elif type(source) is AgentChoice:
                 annotation = annotations.get(name)
-                values = get_args(annotation)
-                if (
-                    index != repeated_index
-                    or source.from_result is not None
-                    or get_origin(annotation) is not Literal
-                    or not values
-                    or not all(type(value) is str for value in values)
-                ):
+                if index == repeated_index:
+                    values = get_args(annotation)
+                    if (
+                        source.from_result is not None
+                        or get_origin(annotation) is not Literal
+                        or not values
+                        or not all(type(value) is str for value in values)
+                    ):
+                        return None
+                    saw_choice = True
+                elif source.from_result is not None:
+                    item = _producer_choice_type(source.from_result.output)
+                    if item is None or (
+                        source.item_type is not None and source.item_type is not item
+                    ):
+                        return None
+                    prefix_choices += 1
+                    references.append(source.from_result)
+                else:
                     return None
-                saw_choice = True
             else:
                 return None
         for name, parameter in inspect.signature(tool.fn).parameters.items():
@@ -531,7 +542,7 @@ def _repeated_stage_indices(tools: Sequence[Any]) -> tuple[int, ...] | None:
                 return None
             predecessors[index].add(producer)
             successors[producer].add(index)
-    if not (saw_request and saw_choice and saw_final):
+    if not (saw_request and saw_choice and saw_final) or prefix_choices > 1:
         return None
     remaining = set(range(len(tools)))
     order = []
@@ -544,7 +555,19 @@ def _repeated_stage_indices(tools: Sequence[Any]) -> tuple[int, ...] | None:
         order.append(current)
         for successor in successors[current]:
             predecessors[successor].discard(current)
-    if order[-1] == repeated_index:
+    for index, tool in enumerate(tools):
+        has_prefix_choice = any(
+            type(source) is AgentChoice and source.from_result is not None
+            for source in tool.contract.bind.values()
+        )
+        if has_prefix_choice and order.index(index) > order.index(repeated_index):
+            return None
+    if prefix_choices and not any(
+        type(source) is AgentChoice and source.from_result is not None
+        for index, tool in enumerate(tools)
+        if order.index(index) < order.index(repeated_index)
+        for source in tool.contract.bind.values()
+    ):
         return None
     return tuple(order)
 
