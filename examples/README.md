@@ -314,6 +314,12 @@ Directory: [`16_stage_chain/`](16_stage_chain/)
 
 Shows the current-source single-stage chain without changing earlier examples. Order loading owns the request bindings; the repeated checks consume validated preparation results. Deterministic verification denies incomplete or failed checks before the final operation persists the report. The model owns only bounded check selection, not approval. This source extension is not yet released and is not in published v0.14.0.
 
+### 17. Candidate selection followed by bounded checks (current source)
+
+Directory: [`17_choice_stage/`](17_choice_stage/)
+
+Combines one application-backed supplier selection with bounded check selection, deterministic verification and a persisted canonical report. Selection identifies which supplier the checks and report concern. Empty candidates stop before checks; singleton selection needs no selection-model call, but the repeated checks still do. This source extension is not in published v0.14.0.
+
 ## What is intentionally not shown as shipped
 
 The examples do not claim these planned features exist:

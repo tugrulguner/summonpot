@@ -38,6 +38,7 @@ EXAMPLES = [
     ("14_bounded_audit/app.py", "/audits", "post"),
     ("15_repeated_stage/app.py", "/audits", "post"),
     ("16_stage_chain/app.py", "/reviews", "post"),
+    ("17_choice_stage/app.py", "/supplier-reviews", "post"),
 ]
 
 
@@ -74,6 +75,7 @@ def test_smoke_cases_cover_every_advertised_route(monkeypatch, tmp_path):
             "BOUNDED_AUDIT_DB",
             "REPEATED_STAGE_DB",
             "STAGE_CHAIN_DB",
+            "CHOICE_STAGE_DB",
         ):
             monkeypatch.setenv(name, str(workdir / (name + ".sqlite3")))
         app = _load_example(source, monkeypatch)

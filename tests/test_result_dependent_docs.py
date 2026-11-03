@@ -156,7 +156,8 @@ def test_changelog_release_section_contains_consumed_fragment() -> None:
         for p in (ROOT / "changelog.d").iterdir()
         if p.is_file() and p.name != "README.md"
     ]
-    assert len(fragments) == 6
+    assert len(fragments) == 7
+    assert any(p.name == "+choice-before-stage.added.md" for p in fragments)
     assert any(p.name == "+stage-chains.added.md" for p in fragments)
     assert any(p.name == "+repeated-stage-results.added.md" for p in fragments)
     assert any(p.name == "+examples-refresh.changed.md" for p in fragments)

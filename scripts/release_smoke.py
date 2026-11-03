@@ -142,6 +142,12 @@ CASES = (
     ExampleCase(
         "16_stage_chain/app.py", "POST", "/reviews", {"order_id": "order-valid"}
     ),
+    ExampleCase(
+        "17_choice_stage/app.py",
+        "POST",
+        "/supplier-reviews",
+        {"category": "paper", "review_id": "smoke-choice-stage"},
+    ),
 )
 
 
@@ -317,6 +323,37 @@ summon=example.summon
     return wrapper
 
 
+def _choice_stage_smoke_wrapper(source: Path, workdir: Path) -> Path:
+    wrapper = workdir / "choice_stage_smoke_app.py"
+    wrapper.write_text(
+        f"""import sys,json
+sys.path.append({str(source.parent)!r})
+import app as example
+from pydantic_ai.messages import ModelResponse,ToolCallPart,UserPromptPart
+from pydantic_ai.models.function import FunctionModel
+from summonpot.runtime import Runtime
+
+def choose(messages,info):
+    assert not info.function_tools
+    props=info.output_tools[0].parameters_json_schema['properties']
+    prompts=[p.content for m in messages for p in m.parts if isinstance(p,UserPromptPart)]
+    data=json.loads(prompts[-1].splitlines()[-1])
+    if 'decision' in props:
+        starts=data['starts']
+        payload={{'decision':'invoke','argument_0':('stock','prices')[starts]}} if starts<2 else {{'decision':'finish'}}
+    else:
+        slot=next(iter(props))
+        selected=min(data[slot]['candidates'],key=lambda item:item['value']['price_cents'])
+        payload={{slot:selected['token']}}
+    return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name,payload)])
+example.summon._runtime=Runtime(model=FunctionModel(choose),retries=0)
+summon=example.summon
+""",
+        encoding="utf-8",
+    )
+    return wrapper
+
+
 def _fixture_smoke_wrapper(
     source: Path, workdir: Path, payload: dict[str, Any] | None
 ) -> Path:
@@ -363,6 +400,8 @@ def _verify_case(
     served_source = (
         _support_smoke_wrapper(source, workdir)
         if case.source == "06_support_service/app.py"
+        else _choice_stage_smoke_wrapper(source, workdir)
+        if case.source == "17_choice_stage/app.py"
         else _bounded_audit_smoke_wrapper(source, workdir)
         if case.source
         in {
@@ -393,6 +432,8 @@ def _verify_case(
         "12_producer_choice/app.py",
     }:
         environment["SUMMONPOT_MODEL"] = "invalid:no-provider"
+    if case.source == "17_choice_stage/app.py":
+        environment["CHOICE_STAGE_DB"] = str(workdir / "choice-stage.sqlite3")
     if case.source == "16_stage_chain/app.py":
         environment["STAGE_CHAIN_DB"] = str(workdir / "stage-chain.sqlite3")
     if case.source == "14_bounded_audit/app.py":
@@ -438,6 +479,23 @@ def _verify_case(
             raise AssertionError(f"{case.source} success returned {success}: {body!r}")
         response_body = json.loads(body)
         side_effects: list[str] = []
+        if case.source == "17_choice_stage/app.py":
+            with sqlite3.connect(environment["CHOICE_STAGE_DB"]) as db:
+                saved = db.execute(
+                    "SELECT report_json FROM review_reports WHERE review_id='smoke-choice-stage'"
+                ).fetchall()
+                checks = db.execute(
+                    "SELECT supplier_id,check_name,passed FROM review_checks WHERE review_id='smoke-choice-stage' ORDER BY check_name"
+                ).fetchall()
+            assert len(saved) == 1 and json.loads(saved[0][0]) == response_body
+            assert (
+                response_body["supplier_id"] == "S-101"
+                and response_body["approved"] is True
+            )
+            assert checks == [("S-101", "prices", 1), ("S-101", "stock", 1)]
+            side_effects.append(
+                "canonical selected supplier, actual checks, verified persisted report"
+            )
         if case.source == "16_stage_chain/app.py":
             with sqlite3.connect(environment["STAGE_CHAIN_DB"]) as db:
                 stored = db.execute(

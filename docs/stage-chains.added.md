@@ -13,6 +13,8 @@ The original two-operation repeated producer/terminal form remains supported as 
 one-consumer case. Sole-operation repetition, resolved `Exactly(1)` chains and producer-choice
 progression retain their existing execution semantics.
 
+The following is the resolved-neighbor form. Current source additionally supports [one producer-backed prefix selection](choice-before-stage.added.md) under a separate narrow predicate; no choices inside or after repetition are added.
+
 ## Complete admission predicate
 
 - Pydantic request and response; at least one `FromRequest` across the whole chain. The
