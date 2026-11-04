@@ -47,10 +47,7 @@ EXAMPLES = [
 def _load_example(relative_path: str, monkeypatch):
     example = ROOT / "examples" / relative_path
     monkeypatch.syspath_prepend(str(example.parent))
-    namespace = runpy.run_path(str(example), run_name=f"example_{relative_path}")
-    variable = "summon" if "summon" in namespace else "app"
-    assert variable in namespace
-    return namespace[variable]
+    return runpy.run_path(str(example), run_name=f"example_{relative_path}")["summon"]
 
 
 @pytest.mark.parametrize(("relative_path", "route", "method"), EXAMPLES)

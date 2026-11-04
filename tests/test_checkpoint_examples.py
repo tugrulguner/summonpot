@@ -17,6 +17,15 @@ from summonpot.runtime import Runtime
 ROOT = Path(__file__).parents[1]
 
 
+@pytest.mark.parametrize("directory", ["18_checkpoint_cleanup", "19_checkpoint_status"])
+def test_checkpoint_example_loads_without_smoke_wrapper(directory, monkeypatch):
+    from summonpot.cli import _load_summon
+
+    monkeypatch.setenv("SUMMONPOT_MODEL", "invalid:no-provider")
+    loaded = _load_summon(str(ROOT / "examples" / directory / "app.py"))
+    assert len(loaded.endpoints) == 1
+
+
 def load_example(number, name, variable, database, monkeypatch):
     monkeypatch.setenv(variable, str(database))
     path = ROOT / "examples" / f"{number}_{name}" / "app.py"
@@ -65,9 +74,11 @@ def test_cleanup_actual_effects_and_canonical_report(
         "18", "checkpoint_cleanup", "CHECKPOINT_CLEANUP_DB", path, monkeypatch
     )
     turns = []
-    module.app._runtime = fixture_runtime(turns)
+    module.summon._runtime = fixture_runtime(turns)
     result = asyncio.run(
-        module.app._runtime.call(module.app.endpoints[0], {"record_id": record_id})
+        module.summon._runtime.call(
+            module.summon.endpoints[0], {"record_id": record_id}
+        )
     )
     assert result.status == status and len(turns) == model_calls
     with sqlite3.connect(path) as db:
@@ -112,9 +123,9 @@ def test_status_actual_effects_and_canonical_report(
         "19", "checkpoint_status", "CHECKPOINT_STATUS_DB", path, monkeypatch
     )
     turns = []
-    module.app._runtime = fixture_runtime(turns)
+    module.summon._runtime = fixture_runtime(turns)
     result = asyncio.run(
-        module.app._runtime.call(module.app.endpoints[0], {"job_id": job_id})
+        module.summon._runtime.call(module.summon.endpoints[0], {"job_id": job_id})
     )
     assert result.status == status and len(turns) == model_calls
     with sqlite3.connect(path) as db:

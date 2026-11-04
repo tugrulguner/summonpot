@@ -421,8 +421,8 @@ def choose(messages,info):
     envelope=json.loads(text[text.index('{{"decision_slot_') :])
     choice={{slot:domain['candidates'][0]['token'] for slot,domain in envelope.items()}}
     return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name,choice)])
-example.app._runtime=Runtime(model=FunctionModel(choose),retries=0)
-summon=example.app
+example.summon._runtime=Runtime(model=FunctionModel(choose),retries=0)
+summon=example.summon
 """,
         encoding="utf-8",
     )

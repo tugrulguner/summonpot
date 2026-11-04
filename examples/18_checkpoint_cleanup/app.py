@@ -221,10 +221,10 @@ persistence = Operation(
     },
     output=CleanupReport,
 )
-app = Summon("checkpoint-cleanup")
+summon = Summon("checkpoint-cleanup")
 
 
-@app("/checkpoint-cleanup")
+@summon("/checkpoint-cleanup")
 def cleanup(
     request: CleanupRequest,
     inspect=Required(inspection, calls=Between(1, 3)),

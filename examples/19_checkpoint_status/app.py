@@ -168,10 +168,10 @@ final = Operation(
     },
     output=StatusReport,
 )
-app = Summon("checkpoint-status")
+summon = Summon("checkpoint-status")
 
 
-@app("/checkpoint-status")
+@summon("/checkpoint-status")
 def checkpoint_status(
     request: StatusRequest,
     check=Required(checkpoint, calls=Between(1, 3), until="accepted"),
