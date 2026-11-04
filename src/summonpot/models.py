@@ -45,6 +45,7 @@ class ToolDef:
     # then itself evidence of an explicit declaration. Dependency registration sets
     # this boolean so its resolved marker bounds are not mistaken for ``calls=``.
     bounds_explicit: bool | None = None
+    until: str | None = None
 
     async def call(self, *args: Any, **kwargs: Any) -> Any:
         """Execute the tool with the given arguments.

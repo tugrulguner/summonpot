@@ -233,9 +233,13 @@ async def _invoke_bound_operation(
     supplied: Mapping[str, Any],
     *,
     redact_application_error: bool = True,
+    checkpoint_epoch: int | None = None,
 ) -> Any:
     """Invoke one enforced operation through the shared trusted-value kernel."""
     values = dict(supplied)
+    checkpoint_epoch = (
+        run.checkpoint_epoch if checkpoint_epoch is None else checkpoint_epoch
+    )
     for default in tool.defaults:
         values.setdefault(default.argument, default.value)
     for binding in tool.bindings:
@@ -263,6 +267,11 @@ async def _invoke_bound_operation(
             and binding.producer_identity is not None
         ):
             producer = run.states[binding.producer_identity]
+            if (
+                run.checkpoint_plan is not None
+                and binding.producer_identity not in run.checkpoint_frame
+            ):
+                raise ModelRetry("The current checkpoint producer has not completed.")
             if producer.outcome != "succeeded":
                 raise ModelRetry("A choice producer has not completed successfully.")
             choices = run.choice_sets.get((tool.identity, binding.argument))
@@ -280,6 +289,11 @@ async def _invoke_bound_operation(
             values[binding.argument] = value
         elif binding.producer_identity is not None:
             producer = run.states[binding.producer_identity]
+            if (
+                run.checkpoint_plan is not None
+                and binding.producer_identity not in run.checkpoint_frame
+            ):
+                raise ModelRetry("The current checkpoint producer has not completed.")
             if producer.outcome != "succeeded":
                 raise ModelRetry("A predecessor has not completed successfully.")
             if binding.final_invocation:
@@ -291,7 +305,11 @@ async def _invoke_bound_operation(
                     raise ModelRetry("The repeated producer stage has not closed.")
                 value = closed.result
             else:
-                value = producer.result
+                value = (
+                    run.checkpoint_frame[binding.producer_identity].result
+                    if run.checkpoint_plan is not None
+                    else producer.result
+                )
             if isinstance(value, BaseModel):
                 storage = BaseModel.__dict__["__dict__"].__get__(value, type(value))
                 if type(storage) is not dict or any(
@@ -334,6 +352,16 @@ async def _invoke_bound_operation(
         # Admission is the effect boundary: validation/reservation/lock contention
         # may consume the remaining budget, so check only after acquiring the lock.
         _check_runtime_deadline()
+        if run.checkpoint_plan is not None and (
+            run.checkpoint_aborted
+            or checkpoint_epoch != run.checkpoint_epoch
+            or run.checkpoint_expected != tool.identity
+            or any(s.running for s in run.states)
+            or any(i not in run.checkpoint_frame for i in tool.predecessors)
+        ):
+            raise _OperationExecutionError(
+                "Checkpoint operation is not ready for admission."
+            )
         if any(
             run.states[i].outcome != "succeeded"
             or (run.states[i].requires_closure and run.states[i].closed is None)
@@ -353,6 +381,9 @@ async def _invoke_bound_operation(
                 f"Capability {tool.name!r} may run exactly once and has already started."
             )
         state.started += 1
+        if run.checkpoint_plan is not None:
+            run.checkpoint_expected = None
+            run.choice_sets.clear()
         state.running += 1
         state.outcome = "running"
         if tool.repeated:
@@ -403,12 +434,21 @@ async def _invoke_bound_operation(
                 invocation.outcome = state.outcome
         raise
     async with run.lock:
+        if run.checkpoint_plan is not None and (
+            run.checkpoint_aborted or checkpoint_epoch != run.checkpoint_epoch
+        ):
+            state.outcome = "outcome_unknown"
+            if invocation is not None:
+                invocation.outcome = "outcome_unknown"
+            raise _OperationExecutionError("Checkpoint execution was aborted.")
         state.succeeded += 1
         state.result = validated
         state.outcome = "succeeded"
         if invocation is not None:
             invocation.result = validated
             invocation.outcome = "succeeded"
+            if run.checkpoint_plan is not None:
+                run.checkpoint_frame[tool.identity] = invocation
     return validated
 
 
@@ -573,7 +613,7 @@ class Runtime:
 
         plan = self._plan_for(endpoint)
         if (
-            plan.repeated_tool is not None
+            (plan.repeated_tool is not None or plan.checkpoint is not None)
             and self.usage_limits is not None
             and self.usage_limits.tool_calls_limit is not None
         ):
@@ -596,6 +636,8 @@ class Runtime:
         run = _new_run(plan, request)
         run.context = context_values
         check_deadline()
+        if plan.checkpoint is not None:
+            return await self._run_checkpoint(endpoint, plan, run, request)
         if plan.repeated_tool is not None:
             return await self._run_repeated(endpoint, plan, run, request)
         if plan.direct_tool is not None:
@@ -788,6 +830,157 @@ class Runtime:
                 output = json.loads(output)
         check_deadline()
         return output
+
+    async def _run_checkpoint(
+        self,
+        endpoint: EndpointDef,
+        plan: _CompiledEndpoint,
+        run: _EndpointRun,
+        request: Mapping[str, Any],
+    ) -> Any:
+        """Advance a compiled checkpoint region through the shared guarded kernel."""
+        region = plan.checkpoint
+        assert region is not None
+        usage = RunUsage()
+        limits = self.usage_limits or UsageLimits()
+        model: ModelSpec | None = None
+
+        async def invoke(identity: int) -> Any:
+            nonlocal model
+            tool = plan.tools[identity]
+            async with run.lock:
+                _check_runtime_deadline()
+                if (
+                    run.checkpoint_aborted
+                    or run.checkpoint_expected is not None
+                    or any(s.running for s in run.states)
+                ):
+                    raise _OperationExecutionError("Checkpoint run is not ready.")
+                run.checkpoint_expected = identity
+                selection_epoch = run.checkpoint_epoch
+                for binding in _choice_bindings(tool):
+                    if binding.producer_identity not in run.checkpoint_frame:
+                        raise _OperationExecutionError(
+                            "Current candidate producer is unavailable."
+                        )
+                _ensure_choice_sets(tool, run, plan.tools)
+                domains = []
+                for binding in tool.bindings:
+                    if type(binding.source) is not AgentChoice:
+                        continue
+                    if binding.producer_identity is not None:
+                        choices = run.choice_sets[(identity, binding.argument)]
+                    else:
+                        from typing import get_args
+
+                        choices = tuple(
+                            (secrets.token_urlsafe(24), value, value)
+                            for value in get_args(
+                                tool.signature.parameters[binding.argument].annotation
+                            )
+                        )
+                    domains.append((binding, choices))
+            selected: dict[str, Any] = {}
+            ambiguous = tuple((b, domain) for b, domain in domains if len(domain) > 1)
+            if ambiguous:
+                if model is None:
+                    model = self.model_for(endpoint)
+                selected.update(
+                    await self._select_choices(
+                        plan, tool, ambiguous, request, model, usage, limits
+                    )
+                )
+            for binding, domain in domains:
+                if not domain:
+                    raise _ChoiceUnavailableError(
+                        "Declared candidate domain is unavailable."
+                    )
+                token = selected.get(binding.argument, domain[0][0])
+                member = next(
+                    (item for candidate, item, _ in domain if candidate == token), None
+                )
+                if member is None:
+                    raise _ChoiceUnavailableError(
+                        "Selected current candidate is unavailable."
+                    )
+                selected[binding.argument] = (
+                    token if binding.producer_identity is not None else member
+                )
+            return await _invoke_bound_operation(
+                tool,
+                run,
+                selected,
+                redact_application_error=_http_error_boundary.get(),
+                checkpoint_epoch=selection_epoch,
+            )
+
+        try:
+            for ordinal in range(1, region.rounds + 1):
+                async with run.lock:
+                    _check_runtime_deadline()
+                    if (
+                        run.checkpoint_aborted
+                        or run.checkpoint_expected is not None
+                        or any(s.running for s in run.states)
+                        or run.states[region.check].closed is not None
+                    ):
+                        raise _OperationExecutionError("Checkpoint cannot advance.")
+                    run.checkpoint_epoch += 1
+                    run.checkpoint_frame.clear()
+                    run.choice_sets.clear()
+                for identity in region.prefix:
+                    await invoke(identity)
+                async with run.lock:
+                    _check_runtime_deadline()
+                    checked = run.checkpoint_frame[region.check]
+                    storage = BaseModel.__dict__["__dict__"].__get__(
+                        checked.result, type(checked.result)
+                    )
+                    if type(storage) is not dict or any(
+                        type(key) is not str for key in storage
+                    ):
+                        raise _OperationOutputError(
+                            "Checkpoint result storage is invalid."
+                        )
+                    accepted = dict.__getitem__(storage, region.field)
+                    if type(accepted) is not bool:
+                        raise _OperationOutputError(
+                            "Checkpoint completion is not a strict Boolean."
+                        )
+                    close = accepted or ordinal == region.rounds
+                    if close:
+                        if (
+                            run.checkpoint_aborted
+                            or any(s.running for s in run.states)
+                            or checked.outcome != "succeeded"
+                        ):
+                            raise _OperationExecutionError("Checkpoint cannot close.")
+                        run.states[region.check].closed = _ClosedStage(
+                            region.check, checked.ordinal, checked.result
+                        )
+                        run.choice_sets.clear()
+                if close:
+                    output = await invoke(region.terminal)
+                    _check_runtime_deadline()
+                    return (
+                        plan.output_auditor(output)
+                        if plan.output_auditor is not None
+                        else output
+                    )
+                for identity in region.continuation:
+                    await invoke(identity)
+            raise _OperationExecutionError("Checkpoint did not complete.")
+        except BaseException:
+            async with run.lock:
+                run.checkpoint_aborted = True
+                run.checkpoint_expected = None
+                run.choice_sets.clear()
+                for state in run.states:
+                    if state.outcome == "running":
+                        state.outcome = "outcome_unknown"
+                        if state.invocations:
+                            state.invocations[-1].outcome = "outcome_unknown"
+            raise
 
     async def _run_repeated(
         self,

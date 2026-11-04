@@ -148,6 +148,18 @@ CASES = (
         "/supplier-reviews",
         {"category": "paper", "review_id": "smoke-choice-stage"},
     ),
+    ExampleCase(
+        "18_checkpoint_cleanup/app.py",
+        "POST",
+        "/checkpoint-cleanup",
+        {"record_id": "needs-review"},
+    ),
+    ExampleCase(
+        "19_checkpoint_status/app.py",
+        "POST",
+        "/checkpoint-status",
+        {"job_id": "pending"},
+    ),
 )
 
 
@@ -391,29 +403,56 @@ summon=example.summon
     return wrapper
 
 
+def _checkpoint_smoke_wrapper(source: Path, workdir: Path) -> Path:
+    """Use the real checkpoint runtime with a keyless canonical-choice model."""
+    wrapper = workdir / "checkpoint_smoke_app.py"
+    wrapper.write_text(
+        f"""import importlib.util,json,sys
+from pydantic_ai.messages import ModelResponse,ToolCallPart,UserPromptPart
+from pydantic_ai.models.function import FunctionModel
+from summonpot.runtime import Runtime
+spec=importlib.util.spec_from_file_location('checkpoint_smoke_example',{str(source)!r})
+example=importlib.util.module_from_spec(spec)
+sys.modules[spec.name]=example
+spec.loader.exec_module(example)
+def choose(messages,info):
+    assert not info.function_tools
+    text=next(p.content for m in reversed(messages) for p in m.parts if isinstance(p,UserPromptPart) and isinstance(p.content,str))
+    envelope=json.loads(text[text.index('{{"decision_slot_') :])
+    choice={{slot:domain['candidates'][0]['token'] for slot,domain in envelope.items()}}
+    return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name,choice)])
+example.app._runtime=Runtime(model=FunctionModel(choose),retries=0)
+summon=example.app
+""",
+        encoding="utf-8",
+    )
+    return wrapper
+
+
 def _verify_case(
     case: ExampleCase, examples_root: Path, workdir: Path
 ) -> dict[str, Any]:
     source = (examples_root / case.source).resolve()
     if not source.is_file():
         raise FileNotFoundError(source)
-    served_source = (
-        _support_smoke_wrapper(source, workdir)
-        if case.source == "06_support_service/app.py"
-        else _choice_stage_smoke_wrapper(source, workdir)
-        if case.source == "17_choice_stage/app.py"
-        else _bounded_audit_smoke_wrapper(source, workdir)
-        if case.source
-        in {
-            "14_bounded_audit/app.py",
-            "15_repeated_stage/app.py",
-            "16_stage_chain/app.py",
-        }
-        else _fixture_smoke_wrapper(source, workdir, case.payload)
-        if case.source == "05_bounded_runtime.py"
-        or (case.source == "04_http_methods.py" and case.method == "POST")
-        else source
-    )
+    if case.source == "06_support_service/app.py":
+        served_source = _support_smoke_wrapper(source, workdir)
+    elif case.source in {"18_checkpoint_cleanup/app.py", "19_checkpoint_status/app.py"}:
+        served_source = _checkpoint_smoke_wrapper(source, workdir)
+    elif case.source == "17_choice_stage/app.py":
+        served_source = _choice_stage_smoke_wrapper(source, workdir)
+    elif case.source in {
+        "14_bounded_audit/app.py",
+        "15_repeated_stage/app.py",
+        "16_stage_chain/app.py",
+    }:
+        served_source = _bounded_audit_smoke_wrapper(source, workdir)
+    elif case.source == "05_bounded_runtime.py" or (
+        case.source == "04_http_methods.py" and case.method == "POST"
+    ):
+        served_source = _fixture_smoke_wrapper(source, workdir, case.payload)
+    else:
+        served_source = source
 
     port = _free_port()
     base_url = f"http://127.0.0.1:{port}"
@@ -431,6 +470,14 @@ def _verify_case(
         "11_linear_result_chain/app.py",
         "12_producer_choice/app.py",
     }:
+        environment["SUMMONPOT_MODEL"] = "invalid:no-provider"
+    if case.source == "18_checkpoint_cleanup/app.py":
+        environment["CHECKPOINT_CLEANUP_DB"] = str(
+            workdir / "checkpoint-cleanup.sqlite3"
+        )
+    if case.source == "19_checkpoint_status/app.py":
+        environment["CHECKPOINT_STATUS_DB"] = str(workdir / "checkpoint-status.sqlite3")
+    if case.source in {"18_checkpoint_cleanup/app.py", "19_checkpoint_status/app.py"}:
         environment["SUMMONPOT_MODEL"] = "invalid:no-provider"
     if case.source == "17_choice_stage/app.py":
         environment["CHOICE_STAGE_DB"] = str(workdir / "choice-stage.sqlite3")
@@ -479,6 +526,46 @@ def _verify_case(
             raise AssertionError(f"{case.source} success returned {success}: {body!r}")
         response_body = json.loads(body)
         side_effects: list[str] = []
+        if case.source == "18_checkpoint_cleanup/app.py":
+            with sqlite3.connect(environment["CHECKPOINT_CLEANUP_DB"]) as db:
+                saved = db.execute(
+                    "SELECT report_json FROM reports WHERE record_id='needs-review'"
+                ).fetchone()
+                corrections = db.execute(
+                    "SELECT revision,action FROM corrections WHERE record_id='needs-review' ORDER BY revision"
+                ).fetchall()
+                record = db.execute(
+                    "SELECT revision,name,sku,email FROM records WHERE record_id='needs-review'"
+                ).fetchone()
+            assert saved is not None and json.loads(saved[0]) == response_body
+            assert corrections == [(1, "trim_name"), (2, "uppercase_sku")]
+            assert record == (2, "Ada", "SKU-7", "ada@example.com")
+            assert (
+                response_body["status"] == "verified" and response_body["revision"] == 2
+            )
+            side_effects.append(
+                "canonical cleanup report and independently read corrections/record"
+            )
+        if case.source == "19_checkpoint_status/app.py":
+            with sqlite3.connect(environment["CHECKPOINT_STATUS_DB"]) as db:
+                saved = db.execute(
+                    "SELECT report_json FROM reports WHERE job_id='pending'"
+                ).fetchone()
+                refreshes = db.execute(
+                    "SELECT revision,pace FROM refreshes WHERE job_id='pending' ORDER BY revision"
+                ).fetchall()
+                job = db.execute(
+                    "SELECT revision,completed,target FROM jobs WHERE job_id='pending'"
+                ).fetchone()
+            assert saved is not None and json.loads(saved[0]) == response_body
+            assert refreshes == [(1, "normal"), (2, "normal")]
+            assert job == (2, 2, 2)
+            assert (
+                response_body["status"] == "verified" and response_body["revision"] == 2
+            )
+            side_effects.append(
+                "canonical status report and independently read refreshes/job"
+            )
         if case.source == "17_choice_stage/app.py":
             with sqlite3.connect(environment["CHOICE_STAGE_DB"]) as db:
                 saved = db.execute(

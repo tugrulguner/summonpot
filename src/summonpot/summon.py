@@ -216,6 +216,7 @@ class Summon:
                     dependency_tool.contract = param.default.contract
                     dependency_tool.bounds = param.default.bounds
                     dependency_tool.bounds_explicit = param.default.calls is not None
+                    dependency_tool.until = param.default.until
                     dependency_tools.append(dependency_tool)
                     continue
                 annotation = hints.get(pname, param.annotation)

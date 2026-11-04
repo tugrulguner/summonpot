@@ -16,6 +16,18 @@ class Dependency:
     operation: Callable[..., Any] | Operation
     required: bool = False
     calls: CallBounds | None = None
+    until: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.until is not None and (
+            type(self.until) is not str
+            or not self.until
+            or not self.required
+            or not isinstance(self.operation, Operation)
+        ):
+            raise TypeError(
+                "Completion requires a required Operation and canonical field name."
+            )
 
     @property
     def bounds(self) -> CallBounds:
@@ -85,7 +97,8 @@ def Required(
     operation: Callable[..., Any] | Operation,
     *,
     calls: CallBounds | None = None,
+    until: str | None = None,
 ) -> Dependency:
     """Expose an operation that must run before successful output."""
     _check_bounds(calls, required=True)
-    return Dependency(operation=operation, required=True, calls=calls)
+    return Dependency(operation=operation, required=True, calls=calls, until=until)

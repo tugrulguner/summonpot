@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError, create
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticCustomError, SchemaValidator, TzInfo
 
+from summonpot._checkpoint import _checkpoint_plan, _CheckpointPlan
 from summonpot._context import _CompiledContext
 from summonpot._output_validation import (
     _compile_input_validator,
@@ -190,6 +191,7 @@ class _CompiledEndpoint:
     repeated_terminal: int | None = None
     repeated_order: tuple[int, ...] | None = None
     context: _CompiledContext | None = field(default=None, repr=False)
+    checkpoint: _CheckpointPlan | None = None
 
 
 _REGISTERED_PLANS: dict[int, tuple[ReferenceType[EndpointDef], _CompiledEndpoint]] = {}
@@ -1055,6 +1057,11 @@ class _EndpointRun:
     choice_sets: dict[tuple[int, str], Any] = field(default_factory=dict)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     application_failure: bool = False
+    checkpoint_plan: _CheckpointPlan | None = None
+    checkpoint_expected: int | None = None
+    checkpoint_epoch: int = 0
+    checkpoint_frame: dict[int, _InvocationState] = field(default_factory=dict)
+    checkpoint_aborted: bool = False
 
 
 def _compile_endpoint(
@@ -1065,6 +1072,29 @@ def _compile_endpoint(
 ) -> _CompiledEndpoint:
     """Snapshot validated endpoint metadata into an immutable runtime plan."""
     source_tools = tuple(endpoint.tools)
+    checkpoint = _checkpoint_plan(source_tools)
+    if checkpoint is not None:
+        response = endpoint.output_annotation or endpoint.output_model
+        terminal_contract = source_tools[checkpoint.terminal].contract
+        assert terminal_contract is not None
+        if (
+            endpoint.input_model is None
+            or response is None
+            or (terminal_contract.output is not response)
+            or sum(
+                t.contract is not None and t.contract.output is response
+                for t in source_tools
+            )
+            != 1
+        ):
+            raise TypeError(
+                "Checkpoint requires a Pydantic request and unique exact terminal response."
+            )
+        for source_tool in source_tools:
+            source_contract = source_tool.contract
+            assert source_contract is not None and source_contract.bind is not None
+            if not _direct_defaults_are_stable(source_tool, source_contract.bind):
+                raise TypeError("Checkpoint requires immutable callable defaults.")
     if context is None and any(
         type(source) is FromContext
         for tool in source_tools
@@ -1173,12 +1203,14 @@ def _compile_endpoint(
             index,
             enforce=index in (enforce_index, repeated_index)
             or bool(chain_indices and index in chain_indices)
-            or bool(stage_indices and index in stage_indices),
+            or bool(stage_indices and index in stage_indices)
+            or checkpoint is not None,
             snapshot_defaults=index in (direct_index, repeated_index)
             or bool(chain_indices and index in chain_indices)
-            or bool(stage_indices and index in stage_indices),
+            or bool(stage_indices and index in stage_indices)
+            or checkpoint is not None,
             operation_identities=operation_identities,
-            repeated=index == repeated_index,
+            repeated=index == repeated_index or checkpoint is not None,
         )
         for index, tool in enumerate(source_tools)
     )
@@ -1246,6 +1278,7 @@ def _compile_endpoint(
             else None
         ),
         context=context,
+        checkpoint=checkpoint,
     )
 
 
@@ -2081,6 +2114,7 @@ def _new_run(plan: _CompiledEndpoint, params: Mapping[str, Any]) -> _EndpointRun
     request = params.typed if isinstance(params, _RequestValues) else params
     return _EndpointRun(
         request=request,
+        checkpoint_plan=plan.checkpoint,
         states=[
             _OperationState(
                 requires_closure=(

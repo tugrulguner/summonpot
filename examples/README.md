@@ -80,6 +80,10 @@ immutable-default, unique-readiness, and exact full response-annotation requirem
 remain; context-only or scalar-request declarations and any declared `AgentChoice` remain
 agent-mediated. Level 13 demonstrates that authenticated direct path.
 
+## Current-source bounded checkpoint progression (unreleased)
+
+The public marker is `Required(check, calls=Between(1, M), until="accepted")`; it names a stored, non-null strict Boolean field, with required bounds `1..M` and optional negative-continuation bounds `0..M-1`. True closes; false continues, and the Mth false closes unresolved. An empty choice domain fails closed with the existing redacted 409, not an unresolved result. The request, context, invocation ledger, budget and deadline are shared. There is no rollback, replay, durable resume or recovery; a later failure does not undo effects. See the [checkpoint contract](../docs/checkpoint-progression.added.md). Published v0.14.0 does not include this behavior.
+
 ## Progression
 
 Included from version 0.13.0: [authenticated tenant context](13_authenticated_context/README.md)
@@ -319,6 +323,19 @@ Shows the current-source single-stage chain without changing earlier examples. O
 Directory: [`17_choice_stage/`](17_choice_stage/)
 
 Combines one application-backed supplier selection with bounded check selection, deterministic verification and a persisted canonical report. Selection identifies which supplier the checks and report concern. Empty candidates stop before checks; singleton selection needs no selection-model call, but the repeated checks still do. This source extension is not in published v0.14.0.
+
+
+### 18. Bounded checkpoint cleanup (current source, unreleased)
+
+Directory: [`18_checkpoint_cleanup/`](18_checkpoint_cleanup/)
+
+Shows application-owned inspection, deterministic verification, permitted guarded correction, reinspection and revision-checked report persistence. Summonpot owns the bounded loop; the application has no handoff orchestration. `until="accepted"` is a stored strict Boolean: true closes; false permits continuation, and the Mth false closes unresolved without another continuation. It needs current source; published v0.14.0 does not support it.
+
+### 19. Bounded checkpoint status (current source, unreleased)
+
+Directory: [`19_checkpoint_status/`](19_checkpoint_status/)
+
+Shows the same rule in a three-operation declaration. Already-accepted state skips refresh and model resolution. Empty choice domains abort with the existing redacted 409, not an unresolved result. Writes may survive later failure; there is no rollback, effect replay, durable resume or recovery.
 
 ## What is intentionally not shown as shipped
 
