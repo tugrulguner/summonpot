@@ -674,6 +674,10 @@ def _immutable_chain_default(value: Any) -> bool:
 
 def _validate_runtime_admission(*, endpoint: str, tools: list[Any]) -> None:
     """Reject explicit contracts that would fall onto unenforced agent execution."""
+    from summonpot._checkpoint import _checkpoint_plan
+
+    if _checkpoint_plan(tools) is not None:
+        return
     enforced = _enforced_contract_tool_index(tools)
     repeated = _repeated_contract_tool_index(tools)
     chain = _chain_contract_tool_indices(tools)

@@ -1,0 +1,1 @@
+Add current-source bounded checkpoint progression with a strict stored Boolean completion marker, bounded required and conditional regions, canonical terminal result ownership, and separate cleanup/status examples. Published v0.14.0 behavior is unchanged.

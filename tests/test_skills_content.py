@@ -31,6 +31,7 @@ def test_skill_documents_annotated_endpoint_metadata():
 def test_description_says_when_to_load_it():
     """An agent reads only the description when deciding to open the skill."""
     assert "@summon" in SKILL_DESCRIPTION
+    assert "bounded checkpoints" in SKILL_DESCRIPTION
     assert len(SKILL_DESCRIPTION) < 500
 
 
@@ -260,3 +261,13 @@ def test_skill_names_every_supported_path_scalar():
     section = body[body.index("## Path parameters") : body.index("## Running it")]
     for scalar in ("`str`", "`int`", "`float`", "`bool`", "`UUID`"):
         assert scalar in section
+
+
+def test_skill_documents_current_source_checkpoint_boundary():
+    body = " ".join(skill_body().split())
+    assert '`Required(check, calls=Between(1, M), until="accepted")`' in body
+    assert "stored, non-null strict Boolean field" in body
+    assert "Mth false closes unresolved" in body
+    assert "existing redacted 409, not unresolved" in body
+    assert "Published v0.14.0 is unchanged" in body
+    assert "no rollback, effect replay" in body

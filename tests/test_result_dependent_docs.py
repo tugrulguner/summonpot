@@ -156,7 +156,11 @@ def test_changelog_release_section_contains_consumed_fragment() -> None:
         for p in (ROOT / "changelog.d").iterdir()
         if p.is_file() and p.name != "README.md"
     ]
-    assert len(fragments) == 7
+    existing_fragments = [
+        p for p in fragments if p.name != "+checkpoint-progression.added.md"
+    ]
+    assert len(existing_fragments) == 7
+    assert any(p.name == "+checkpoint-progression.added.md" for p in fragments)
     assert any(p.name == "+choice-before-stage.added.md" for p in fragments)
     assert any(p.name == "+stage-chains.added.md" for p in fragments)
     assert any(p.name == "+repeated-stage-results.added.md" for p in fragments)

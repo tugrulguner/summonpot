@@ -39,6 +39,8 @@ EXAMPLES = [
     ("15_repeated_stage/app.py", "/audits", "post"),
     ("16_stage_chain/app.py", "/reviews", "post"),
     ("17_choice_stage/app.py", "/supplier-reviews", "post"),
+    ("18_checkpoint_cleanup/app.py", "/checkpoint-cleanup", "post"),
+    ("19_checkpoint_status/app.py", "/checkpoint-status", "post"),
 ]
 
 

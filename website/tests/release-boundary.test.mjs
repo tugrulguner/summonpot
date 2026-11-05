@@ -40,3 +40,19 @@ test('homepage and operation reference describe the 0.14.0 execution boundary', 
   assert.match(reference, /65,536/);
   assert.match(reference, /provider-configuration failure/i);
 });
+
+test('current-source checkpoint progression stays unreleased and bounded', async () => {
+  const [architecture, operations, home] = await Promise.all([
+    readFile(new URL('../src/content/docs/architecture.mdx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/content/docs/reference/operations.mdx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/content/docs/index.mdx', import.meta.url), 'utf8'),
+  ]);
+  for (const page of [architecture, operations, home]) {
+    assert.match(page, /Current-source bounded checkpoint progression \(unreleased\)/);
+    assert.match(page, /stored, non-null strict Boolean field/);
+    assert.match(page, /Mth false closes unresolved/);
+    assert.match(page, /redacted 409, not an unresolved result/);
+    assert.match(page, /Published v0\.14\.0 is unchanged/);
+    assert.match(page, /No rollback, replay, durable resume or recovery/);
+  }
+});
