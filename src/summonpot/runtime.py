@@ -962,11 +962,16 @@ class Runtime:
                 if close:
                     output = await invoke(region.terminal)
                     _check_runtime_deadline()
-                    output = (
-                        plan.output_auditor(output)
-                        if plan.output_auditor is not None
-                        else output
-                    )
+                    try:
+                        output = (
+                            plan.output_auditor(output)
+                            if plan.output_auditor is not None
+                            else output
+                        )
+                    except Exception:
+                        raise _OperationOutputError(
+                            "Endpoint output did not satisfy its declared contract."
+                        ) from None
                     # Final auditing is synchronous and cannot be preempted by
                     # asyncio.timeout; do not publish a result after it expires.
                     _check_runtime_deadline()
