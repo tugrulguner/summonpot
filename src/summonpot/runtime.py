@@ -962,11 +962,15 @@ class Runtime:
                 if close:
                     output = await invoke(region.terminal)
                     _check_runtime_deadline()
-                    return (
+                    output = (
                         plan.output_auditor(output)
                         if plan.output_auditor is not None
                         else output
                     )
+                    # Final auditing is synchronous and cannot be preempted by
+                    # asyncio.timeout; do not publish a result after it expires.
+                    _check_runtime_deadline()
+                    return output
                 for identity in region.continuation:
                     await invoke(identity)
             raise _OperationExecutionError("Checkpoint did not complete.")
