@@ -171,3 +171,30 @@ def test_contribution_document_links_resolve() -> None:
                 missing.append(f"{source.relative_to(ROOT)} -> {target}")
 
     assert missing == []
+
+
+def test_documented_pre_commit_setup_has_valid_checked_in_configuration() -> None:
+    config_path = ROOT / ".pre-commit-config.yaml"
+    assert config_path.is_file(), ".pre-commit-config.yaml must exist"
+
+    config = yaml.safe_load(_text(config_path))
+    assert isinstance(config, dict)
+    repos = config.get("repos", [])
+    assert isinstance(repos, list) and repos
+
+    local_repo = None
+    for repo in repos:
+        if isinstance(repo, dict) and repo.get("repo") == "local":
+            local_repo = repo
+            break
+    assert local_repo is not None, "pre-commit config must define local hooks"
+
+    hooks = local_repo.get("hooks", [])
+    assert isinstance(hooks, list) and hooks
+
+    hook_ids = {h.get("id") for h in hooks if isinstance(h, dict)}
+    assert "ruff-check" in hook_ids
+    assert "ruff-format" in hook_ids
+
+    contributing = _text(CONTRIBUTING)
+    assert "pre-commit install" in contributing
