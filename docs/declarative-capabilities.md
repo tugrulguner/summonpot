@@ -1,5 +1,8 @@
 # Declarative capability endpoints
 
+Current source (unreleased) permits `Operation(fn, bind=...)` to omit `output=` when the callable has a resolved, non-empty return annotation. Registration snapshots the full annotation, including `Annotated` metadata, without mutating the original declaration. Explicit outputs remain authoritative; input bindings are never inferred. Published v0.14.0 requires explicit outputs.
+
+
 A summonpot endpoint is a declaration, not a Python handler.
 
 The opening fragment focuses on the declaration shape and assumes the application-specific

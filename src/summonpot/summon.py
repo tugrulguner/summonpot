@@ -287,6 +287,9 @@ class Summon:
                 return_type = type_name(return_hint)
 
             endpoint_tools = [*all_tools, *dependency_tools]
+            from summonpot._operation_outputs import _complete_operation_outputs
+
+            _complete_operation_outputs(endpoint_tools)
             validate_contracts(
                 endpoint=endpoint_name,
                 tools=endpoint_tools,
