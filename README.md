@@ -401,6 +401,15 @@ See the complete executable
 
 ## Typed operation contracts fail before serving
 
+**Current source, unreleased:** `Operation(fn, bind=...)` may omit `output=` when the
+callable has a resolved, non-empty return annotation. Registration captures that full
+annotation (including `Annotated` metadata) without mutating the original Operation.
+An explicit `output=` remains authoritative. Input bindings are never inferred;
+missing bindings and unsupported shapes still fail before serving. Published v0.14.0
+requires explicit `output=`. Examples 7 and 8 retain explicit outputs for release compatibility;
+source users may omit those redundant output declarations.
+
+
 Use `Operation` when a capability's dataflow is part of the endpoint contract rather
 than something the agent should invent:
 
