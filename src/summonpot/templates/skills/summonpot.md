@@ -1,5 +1,12 @@
 # summonpot
 
+Current source (unreleased): `Operation(fn, bind=...)` may omit `output=` when the
+callable has a resolved, non-empty return annotation. Registration snapshots the full
+annotation, including `Annotated` metadata; explicit `output=` remains authoritative.
+The original Operation is not mutated. Input bindings are never inferred. Missing
+return contracts or unsupported shapes fail registration; published v0.14.0 still
+requires explicit outputs.
+
 summonpot modernizes APIs for AI without replacing the endpoint with a separate agent
 layer. The endpoint remains the stable public abstraction while its contract combines
 exact application behavior with explicitly bounded agentic decisions. You declare the

@@ -220,6 +220,13 @@ Version 0.14.0 includes the narrow single-choice result-dependent optimization d
 
 ## Current source, not yet released
 
+Current source also permits omitted `Operation.output` to be completed from the
+callable's resolved return annotation during endpoint registration. Explicit outputs
+and all input bindings remain authoritative; no request/result/context/agent-choice
+sources are inferred and no new execution shape is introduced. Original declarations
+are not mutated. This simplification is not included in published v0.14.0.
+
+
 ## Current-source bounded checkpoint progression (unreleased)
 
 Current source supports one explicit `Required(check, calls=Between(1, M), until="accepted")` marker, with finite `M >= 2`. The marker must name a stored, non-null strict Boolean field in the checkpoint's validated Pydantic output; aliases, computed properties, expressions and coercive Boolean fields do not qualify. `until=None` keeps ordinary `Required` behavior. A uniquely ordered required region ends at the checkpoint, with effective bounds `1..M`; a nonempty uniquely ordered optional negative continuation has bounds `0..M-1`. Exactly one `Required(..., calls=Exactly(1))` terminal returns the endpoint's exact full response annotation and reads only fields from the final checkpoint invocation. Invalid marked shapes fail registration, never fall back to the legacy route.

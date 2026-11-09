@@ -1,5 +1,11 @@
 # Summonpot examples
 
+Current source (unreleased) can omit `Operation.output` when the callable has a resolved
+return annotation. Input bindings remain explicit. The runnable examples retain explicit
+outputs for compatibility with published v0.14.0; source users may omit the redundant
+`output=CustomerRecord` in example 7 or `output=QuoteResponse` in example 8. This changes
+neither example's application work nor execution purpose.
+
 These examples grow from one typed endpoint to a multi-file service with bounded agentic orchestration. Every endpoint uses the same executable contract:
 
 ```text

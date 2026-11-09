@@ -157,7 +157,13 @@ def test_changelog_release_section_contains_consumed_fragment() -> None:
         if p.is_file() and p.name != "README.md"
     ]
     existing_fragments = [
-        p for p in fragments if p.name != "+checkpoint-progression.added.md"
+        p
+        for p in fragments
+        if p.name
+        not in {
+            "+checkpoint-progression.added.md",
+            "+operation-output-inference.added.md",
+        }
     ]
     assert len(existing_fragments) == 7
     assert any(p.name == "+checkpoint-progression.added.md" for p in fragments)

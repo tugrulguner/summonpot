@@ -488,13 +488,17 @@ def test_from_result_on_an_undeclared_operation_is_rejected():
 
 
 def test_from_result_on_an_operation_without_an_output_is_rejected():
-    """A result cannot be read before it can be validated."""
+    """A result needs an explicit output or a resolved return annotation."""
+
+    def unannotated_lookup(customer_id: str):
+        return lookup_customer(customer_id)
+
     lookup = Operation(
-        lookup_customer, bind={"customer_id": FromRequest("customer_id")}
+        unannotated_lookup, bind={"customer_id": FromRequest("customer_id")}
     )
     summon = Summon("svc")
 
-    with pytest.raises(TypeError, match="declares no output type"):
+    with pytest.raises(TypeError, match="explicit output or a resolved"):
 
         @summon("/orders")
         def create_order(
@@ -836,13 +840,17 @@ def test_a_bare_variadic_callable_is_still_allowed():
 
 
 def test_agent_choice_may_not_offer_a_result_with_no_declared_output():
-    """Offering a result puts it in agent context, so it must be validatable first."""
+    """Offering a result requires an explicit or inferred output contract."""
+
+    def unannotated_lookup(customer_id: str):
+        return lookup_customer(customer_id)
+
     producer = Operation(
-        lookup_customer, bind={"customer_id": FromRequest("customer_id")}
+        unannotated_lookup, bind={"customer_id": FromRequest("customer_id")}
     )
     summon = Summon("svc")
 
-    with pytest.raises(TypeError, match="declares no output type"):
+    with pytest.raises(TypeError, match="explicit output or a resolved"):
 
         @summon("/orders")
         def create_order(
