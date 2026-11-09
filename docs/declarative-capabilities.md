@@ -371,10 +371,12 @@ constraints remain supported. Receiver schemas containing custom functional vali
 string constraints, custom literal values, custom instance-checking metaclasses, or
 unsupported core schemas are rejected at registration rather than silently stripped.
 
-Broader explicit operation shapes are rejected before serving until complete graph semantics
-ship. `FromResult` and `after` are supported only in a sequential chain where each step has
-exactly one ready operation. Producer-backed `AgentChoice(from_result=...)` is supported
-there only for producer outputs `list[ConcreteModel]`, under the bounded tokenized contract
+Broader explicit operation shapes are rejected before serving until their execution
+semantics ship. Published chain behavior requires exactly one ready operation at each
+step. Current source additionally supports `FromResult` and `after` in the fully resolved
+branch/join slice above, with stable sequential readiness and one exact terminal response.
+Producer-backed `AgentChoice(from_result=...)` remains restricted to uniquely ordered
+chains and producer outputs `list[ConcreteModel]`, under the bounded tokenized contract
 described above. Authenticated `FromContext` outside its narrow supported source slice, primitive/untyped collections, broader bounds, and unsupported graph shapes cannot fall through to unenforced model
 arguments. Bare callable dependencies retain the legacy agent path. Continue to validate
 inputs and enforce authorization inside every operation; trusted binding does not grant

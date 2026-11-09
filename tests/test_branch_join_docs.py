@@ -61,3 +61,15 @@ def test_capability_guide_preserves_broader_graph_deferral():
     assert "`AgentChoice` is not admitted" in body
     assert "not a public graph API or parallel scheduler" in body
     assert "milestone 4 is partial" in body
+    assert (
+        "`FromResult` and `after` are supported only in a sequential chain" not in body
+    )
+    assert "Producer-backed `AgentChoice(from_result=...)` remains restricted" in body
+    reference = _text("website/src/content/docs/reference/operations.mdx")
+    assert (
+        "`FromResult`, `after`, and producer-backed choices work only" not in reference
+    )
+    assert (
+        "`FromResult` and `after` also work in that fully resolved branch/join slice"
+        in reference
+    )
