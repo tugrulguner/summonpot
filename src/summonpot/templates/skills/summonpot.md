@@ -603,3 +603,8 @@ Two things to know:
   exact-response operation runs directly, and an admitted operation with direct
   `AgentChoice` uses the agent path. Unsupported explicit operation shapes are rejected at
   registration. Validate inputs and enforce authorization inside every capability.
+
+
+## Current-source branch/join execution (unreleased)
+
+Current source supports one narrow model-free graph form: a Pydantic request/response, at least one `FromRequest`, required `Exactly(1)` acyclic operations using supported request/result/authenticated-context/default inputs, a unique sink reached by every operation, and exactly one exact full-response producer. `AgentChoice` is not supported in this form. Ready operations run sequentially with declaration-order tie-breaking; `after` imposes business ordering. This is not a public graph API, parallel scheduler, feedback, or general graph support. Existing chain/choice/repetition/checkpoint paths are unchanged. Published v0.14.0 is unchanged; milestone 4 is partial and milestone 3 remains partial. See the [contract](https://github.com/tugrulguner/summonpot/blob/main/docs/declarative-capabilities.md#current-source-branchjoin-execution-unreleased) and [example 20](https://github.com/tugrulguner/summonpot/blob/main/examples/20_branch_join/README.md).

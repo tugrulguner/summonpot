@@ -82,6 +82,10 @@ clear error; serve the application or invoke its generated HTTP route instead.
 > Current source (unreleased) also composes exactly one producer-backed choice argument on one required `Exactly(1)` prefix consumer with one nonterminal bounded repeated stage and a resolved suffix. The candidate producer is an earlier single-start operation returning `list[ConcreteModel]`; repeated choices remain direct closed string `Literal` values, and all other operations remain resolved required `Exactly(1)`. Pydantic request/response, chain-wide `FromRequest`, unique ordering, final-invocation addressing and exact terminal response ownership remain required. Empty/unavailable/oversized candidate domains stop before selection or repeated work; a singleton binds locally, while ambiguity uses canonical request-local tokens. Singleton selection still leads to model-backed repeated decisions. One lazy model-configuration lookup, run, principal, ledger, deadline and usage budget span both phases. No business-function tools, reselection after same-run failure, effect replay or final model acknowledgment are added. A fresh request starts a fresh run. Published v0.14.0 is unchanged. See the [composed selection/stage contract](docs/choice-before-stage.added.md).
 
 
+## Current-source branch/join execution (unreleased)
+
+Current source adds one narrow model-free branch/join form. A supported Pydantic request/response declaration must contain at least one `FromRequest` and a fully resolved required `Exactly(1)` acyclic operation graph: request, result, authenticated-context, or supported immutable-default inputs; a unique sink reached by every operation; and one exact full-response producer. Ready operations run sequentially, with declaration order breaking ties. `after` adds business ordering but does not widen the graph contract. This is not a public graph API, parallel scheduler, feedback, or choice support; existing chain, choice, repetition, and checkpoint paths are unchanged. Published v0.14.0 is unchanged; milestone 4 is partial, and milestone 3 remains partial. See [the branch/join contract](docs/declarative-capabilities.md#current-source-branchjoin-execution-unreleased) and [example 20](examples/20_branch_join/README.md).
+
 ## Current-source bounded checkpoint progression (unreleased)
 
 Current source supports one explicit `Required(check, calls=Between(1, M), until="accepted")` marker, with finite `M >= 2`. The marker must name a stored, non-null strict Boolean field in the checkpoint's validated Pydantic output; aliases, computed properties, expressions and coercive Boolean fields do not qualify. `until=None` keeps ordinary `Required` behavior. A uniquely ordered required region ends at the checkpoint, with effective bounds `1..M`; a nonempty uniquely ordered optional negative continuation has bounds `0..M-1`. Exactly one `Required(..., calls=Exactly(1))` terminal returns the endpoint's exact full response annotation and reads only fields from the final checkpoint invocation. Invalid marked shapes fail registration, never fall back to the legacy route.
@@ -616,9 +620,10 @@ Summonpot chooses its current execution path without adding a second endpoint AP
 | Eligible fully resolved sequential chain meeting every 0.12.0 predicate above | Model-free sequential execution; return the canonical terminal result |
 | Supported sequential chain with producer-backed `AgentChoice` | Included from version 0.14.0: exactly one choice uses singleton-local execution or multi-candidate lazy agent handoff. Current source (unreleased): framework-owned progression across one or more choices; selectors return ambiguous tokens and local execution resumes. Explicit `tool_calls_limit` retains the one-way agent suffix. Historical v0.13.0 behavior remains agent-mediated for all such choices. |
 | Bare callable capabilities with implicit marker bounds | Use the legacy agent runtime |
-| Unsupported explicit binding, ordering, bound, output, or multi-operation shape | Reject during registration |
+| Current-source fully resolved branch/join meeting the narrow acyclic, unique-sink, exact-response predicates | Sequential model-free execution with declaration-order readiness tie-break; unreleased, not v0.14.0 |
+| Unsupported explicit binding, ordering, bound, output, or multi-operation shape outside a supported chain or narrow branch/join | Reject during registration |
 
-Broader graph execution and deterministic compilation beyond the supported sequential slice, SQLAlchemy/SQLite operation adapters, write receipts, streaming, and framework-managed authentication are **planned, not shipped**. Authentication context is application-owned; it does not add login, token issuance, or tenant isolation. See
+Broader graph execution beyond the narrow current-source branch/join slice, SQLAlchemy/SQLite operation adapters, write receipts, streaming, and framework-managed authentication are **planned, not shipped**. The branch/join slice is unreleased and is not included in published v0.14.0. Authentication context is application-owned; it does not add login, token issuance, or tenant isolation. See
 [ROADMAP.md](ROADMAP.md) for the design boundaries and implementation order.
 
 
@@ -777,6 +782,7 @@ The [`examples/`](examples/) directory grows from one endpoint to a multi-file s
 | 7 | [`07_bound_operation.py`](examples/07_bound_operation.py) | Enforced `FromRequest` + `AgentChoice` with `Exactly(1)` |
 | 8 | [`08_direct_execution.py`](examples/08_direct_execution.py) | Credential-free single-operation deterministic execution |
 | 9 | [`09_contract_boundaries/`](examples/09_contract_boundaries/) | Fail-closed registration, receiving constraints, output namespaces, and raw/HTTP parity |
+| 20 | [`20_branch_join/`](examples/20_branch_join/README.md) | Current-source model-free branch/join calculation; not published in v0.14.0 |
 
 The [examples guide](examples/README.md) includes a real HTTP call for every level and
 explains what runs today and what remains planned.

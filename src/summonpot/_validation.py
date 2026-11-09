@@ -574,6 +574,17 @@ def _repeated_stage_indices(tools: Sequence[Any]) -> tuple[int, ...] | None:
 
 def _chain_contract_tool_indices(tools: Sequence[Any]) -> tuple[int, ...] | None:
     """Identify a totally ordered required Exactly(1) chain, in execution order."""
+    return _ordered_contract_tool_indices(tools, allow_branches=False)
+
+
+def _resolved_graph_tool_indices(tools: Sequence[Any]) -> tuple[int, ...] | None:
+    """Identify a resolved single-sink graph in stable declaration-priority order."""
+    return _ordered_contract_tool_indices(tools, allow_branches=True)
+
+
+def _ordered_contract_tool_indices(
+    tools: Sequence[Any], *, allow_branches: bool
+) -> tuple[int, ...] | None:
     if len(tools) < 2:
         return None
     contracts = []
@@ -591,7 +602,11 @@ def _chain_contract_tool_indices(tools: Sequence[Any]) -> tuple[int, ...] | None
             return None
         if not all(
             type(source) in (FromRequest, FromResult, FromContext)
-            or (type(source) is AgentChoice and source.from_result is not None)
+            or (
+                not allow_branches
+                and type(source) is AgentChoice
+                and source.from_result is not None
+            )
             for source in contract.bind.values()
         ):
             return None
@@ -634,14 +649,17 @@ def _chain_contract_tool_indices(tools: Sequence[Any]) -> tuple[int, ...] | None
             predecessors[index].add(producer)
             successors[producer].add(index)
 
-    # Require a unique next vertex at every step. Multiple ready vertices would
-    # grant unresolved ordering choices; cycles and disconnected vertices fail
-    # closed. Redundant edges from earlier producers remain valid.
+    # A finite DAG with one sink has a path from every vertex to that sink.
+    # Check this separately so disconnected components cannot become an order.
+    if sum(not edges for edges in successors) != 1:
+        return None
+    # Preserve unique readiness for chains, especially producer-backed choices.
+    # Resolved graphs use declaration order among the currently ready vertices.
     remaining = set(range(len(tools)))
     order: list[int] = []
     while remaining:
         ready = [index for index in sorted(remaining) if not predecessors[index]]
-        if len(ready) != 1:
+        if not ready or (not allow_branches and len(ready) != 1):
             return None
         current = ready[0]
         remaining.remove(current)
@@ -680,7 +698,7 @@ def _validate_runtime_admission(*, endpoint: str, tools: list[Any]) -> None:
         return
     enforced = _enforced_contract_tool_index(tools)
     repeated = _repeated_contract_tool_index(tools)
-    chain = _chain_contract_tool_indices(tools)
+    chain = _chain_contract_tool_indices(tools) or _resolved_graph_tool_indices(tools)
     stage = _repeated_stage_indices(tools)
     for index, tool in enumerate(tools):
         if tool.contract is not None and tool.contract.bind is not None:

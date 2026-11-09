@@ -299,6 +299,8 @@ marker normalization remains unchanged: its effective minimum is at least one.
 
 ### 4. Broader private execution compiler
 
+Current source contains a narrow branch/join slice; milestone 4 is **partially implemented, not complete**. It remains unreleased and does not change published v0.14.0. The existing sequential chain, choice, repetition, and checkpoint paths are unchanged.
+
 - Extend private compilation beyond the required single-start slices only after milestone 3 settles invocation and result semantics. Preserve the least-powerful sufficient execution rule:
 
 ```text
@@ -307,7 +309,8 @@ bounded declared choice → agent-mediated execution
 no legal path → typed deterministic error
 ```
 
-- Compile complete paths, unresolved choices, and impossible paths across supported non-linear dependency shapes without exposing a public graph API or stable classifier strings.
+- The current narrow slice admits fully resolved required `Exactly(1)` acyclic graphs only: Pydantic request/response, at least one `FromRequest`, supported request/result/authenticated-context/default inputs, a unique sink reached by every operation, and one exact full-response producer. Execute sequentially using stable declaration-order tie-breaking among ready operations; `after` adds business ordering. No `AgentChoice`. See [example 20](examples/20_branch_join/README.md) and [the contract](docs/declarative-capabilities.md#current-source-branchjoin-execution-unreleased).
+- Broader path/choice compilation, public graph APIs, parallel scheduling, feedback, and general non-linear shapes remain planned.
 - Keep argument and result provenance identity-keyed; validate operation outputs before consumption and use exact terminal response annotations.
 - Use conservative compatibility analysis: unknown type relationships remain unknown and cannot erase known contradictions.
 - Keep the runtime/compiler private. Callers do not select a path, send `action`, or gain capabilities through compilation.
