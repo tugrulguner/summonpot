@@ -1,1 +1,0 @@
-Require pyasn1>=0.6.5 for the optional Google provider extra and refresh its lock entry from 0.6.4. This excludes the affected ASN.1 decoders reported in GHSA-2qm8-x737-gmw5, GHSA-fm9c-5rcf-2q5p, GHSA-mm57-4v3p-rchx and GHSA-9m75-vc3g-4x39 without changing the framework runtime or unrelated dependencies.

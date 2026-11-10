@@ -29,6 +29,10 @@ release assembles them here — run `make changelog-draft` to preview them.
 - Align the README, roadmap, capability/review guidance, example index, packaged agent skill and website with implemented capabilities and historical release boundaries. Add runnable lessons for URL-owned path parameters across six HTTP methods and application-owned defaults with annotated receiving/output contracts; preserve stable example identities.
 - Clarify the customer-view example goal, scope legacy call-bound warnings correctly and exercise every advertised example route through the public CLI/HTTP smoke verifier, with keyless fixtures kept separate from teaching applications.
 
+### Fixed
+
+- Require pyasn1>=0.6.5 for the optional Google provider extra and refresh its lock entry from 0.6.4. This excludes the affected ASN.1 decoders reported in GHSA-2qm8-x737-gmw5, GHSA-fm9c-5rcf-2q5p, GHSA-mm57-4v3p-rchx and GHSA-9m75-vc3g-4x39 without changing the framework runtime or unrelated dependencies.
+
 
 ## [0.14.0] - 2026-10-29
 
