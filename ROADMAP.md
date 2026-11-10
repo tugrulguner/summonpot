@@ -64,9 +64,11 @@ The current release line provides:
 - Registration-time validation for complete bindings, request and result references, operation ordering, selectable collections, and provable type incompatibility.
 - Fail-closed runtime admission: binding sources must use the exact built-in source
   vocabulary, and every explicit binding, ordering, call-bound, and output contract must fit
-  supported single-operation or uniquely ordered sequential required `Exactly(1)` shape,
-  or registration rejects it. Adding another capability cannot downgrade that contract to
-  the legacy path.
+  an admitted shape. Alongside required `Exactly(1)` operations and sequential chains,
+  version 0.15.0 admits the documented bounded repetition, single repeated-stage,
+  checkpoint and fully resolved branch/join slices under their separate predicates.
+  Unsupported combinations still fail registration. Adding another capability cannot downgrade
+  that contract to the legacy path.
 - Structural output-namespace validation rejects duplicate field, alias, serialization-alias,
   and computed-field JSON keys at registration, including nested model, dataclass, and typed
   dictionary shapes. Runtime output validation rejects allowed extras that shadow canonical

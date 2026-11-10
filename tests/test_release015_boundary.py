@@ -40,3 +40,29 @@ def test_release015_notes_include_all_feature_families():
         "CLI/HTTP",
     ):
         assert feature.lower() in notes.lower(), feature
+
+
+def test_release015_foundation_includes_all_admitted_execution_families():
+    text = " ".join((ROOT / "ROADMAP.md").read_text().split())
+    foundation = text.split("## Shipped foundation", 1)[1].split(
+        "### 0.5.0 boundary", 1
+    )[0]
+    for feature in ("bounded repetition", "checkpoint", "branch/join"):
+        assert feature in foundation
+    assert "exact built-in source vocabulary" in foundation
+    assert "Adding another capability cannot downgrade" in foundation
+    assert (
+        "supported single-operation or uniquely ordered sequential required"
+        not in foundation
+    )
+
+
+def test_release015_boundary_sentences_have_a_subject():
+    import re
+
+    for filename in (*SURFACES, "docs/reviewing.md"):
+        text = (ROOT / filename).read_text()
+        assert not re.search(
+            r"Included from version 0\.15\.0 (?:also )?(?:supports|includes|adds|permits|admits)\b",
+            text,
+        ), filename
