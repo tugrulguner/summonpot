@@ -1,8 +1,8 @@
-# Branch-and-join quote — current source, unreleased
+# Branch-and-join quote — included from version 0.15.0
 
 Two independent exact calculations feed one final quote. The endpoint body is only `...`;
 Summonpot derives readiness from `FromResult`. There is no public graph or hand-written
-orchestration. This shape requires current source and is **not supported by published
+orchestration. This shape requires version 0.15.0 or later and is **not supported by published
 v0.14.0**.
 
 ## Run

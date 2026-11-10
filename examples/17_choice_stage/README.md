@@ -9,7 +9,7 @@ approval or denial; the model is not an approval authority. Failed checks do not
 automatic reselection. The request contains only the category and
 review identifier, never an action, mode, or execution selector.
 
-This targets the current source checkout and is not a claim about published summonpot
+This targets the version 0.15.0 checkout and is not a claim about published summonpot
 0.14.0. The response is the canonical JSON report read back from SQLite. Check rows are
 application-owned state rather than framework aggregation. A fresh request starts a fresh
 run and can select again; there is no framework-wide idempotency, rollback, or durable

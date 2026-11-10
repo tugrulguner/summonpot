@@ -16,7 +16,7 @@ def test_readme_execution_summary_states_narrow_versioned_exception() -> None:
     assert "included from version 0.14.0" in summary
     assert "Pydantic request" in summary and "FromRequest" in summary
     assert "singleton" in summary and "multiple candidates" in summary
-    assert "current source (unreleased)" in summary.lower()
+    assert "version 0.15.0" in summary.lower()
     assert "one or more" in summary
     assert (
         "historical v0.14.0 remains exactly-one-choice" in summary.lower()
@@ -60,7 +60,7 @@ def test_roadmap_and_detail_preserve_published_boundary_and_effect_timing() -> N
     assert "no rollback" in execution
     current_source = section(
         guide,
-        "## Current source: framework-owned decision progression",
+        "## Version 0.15.0: framework-owned decision progression",
         "## Deterministic and agentic execution",
     )
     for expected in (
@@ -75,9 +75,7 @@ def test_roadmap_and_detail_preserve_published_boundary_and_effect_timing() -> N
 
 def test_current_source_multiple_choice_roadmap_is_partial_and_explicit() -> None:
     roadmap = (ROOT / "ROADMAP.md").read_text()
-    source = section(
-        roadmap, "## Current source, not yet released", "## Next milestones"
-    )
+    source = section(roadmap, "## Version 0.15.0 boundary", "## Next milestones")
     for expected in (
         "partial milestone 3 implementation",
         "one or more",
@@ -151,14 +149,22 @@ def test_changelog_release_section_contains_consumed_fragment() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text()
     release = section(changelog, "## [0.14.0]", "## [0.13.0]")
     assert "result-dependent execution" in release.lower()
-    fragments = [
-        p
-        for p in (ROOT / "changelog.d").iterdir()
-        if p.is_file() and p.name != "README.md"
-    ]
-    # Preserve the already-pending feature fragments without freezing the count
-    # of unrelated future additions to the unreleased line.
-    expected_pending = {
+    release015 = section(changelog, "## [0.15.0]", "## [0.14.0]").lower()
+    for feature in (
+        "multiple producer-backed choices",
+        "decision-only selector",
+        "finite repeated calls",
+        'invocation="final"',
+        "nonterminal bounded repeated stage",
+        "producer-backed prefix choice",
+        "checkpoint",
+        "branches and joins",
+        "omit output=",
+        "example identities",
+        "public cli/http",
+    ):
+        assert feature in release015, feature
+    consumed = {
         "+multiple-producer-choices.added.md",
         "+framework-owned-progression.added.md",
         "+examples-refresh.changed.md",
@@ -166,13 +172,15 @@ def test_changelog_release_section_contains_consumed_fragment() -> None:
         "+bounded-repeated-calls.added.md",
         "+repeated-stage-results.added.md",
         "+choice-before-stage.added.md",
+        "+checkpoint-progression.added.md",
+        "+branch-join.added.md",
+        "+operation-output-inference.added.md",
+        "+capability-docs-examples.changed.md",
     }
-    assert expected_pending <= {p.name for p in fragments}
-    assert any(p.name == "+checkpoint-progression.added.md" for p in fragments)
-    assert any(p.name == "+choice-before-stage.added.md" for p in fragments)
-    assert any(p.name == "+stage-chains.added.md" for p in fragments)
-    assert any(p.name == "+repeated-stage-results.added.md" for p in fragments)
-    assert any(p.name == "+examples-refresh.changed.md" for p in fragments)
-    assert any(p.name == "+framework-owned-progression.added.md" for p in fragments)
-    assert any(p.name == "+bounded-repeated-calls.added.md" for p in fragments)
+    fragments = [
+        p
+        for p in (ROOT / "changelog.d").iterdir()
+        if p.is_file() and p.name != "README.md"
+    ]
+    assert not consumed & {p.name for p in fragments}
     assert all(p.read_text().strip() for p in fragments)

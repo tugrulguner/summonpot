@@ -10,6 +10,26 @@ release assembles them here — run `make changelog-draft` to preview them.
 
 <!-- towncrier release notes start -->
 
+## [0.15.0] - 2026-11-10
+
+### Added
+
+- Add bounded application-verified checkpoint progression using Required(..., until="accepted") with a strict stored Boolean result, bounded required/conditional regions and one canonical terminal response. The application owns verification and allowed corrections; request-wide accounting and deadlines remain shared. No rollback, effect replay or durable resumption is introduced.
+- Allow Operation to omit output= when its callable has a resolved return annotation. Registration snapshots the full annotated contract without mutating the original declaration; explicit outputs and all input bindings remain authoritative.
+- Allow a resolved terminal consumer to use FromResult(..., invocation="final") from a closed bounded repeated producer. Consumption follows successful stage closure; arbitrary historical addressing, repeated consumers and result aggregation remain unsupported.
+- Compose one nonterminal bounded repeated stage with resolved preparation and finalization in a uniquely ordered chain. Preserve chain-wide request bindings, lazy model resolution, exact final-response ownership and shared request-wide accounting. Add a separate order-review example.
+- Compose one producer-backed prefix choice with a bounded repeated stage and resolved finalization. Candidate membership remains canonical and request-local; both decision phases share usage, reservations and one deadline. Add a focused supplier-review example.
+- Enforce finite repeated calls for one required typed operation with explicit closed string choices. Summonpot owns sequential decisions, validates each invocation, reserves starts against the maximum and returns only the final successful canonical result. A later failure aborts rather than returning an earlier success.
+- Execute fully resolved required Exactly(1) branches and joins without a model through existing Operation, FromResult and after declarations. The private compiler requires an acyclic graph, a Pydantic request/response, at least one request binding, one unique sink and exact terminal response ownership. Execution remains sequential; choice-bearing graphs, parallel scheduling and durable recovery are excluded.
+- Progress eligible chains locally between bounded producer-choice decisions. A private decision-only selector receives opaque candidate tokens and bounded inert evidence, while the guarded invocation kernel owns operation execution and returns the canonical terminal result without a final model acknowledgment. Explicit compatibility and tool-quota routes remain preserved.
+- Support multiple producer-backed choices in eligible sequential required Exactly(1) chains. Validate every current consumer domain before selection or invocation, bind singleton domains locally and expose only ambiguous choices to the configured model. Existing candidate limits, authenticated context and invocation authority remain enforced.
+
+### Changed
+
+- Align the README, roadmap, capability/review guidance, example index, packaged agent skill and website with implemented capabilities and historical release boundaries. Add runnable lessons for URL-owned path parameters across six HTTP methods and application-owned defaults with annotated receiving/output contracts; preserve stable example identities.
+- Clarify the customer-view example goal, scope legacy call-bound warnings correctly and exercise every advertised example route through the public CLI/HTTP smoke verifier, with keyless fixtures kept separate from teaching applications.
+
+
 ## [0.14.0] - 2026-10-29
 
 ### Added

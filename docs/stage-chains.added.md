@@ -1,9 +1,9 @@
-# One repeated stage in a sequential chain (current source, unreleased)
+# One repeated stage in a sequential chain (included from version 0.15.0)
 
 Summonpot can own a uniquely ordered chain with one nonterminal bounded repeated operation,
 a resolved prefix, and a nonempty resolved suffix. This composes preparation and deterministic
 verification/finalization with bounded agent-owned decisions, without handler-side loops or a
-new graph/configuration API. Published v0.14.0 is unchanged.
+new graph/configuration API. Published behavior before v0.15.0 remains unchanged.
 
 ```text
 prepare → bounded checks → verify → finalize
@@ -13,7 +13,7 @@ The original two-operation repeated producer/terminal form remains supported as 
 one-consumer case. Sole-operation repetition, resolved `Exactly(1)` chains and producer-choice
 progression retain their existing execution semantics.
 
-The following is the resolved-neighbor form. Current source additionally supports [one producer-backed prefix selection](choice-before-stage.added.md) under a separate narrow predicate; no choices inside or after repetition are added.
+The following is the resolved-neighbor form. Version 0.15.0 additionally supports [one producer-backed prefix selection](choice-before-stage.added.md) under a separate narrow predicate; no choices inside or after repetition are added.
 
 ## Complete admission predicate
 
@@ -90,4 +90,4 @@ No feedback cycles, inspect/correct/verify retry workflow, repeated consumers, c
 the repeated operation, producer-backed choices from repeated outputs, arbitrary ordinal/latest
 addressing, result aggregation, multiple/nested repeated stages, optional/unbounded stages,
 parallel scheduling, durable recovery, database adapters or distributed exactly-once effects
-are introduced. Milestone 3 remains partial. This is current source, not a v0.14.0 release claim.
+are introduced. Milestone 3 remains partial. This is version 0.15.0, not a v0.14.0 release claim.

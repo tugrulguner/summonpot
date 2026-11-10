@@ -1,8 +1,8 @@
-# Repeated stage with final-result consumer (current source, unreleased)
+# Repeated stage with final-result consumer (included from version 0.15.0)
 
-This is a narrow source capability, not a release claim: one bounded repeated producer
+This is a narrow capability included from version 0.15.0: one bounded repeated producer
 closes, then one required terminal operation consumes its explicitly addressed final
-validated result. Published v0.14.0 is unchanged. The inspect/correct/verify workflow is not
+validated result. Published behavior before v0.15.0 remains unchanged. The inspect/correct/verify workflow is not
 implemented by this shape.
 
 ```python
@@ -20,7 +20,7 @@ model-selected provenance.
 
 ## Admission
 
-The following is the original two-operation admission form. Current source also admits its composition with resolved prefix/suffix operations under the [single-stage chain predicate](stage-chains.added.md), with `FromRequest` required across the complete chain. No new selector syntax is added.
+The following is the original two-operation admission form. Version 0.15.0 also admits its composition with resolved prefix/suffix operations under the [single-stage chain predicate](stage-chains.added.md), with `FromRequest` required across the complete chain. No new selector syntax is added.
 
 - Exactly two required typed operations: the repeated producer and a uniquely ordered,
   required `Exactly(1)` terminal consumer. The result dependency establishes readiness;
@@ -62,4 +62,4 @@ outputs, arbitrary invocation selection, result aggregation, optional/zero-succe
 unbounded stages, multiple repeated operations, general graphs, cycles, parallelism,
 durable resumption, rollback, distributed exactly-once effects, or a complete
 inspect/correct/verify workflow. Application-owned SQL and cumulative snapshot policy remain
-application concerns. The feature is unreleased current source and does not alter v0.14.0.
+application concerns. The feature is version 0.15.0 and does not alter v0.14.0.

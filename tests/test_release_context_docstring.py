@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_context_release_boundary_reaches_every_current_surface(relative):
     text = " ".join((ROOT / relative).read_text().split())
     assert "FromContext" in text and "0.13.0" in text, relative
-    assert "feature is unreleased" not in text, relative
+    assert "feature is included from version 0.15.0" not in text, relative
     if relative in {"README.md", "examples/README.md"}:
         # These surfaces now document a separate versioned result-dependent
         # optimization. Keep the authenticated-context claim tied to its 0.13.0 section.

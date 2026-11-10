@@ -1,4 +1,4 @@
-"""Current-source chain eligibility must not be inferred from global keywords."""
+"Version 0.15.0 chain eligibility must not be inferred from global keywords."
 
 from pathlib import Path
 
@@ -19,7 +19,7 @@ def test_canonical_stage_chain_contract_preserves_complete_predicate():
     ):
         assert phrase.lower() in text.lower()
     assert 'invocation="final"' in text
-    assert "Published v0.14.0 is unchanged" in text
+    assert "included from version 0.15.0" in text and "v0.14.0" in text
     assert "Existing examples 1-15 are unchanged" in text
 
 

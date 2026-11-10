@@ -1,6 +1,6 @@
 # 15. Repeated audit stage and final report
 
-This example is for the current source checkout, not published summonpot 0.14.0. It
+This example is for the version 0.15.0 checkout, not published summonpot 0.14.0. It
 illustrates a bounded producer stage (one to three real inventory checks) followed by
 exactly one required report operation. The model chooses only among the closed `stock`,
 `prices`, and `deliveries` check names. Summonpot owns repetition, stage closure, explicit

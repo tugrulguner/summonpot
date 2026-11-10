@@ -1,4 +1,4 @@
-# One prefix selection before a repeated stage (current source, unreleased)
+# One prefix selection before a repeated stage (included from version 0.15.0)
 
 One endpoint can find application-approved candidates, select/prepare one, perform bounded
 checks, verify its facts and persist a canonical report. Summonpot owns progression through

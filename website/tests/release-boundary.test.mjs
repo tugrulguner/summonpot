@@ -29,7 +29,7 @@ test('homepage and operation reference describe the 0.14.0 execution boundary', 
     assert.match(html, /Pydantic request/i);
     assert.match(html, /FromRequest/i);
     assert.match(html, /historical v0\.13\.0/i);
-    assert.match(html, /current source \(unreleased\)/i);
+    assert.match(html, /version 0\.15\.0/i);
     assert.match(html, /one or more producer-backed/i);
     assert.match(html, /framework-owned progression/i);
     assert.match(html, /without a final model acknowledgment/i);
@@ -41,14 +41,14 @@ test('homepage and operation reference describe the 0.14.0 execution boundary', 
   assert.match(reference, /provider-configuration failure/i);
 });
 
-test('current-source checkpoint progression stays unreleased and bounded', async () => {
+test('version 0.15.0 checkpoint progression stays bounded', async () => {
   const [architecture, operations, home] = await Promise.all([
     readFile(new URL('../src/content/docs/architecture.mdx', import.meta.url), 'utf8'),
     readFile(new URL('../src/content/docs/reference/operations.mdx', import.meta.url), 'utf8'),
     readFile(new URL('../src/content/docs/index.mdx', import.meta.url), 'utf8'),
   ]);
   for (const page of [architecture, operations, home]) {
-    assert.match(page, /Current-source bounded checkpoint progression \(unreleased\)/);
+    assert.match(page, /Version 0\.15\.0 bounded checkpoint progression/);
     assert.match(page, /stored, non-null strict Boolean field/);
     assert.match(page, /Mth false closes unresolved/);
     assert.match(page, /redacted 409, not an unresolved result/);

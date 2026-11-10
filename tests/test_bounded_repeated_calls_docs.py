@@ -16,7 +16,7 @@ def test_all_seven_web_surfaces_identify_the_narrow_unreleased_shape():
     for rel in paths:
         text = (ROOT / "website/src/content/docs" / rel).read_text().lower()
         assert "bounded repeated calls" in text
-        assert "unreleased" in text and "1 <= minimum <= maximum" in text
+        assert "0.15.0" in text and "1 <= minimum <= maximum" in text
         assert "maximum > 1" in text and "literal[str]" in text
         assert "final successful canonical" in text
         assert "tool_calls_limit" in text

@@ -1,6 +1,6 @@
 # 16. Resolved order-review stage
 
-This is a new source-checkout example, not a claim about published summonpot 0.14.0 or a PyPI release. It composes one request-bound order load, a one-to-three-call closed `stock`/`prices` stage, a deterministic verification operation, and a terminal SQLite JSON report write. The request binding is in the prefix; the repeated operation consumes only prefix results plus its direct literal `AgentChoice`.
+This example is included from Summonpot 0.15.0 and is not supported by v0.14.0. It composes one request-bound order load, a one-to-three-call closed `stock`/`prices` stage, a deterministic verification operation, and a terminal SQLite JSON report write. The request binding is in the prefix; the repeated operation consumes only prefix results plus its direct literal `AgentChoice`.
 
 From the repository root, install the locked all-extras environment and choose an isolated database:
 

@@ -1,4 +1,4 @@
-# Bounded repeated calls — unreleased source contract
+# Bounded repeated calls — version 0.15.0 contract
 
 The minimum here is the effective bound after marker normalization: existing `Required(op, calls=AtMost(3))` still requires at least one successful call. Zero-success/optional shapes remain unsupported; the marker is not redefined.
 
@@ -13,4 +13,4 @@ The new shape rejects an explicit `tool_calls_limit` before provider resolution 
 
 Previous-result evidence is bounded to 65,536 characters per decision; this is not an aggregate prompt budget. The selector may see caller request data and bounded declared evidence intentionally used for its choice. It receives no implicit principal or complete invocation ledger.
 
-The implementation is partial milestone 3, not a finished milestone. Repeated-result addressing for chains remains next. No behavior, version, dependency, or release claim is made for published v0.14.0.
+The implementation is partial milestone 3, not a finished milestone. A closed repeated stage can feed its final result to the supported resolved suffix; broader repeated-result addressing and repeated consumers remain planned. No behavior, version, dependency, or release claim is made for published v0.14.0.

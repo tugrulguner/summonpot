@@ -1,4 +1,4 @@
-# 19. Bounded checkpoint status (current source, unreleased)
+# 19. Bounded checkpoint status (included from version 0.15.0)
 
 This three-operation endpoint uses the same checkpoint rule as the longer cleanup
 example: read actual progress, refresh only after a negative check, then persist the

@@ -1,1 +1,0 @@
-Compose one producer-backed prefix selection with a bounded repeated stage and resolved finalization, preserving canonical candidate authority and shared request-wide accounting; add a separate supplier-review example.
