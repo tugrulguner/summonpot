@@ -53,6 +53,15 @@ Current source (unreleased) also composes exactly one producer-backed choice arg
 
 Current source admits one `Required(check, calls=Between(1, M), until="accepted")` checkpoint with finite `M >= 2`. The marker names a stored, non-null strict Boolean field in the validated Pydantic output; `until=None` preserves ordinary semantics. The uniquely ordered required region uses bounds `1..M`; a nonempty uniquely ordered optional negative continuation uses `0..M-1`. One `Required(..., calls=Exactly(1))` terminal returns the endpoint's exact full response annotation and reads only final checkpoint fields. Unsupported marked shapes reject at registration. True closes; false continues, and the Mth false closes unresolved without another continuation. Empty choice domains fail closed with the existing redacted 409, not unresolved. Only one frame operation is in flight; continuation admission atomically retires that round’s authority, so closure cannot race it. The existing shared kernel handles invocations. Request, context, invocation ledger, usage budget and deadline are shared. There is no rollback, effect replay, durable resume or recovery; effects may remain after later failure, and fresh requests are not recovery. Published v0.14.0 is unchanged. See `docs/checkpoint-progression.added.md`.
 
+## Find runnable contract examples
+
+Use the [complete examples guide](https://github.com/tugrulguner/summonpot/blob/main/examples/README.md), including the separately labeled authenticated-context and multiple-choice level-13 applications. Stable existing example paths are preserved.
+
+- [Example 21: path values and HTTP methods](https://github.com/tugrulguner/summonpot/blob/main/examples/21_path_methods/README.md) demonstrates typed URL-owned values, body/query/no-body contracts across six verbs and empty HEAD responses. Scalar declarations remain model-backed; this is stateless transport, not a fake CRUD store. Keyless fixtures read actual SDK request evidence and do not establish live-provider semantic quality.
+- [Example 22: callable defaults and annotated contracts](https://github.com/tugrulguner/summonpot/blob/main/examples/22_contract_defaults/README.md) performs a real direct calculation. Its immutable callable default stays application-owned, receiving constraints are checked before the call, and the full annotated response metadata is preserved. Omitted output is current-source/unreleased shorthand; the guide names the explicit-output alternative.
+
+These are teaching examples of existing boundaries, not new graph, selector, scheduling or authentication APIs. Preserve historical published-version claims and earlier example compatibility.
+
 ## The endpoint shape
 
 ```python

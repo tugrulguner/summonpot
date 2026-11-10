@@ -17,7 +17,7 @@ SKILL_TITLE = "summonpot endpoints"
 SKILL_DESCRIPTION = (
     "Write and review summonpot @summon endpoint contracts. Use when declaring "
     "request and response models, Depends, Required, sequential FromResult chains, authenticated FromContext, producer-backed AgentChoice, bounded checkpoints, current-source branch/join graphs, inferred operation outputs, explicit Operation bindings, model and "
-    "runtime limits, HTTP methods, or serving an application. The declaration body is "
+    "runtime limits, HTTP methods and path parameters, or serving an application. The declaration body is "
     "`...`."
 )
 

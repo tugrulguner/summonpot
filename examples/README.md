@@ -1,7 +1,7 @@
 # Summonpot examples
 
 Current source (unreleased) can omit `Operation.output` when the callable has a resolved
-return annotation. Input bindings remain explicit. The runnable examples retain explicit
+return annotation. Input bindings remain explicit. Earlier runnable examples retain explicit
 outputs for compatibility with published v0.14.0; source users may omit the redundant
 `output=CustomerRecord` in example 7 or `output=QuoteResponse` in example 8. This changes
 neither example's application work nor execution purpose.
@@ -31,12 +31,12 @@ export OPENROUTER_API_KEY='<your key>'
 export SUMMONPOT_MODEL="openrouter:openai/gpt-4o-mini"
 ```
 
-Examples 2, 4, and 6 use the configured agent runtime and require a working provider/model configuration; deterministic operations do not make their endpoints model-free. Levels 8, 9 checks, 10, 11, authenticated-context 13, and a singleton level-12 candidate set can run without provider configuration on their eligible path. Ambiguous level-12 candidates and level-13 multiple-choice choices need model resolution; level 14 uses model-selected checks. Level 13 authenticated context still requires an application-owned bearer credential. Level 8's fully resolved operation requires no provider model or credentials. From 0.12.0,
+Examples 2, 4, and 6 use the configured agent runtime and require a working provider/model configuration; deterministic operations do not make their endpoints model-free. Levels 8, 9 checks, 10, 11, 13a authenticated-context, and a singleton level-12 candidate set can run without provider configuration on their eligible path. Ambiguous level-12 candidates and level-13 multiple-choice choices need model resolution; level 14 uses model-selected checks. Level 13 authenticated context still requires an application-owned bearer credential. Level 8's fully resolved operation requires no provider model or credentials. From 0.12.0,
 the fully resolved chains in levels 10 and 11 also run without a model. Level 12 demonstrates
 the producer-choice path. Its singleton local route is included from version 0.14.0; published
 v0.13.0 ran all level-12 choices through the configured agent runtime.
 
-For the current checkout (including unreleased levels 13-multiple and 14), use the committed environment instead of installing the published wheel:
+For the current checkout (including current-source 13b and levels 14–22), use the committed environment instead of installing the published wheel:
 
 ```bash
 env -u PYTHONPATH -u VIRTUAL_ENV UV_PYTHON=3.13 uv sync --locked --all-extras
@@ -144,7 +144,7 @@ curl -X POST http://127.0.0.1:8000/orders \
 
 The endpoint checks inventory, may choose an approved substitute, and must call the order
 write successfully before returning success. Its goal asks for exactly one write, but the
-current runtime enforces required use—not the declared maximum—so the write itself still
+bare legacy capability form enforces required use rather than a maximum start count—so the write itself still
 needs an idempotency policy.
 
 ### 4. HTTP methods and query parameters
@@ -299,7 +299,13 @@ choice is locally token-bound to one canonical producer result. The tests exerci
 real runtime, HTTP, and SQLite path with a keyless scripted model; the example's production
 run uses the configured provider.
 
-### 13. Multiple producer-backed choices (current source, unreleased)
+### 13a. Authenticated tenant context (released in 0.13.0)
+
+Directory: [`13_authenticated_context/`](13_authenticated_context/)
+
+Shows application-owned bearer authentication, canonical `FromContext` bindings, tenant-scoped SQLite notes and independently checked persistence/idempotency. It runs model-free on the supported resolved path, but still requires the application-issued bearer credential. Summonpot does not provide login or infer tenant authority from caller JSON. See the [guide](13_authenticated_context/README.md).
+
+### 13b. Multiple producer-backed choices (current source, unreleased)
 
 Directory: [`13_multiple_producer_choices/`](13_multiple_producer_choices/)
 
@@ -318,13 +324,13 @@ Directory: [`15_repeated_stage/`](15_repeated_stage/)
 Shows one bounded repeated producer closing before a choice-free terminal operation consumes its explicitly addressed final canonical result with `FromResult(..., invocation="final")`. This narrow source shape does not implement repeated consumers or an inspect/correct/verify workflow; published v0.14.0 is unchanged. See the [contract](../docs/repeated-stage-results.added.md).
 
 
-### 16. Resolved preparation, repeated checks, verification and finalization
+### 16. Resolved preparation, repeated checks, verification and finalization (current source, unreleased)
 
 Directory: [`16_stage_chain/`](16_stage_chain/)
 
 Shows the current-source single-stage chain without changing earlier examples. Order loading owns the request bindings; the repeated checks consume validated preparation results. Deterministic verification denies incomplete or failed checks before the final operation persists the report. The model owns only bounded check selection, not approval. This source extension is not yet released and is not in published v0.14.0.
 
-### 17. Candidate selection followed by bounded checks (current source)
+### 17. Candidate selection followed by bounded checks (current source, unreleased)
 
 Directory: [`17_choice_stage/`](17_choice_stage/)
 
@@ -343,18 +349,30 @@ Directory: [`19_checkpoint_status/`](19_checkpoint_status/)
 
 Shows the same rule in a three-operation declaration. Already-accepted state skips refresh and model resolution. Empty choice domains abort with the existing redacted 409, not an unresolved result. Writes may survive later failure; there is no rollback, effect replay, durable resume or recovery.
 
+### 20. Fully resolved branch/join (current source, unreleased)
+
+[Example 20](20_branch_join/README.md) demonstrates a deterministic subtotal branch and independent shipping calculation joining at one total-quote finalizer. This narrow current-source path requires an acyclic, fully resolved required `Exactly(1)` graph with a unique sink reached by every operation and one exact response producer. It runs ready operations sequentially with declaration-order tie-breaking. It does not support `AgentChoice`, general graphs, or parallel execution; published v0.14.0 is unchanged.
+
+### 21. URL path values and HTTP methods (current source, unreleased)
+
+Directory: [`21_path_methods/`](21_path_methods/)
+
+Shows typed URL-owned values across GET, POST, PUT, PATCH, DELETE and HEAD. GET consumes query data; POST/PUT/PATCH consume JSON; DELETE/HEAD need only the path. JSON cannot override the URL, and HEAD returns no HTTP body. These scalar declarations remain model-backed. The application is a truthful stateless transport demonstration, not a pretend CRUD store or persistence receipt. Its [guide](21_path_methods/README.md) distinguishes provider use from the keyless request-evidence fixtures used in tests.
+
+### 22. Callable defaults and annotated contracts (current source, unreleased)
+
+Directory: [`22_contract_defaults/`](22_contract_defaults/)
+
+A real integer quote calculation keeps the immutable discount default application-owned while binding request values explicitly. The operation's tighter `Annotated` quantity constraint rejects an otherwise valid request before the callable starts. Its inferred full annotated output contract preserves response metadata and executes without a model. The [guide](22_contract_defaults/README.md) explains extra-field rejection, rounding and the published-version explicit-output alternative.
+
 ## What is intentionally not shown as shipped
 
 The examples do not claim these planned features exist:
 
-- broader multi-operation graph and model-free execution;
+- general graphs and model-free execution outside the supported chain and narrow branch/join slices;
 - SQLAlchemy or SQLite operation adapters;
 - streaming responses;
 
 Authenticated context is an application-owned credential hook, not built-in login or authorization.
 
 For local development, bind to `127.0.0.1`. Before exposing a service, put authentication in front of it and configure runtime limits because every reachable request can spend provider credit.
-
-### 20. Fully resolved branch/join (current source, unreleased)
-
-[Example 20](20_branch_join/README.md) demonstrates a deterministic subtotal branch and independent shipping calculation joining at one total-quote finalizer. This narrow current-source path requires an acyclic, fully resolved required `Exactly(1)` graph with a unique sink reached by every operation and one exact response producer. It runs ready operations sequentially with declaration-order tie-breaking. It does not support `AgentChoice`, general graphs, or parallel execution; published v0.14.0 is unchanged.

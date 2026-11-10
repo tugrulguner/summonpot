@@ -97,14 +97,11 @@ def test_contributing_states_the_supported_binding_slice_precisely() -> None:
     contributing = re.sub(r"\s+", " ", _text(CONTRIBUTING))
 
     assert "single-required-operation `Exactly(1)` slice" in contributing
-    assert (
-        "supported `FromRequest`, direct `AgentChoice`, and callable-default bindings"
-        in contributing
-    )
-    assert (
-        "Unsupported explicit binding shapes, including `FromContext`, are rejected "
-        "before serving" in contributing
-    )
+    assert "request/context/default bindings remain framework-owned" in contributing
+    assert "only direct `AgentChoice` arguments are model-owned" in contributing
+    assert "Authenticated `FromContext`" in contributing
+    assert "including `FromContext`, are rejected before serving" not in contributing
+    assert "unsupported combinations" in contributing
     assert (
         "Bare callable dependencies retain their implicit marker behavior"
         in contributing
@@ -112,16 +109,15 @@ def test_contributing_states_the_supported_binding_slice_precisely() -> None:
     assert "direct execution with no model resolved" in contributing
 
 
-def test_reviewing_separates_shipped_ordering_validation_from_runtime_enforcement() -> (
-    None
-):
+def test_reviewing_distinguishes_enforced_ordering_from_broader_plans() -> None:
     reviewing = _text(REVIEWING)
 
     assert (
         "Ordering declarations and their registration-time validation have shipped"
         in reviewing
     )
-    assert "runtime ordering enforcement remains planned" in reviewing
+    assert "runtime ordering is enforced in supported chains" in reviewing
+    assert "runtime ordering enforcement remains planned" not in reviewing
 
 
 def test_templates_preserve_summonpot_contract_boundaries() -> None:

@@ -205,6 +205,15 @@ The v0.10.0 deadline excludes HTTP body parsing, request validation, and respons
 
 Version 0.11.0 sequential chains of two or more required operations with exactly one ready operation at each step were agent-mediated. Fully resolved chains meeting the 0.12.0 boundary above run model-free. Within a chain, `AgentChoice(from_result=producer)` can select from a producer's validated `list[ConcreteModel]` using inert projected descriptions and opaque request-local tokens (at most 128 candidates and 65,536 JSON characters per binding). The selected token maps locally to the exact canonical member; Python equality is not authority. Empty, unavailable, or oversized sets fail with a fixed redacted 409 before model decision or downstream work, without an extra model request. Primitive/untyped collections, direct unbounded choices within chains, broader bounds, and general graph execution remain unsupported. Authenticated context has a narrow implementation included from version 0.13.0, not included in version 0.12.0. Direct single-operation `AgentChoice` is unchanged. This behavior is included from 0.11.0; historical v0.10.0 does not include it. See the [project roadmap](https://github.com/tugrulguner/summonpot/blob/main/ROADMAP.md) and [changelog](https://github.com/tugrulguner/summonpot/blob/main/CHANGELOG.md) for current boundaries.
 
+## Runnable capability lessons
+
+The [complete examples guide](https://github.com/tugrulguner/summonpot/blob/main/examples/README.md) separates published behavior from current-source lessons. Two focused checkout examples cover transport and contract details without adding a new runtime mode:
+
+- [URL-owned values and all six HTTP methods](https://github.com/tugrulguner/summonpot/blob/main/examples/21_path_methods/README.md): body/query/no-body contracts, path ownership and empty HEAD responses. These scalar declarations remain model-backed; the stateless echo is not a CRUD store.
+- [Callable defaults and annotated contracts](https://github.com/tugrulguner/summonpot/blob/main/examples/22_contract_defaults/README.md): a real direct quote calculation with an application-owned discount default, stricter receiving constraints and full response metadata.
+
+Both are current-checkout lessons, not a claim that unreleased output shorthand ships in v0.14.0. Earlier example identities and compatibility are preserved.
+
 ## Part of ModePot
 
 Summonpot is an open-source [ModePot](https://modepot.io/) project. Join the [ModePot Discord](https://discord.gg/u3AANZr6RG), explore the [source on GitHub](https://github.com/tugrulguner/summonpot), or read the [README](https://github.com/tugrulguner/summonpot#readme).

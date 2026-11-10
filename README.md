@@ -775,17 +775,29 @@ The [`examples/`](examples/) directory grows from one endpoint to a multi-file s
 |---|---|---|
 | 1 | [`basic_app.py`](examples/basic_app.py) | Minimal typed request and response |
 | 2 | [`02_required_capability.py`](examples/02_required_capability.py) | Required exact calculation |
-| 3 | [`03_agentic_order.py`](examples/03_agentic_order.py) | Bounded choice plus a required write |
-| 4 | [`04_http_methods.py`](examples/04_http_methods.py) | GET/POST routing and query parameters |
-| 5 | [`05_bounded_runtime.py`](examples/05_bounded_runtime.py) | Limits, timeout, and model override |
-| 6 | [`06_support_service/`](examples/06_support_service/) | Multi-file legacy capabilities and persisted ticket |
-| 7 | [`07_bound_operation.py`](examples/07_bound_operation.py) | Enforced `FromRequest` + `AgentChoice` with `Exactly(1)` |
-| 8 | [`08_direct_execution.py`](examples/08_direct_execution.py) | Credential-free single-operation deterministic execution |
-| 9 | [`09_contract_boundaries/`](examples/09_contract_boundaries/) | Fail-closed registration, receiving constraints, output namespaces, and raw/HTTP parity |
-| 20 | [`20_branch_join/`](examples/20_branch_join/README.md) | Current-source model-free branch/join calculation; not published in v0.14.0 |
+| 3 | [`03_agentic_order.py`](examples/03_agentic_order.py) | Bounded choice plus required write |
+| 4 | [`04_http_methods.py`](examples/04_http_methods.py) | GET/POST and query parameters |
+| 5 | [`05_bounded_runtime.py`](examples/05_bounded_runtime.py) | Limits, timeout, model override |
+| 6 | [`06_support_service/`](examples/06_support_service/) | Multi-file legacy service |
+| 7 | [`07_bound_operation.py`](examples/07_bound_operation.py) | Enforced request binding and agent choice |
+| 8 | [`08_direct_execution.py`](examples/08_direct_execution.py) | Credential-free deterministic execution |
+| 9 | [`09_contract_boundaries/`](examples/09_contract_boundaries/) | Registration and receiving-constraint checks |
+| 10 | [`10_result_chain/`](examples/10_result_chain/) | Sequential result chain |
+| 11 | [`11_linear_result_chain/`](examples/11_linear_result_chain/) | Fully resolved linear chain |
+| 12 | [`12_producer_choice/`](examples/12_producer_choice/) | Producer-constrained candidate choice |
+| 13a | [`13_authenticated_context/`](examples/13_authenticated_context/) | Authenticated tenant context (released 0.13.0) |
+| 13b | [`13_multiple_producer_choices/`](examples/13_multiple_producer_choices/) | Multiple producer choices (current source, unreleased) |
+| 14 | [`14_bounded_audit/`](examples/14_bounded_audit/) | Bounded repeated calls (current source, unreleased) |
+| 15 | [`15_repeated_stage/`](examples/15_repeated_stage/) | Repeated-stage final result (current source, unreleased) |
+| 16 | [`16_stage_chain/`](examples/16_stage_chain/) | Repeated stage in a resolved chain (current source, unreleased) |
+| 17 | [`17_choice_stage/`](examples/17_choice_stage/) | Choice before repeated stage (current source, unreleased) |
+| 18 | [`18_checkpoint_cleanup/`](examples/18_checkpoint_cleanup/) | Bounded checkpoint progression (current source, unreleased) |
+| 19 | [`19_checkpoint_status/`](examples/19_checkpoint_status/) | Checkpoint status (current source, unreleased) |
+| 20 | [`20_branch_join/`](examples/20_branch_join/) | Narrow branch/join (current source, unreleased) |
+| 21 | [`21_path_methods/`](examples/21_path_methods/) | Path parameters and HTTP methods (current source, unreleased) |
+| 22 | [`22_contract_defaults/`](examples/22_contract_defaults/) | Callable defaults and contract metadata (current source, unreleased) |
 
-The [examples guide](examples/README.md) includes a real HTTP call for every level and
-explains what runs today and what remains planned.
+The [examples guide](examples/README.md) explains capability progression and release boundaries.
 
 ## Give your coding agent the contract
 
