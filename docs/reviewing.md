@@ -50,10 +50,7 @@ Prioritize:
   endpoint declaration more complex without a proven user need.
 
 The narrow single-operation direct execution has shipped with the predicate described in the
-public documentation. Broader model-free execution, broader operation graphs, context
-injection, receipts, and built-in authentication remain planned unless current source and
-real execution prove otherwise. Ordering declarations and their registration-time validation have shipped;
-runtime ordering enforcement remains planned.
+public documentation. Fully resolved operations, eligible sequential chains and application-authenticated context have shipped. Ordering declarations and their registration-time validation have shipped; runtime ordering is enforced in supported chains. Current source (unreleased) also includes narrow branch/join, repetition/stage and checkpoint progression slices with their documented predicates. Broader model-free execution outside these admitted slices remains planned. General graphs, framework-managed database adapters, durable receipts/recovery and built-in login remain planned; application-owned typed results and authentication are not those deferred features. Verify historical release boundaries against the current documentation and executed tests rather than treating a narrow slice as general graph support.
 
 ## 4. Run the checks that matter
 

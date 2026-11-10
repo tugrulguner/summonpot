@@ -45,11 +45,14 @@ Use `make format` before committing.
   identity executes directly without a model.
   A direct `AgentChoice` in the same admitted shape remains model-backed.
 - Registration rejects invalid declarations before traffic when the failure is knowable.
-- In the shipped single-required-operation `Exactly(1)` slice, supported `FromRequest`, direct
-  `AgentChoice`, and callable-default bindings are framework-owned rather than model-controlled.
-- Unsupported explicit binding shapes, including `FromContext`, are rejected before serving.
-  The same enforce-or-reject rule covers ordering, bounds, operation output, and a second
-  capability. Binding-source subclasses are outside the exact built-in vocabulary.
+- In the shipped single-required-operation `Exactly(1)` slice,
+  request/context/default bindings remain framework-owned; only direct `AgentChoice` arguments are model-owned.
+- Authenticated `FromContext` is supported from 0.13.0 in the admitted operation/chain
+  slices. Current source also admits it in the narrow resolved branch/join slice.
+- The enforce-or-reject rule covers unsupported combinations of bindings, ordering,
+  bounds, operation outputs and capabilities; adding a capability cannot silently
+  downgrade an explicit contract to legacy execution. Binding-source subclasses remain
+  outside the exact built-in vocabulary.
 - Bare callable dependencies retain their implicit marker behavior and legacy agent path.
 - Provider text, model output, capability details, credentials, and private request data do
   not enter public error bodies, fixtures, issue reports, or pull requests.

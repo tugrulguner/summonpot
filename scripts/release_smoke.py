@@ -28,6 +28,7 @@ class ExampleCase:
     method: str
     path: str
     payload: dict[str, Any] | None = None
+    schema_path: str | None = None
 
 
 CASES = (
@@ -165,6 +166,54 @@ CASES = (
         "POST",
         "/quotes/combined",
         {"unit_price_cents": 1299, "quantity": 3, "unit_weight_grams": 250},
+    ),
+    ExampleCase(
+        "21_path_methods/app.py",
+        "GET",
+        "/transport/7?text=query-evidence",
+        None,
+        schema_path="/transport/{item_id}",
+    ),
+    ExampleCase(
+        "21_path_methods/app.py",
+        "POST",
+        "/transport/7",
+        {"text": "body-evidence", "item_id": 999},
+        schema_path="/transport/{item_id}",
+    ),
+    ExampleCase(
+        "21_path_methods/app.py",
+        "PUT",
+        "/transport/7",
+        {"text": "body-evidence", "item_id": 999},
+        schema_path="/transport/{item_id}",
+    ),
+    ExampleCase(
+        "21_path_methods/app.py",
+        "PATCH",
+        "/transport/7",
+        {"text": "body-evidence", "item_id": 999},
+        schema_path="/transport/{item_id}",
+    ),
+    ExampleCase(
+        "21_path_methods/app.py",
+        "DELETE",
+        "/transport/7",
+        None,
+        schema_path="/transport/{item_id}",
+    ),
+    ExampleCase(
+        "21_path_methods/app.py",
+        "HEAD",
+        "/transport/7",
+        None,
+        schema_path="/transport/{item_id}",
+    ),
+    ExampleCase(
+        "22_contract_defaults/app.py",
+        "POST",
+        "/quotes/defaults",
+        {"unit_price_cents": 199, "quantity": 3},
     ),
 )
 
@@ -435,13 +484,40 @@ summon=example.summon
     return wrapper
 
 
+def _path_methods_smoke_wrapper(source: Path, workdir: Path) -> Path:
+    """Keyless SDK fixture; derive every echo from the actual model request."""
+    wrapper = workdir / "path_methods_smoke_app.py"
+    wrapper.write_text(
+        f"""import json,runpy
+from pydantic_ai.messages import ModelRequest,ModelResponse,ToolCallPart,UserPromptPart
+from pydantic_ai.models.function import FunctionModel
+from summonpot.runtime import Runtime
+summon=runpy.run_path({str(source)!r})["summon"]
+def echo(messages,info):
+    prompt=next(p.content for m in reversed(messages) if isinstance(m,ModelRequest) for p in m.parts if isinstance(p,UserPromptPart) and isinstance(p.content,str))
+    values={{}}
+    for line in prompt.splitlines():
+        if line.startswith("  "):
+            name,value=line.strip().split(": ",1)
+            values[name]=json.loads(value)
+    assert type(values["item_id"]) is int
+    return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name,values)])
+summon._runtime=Runtime(model=FunctionModel(echo))
+""",
+        encoding="utf-8",
+    )
+    return wrapper
+
+
 def _verify_case(
     case: ExampleCase, examples_root: Path, workdir: Path
 ) -> dict[str, Any]:
     source = (examples_root / case.source).resolve()
     if not source.is_file():
         raise FileNotFoundError(source)
-    if case.source == "06_support_service/app.py":
+    if case.source == "21_path_methods/app.py":
+        served_source = _path_methods_smoke_wrapper(source, workdir)
+    elif case.source == "06_support_service/app.py":
         served_source = _support_smoke_wrapper(source, workdir)
     elif case.source in {"18_checkpoint_cleanup/app.py", "19_checkpoint_status/app.py"}:
         served_source = _checkpoint_smoke_wrapper(source, workdir)
@@ -470,6 +546,7 @@ def _verify_case(
     )
     auth_headers: dict[str, str] = {}
     if case.source in {
+        "22_contract_defaults/app.py",
         "08_direct_execution.py",
         "20_branch_join/app.py",
         "09_contract_boundaries/app.py",
@@ -531,7 +608,46 @@ def _verify_case(
         )
         if success != 200:
             raise AssertionError(f"{case.source} success returned {success}: {body!r}")
-        response_body = json.loads(body)
+        schema_status, schema_body = _request(base_url, "GET", "/openapi.json")
+        assert schema_status == 200
+        schema = json.loads(schema_body)
+        actual_routes = {
+            (method.upper(), path)
+            for path, methods in schema["paths"].items()
+            for method in methods
+        }
+        expected_routes = {
+            (other.method, other.schema_path or urllib.parse.urlsplit(other.path).path)
+            for other in CASES
+            if other.source == case.source
+        }
+        assert actual_routes == expected_routes
+        response_body: Any
+        if case.method == "HEAD":
+            assert body == b""
+            response_body = None
+        else:
+            response_body = json.loads(body)
+        if case.source == "21_path_methods/app.py" and case.method != "HEAD":
+            expected_echo: dict[str, Any] = {"item_id": 7}
+            if case.payload is not None:
+                expected_echo["text"] = case.payload["text"]
+            elif case.method == "GET":
+                expected_echo["text"] = "query-evidence"
+            assert response_body == expected_echo
+        if case.source == "22_contract_defaults/app.py":
+            assert response_body == {
+                "subtotal_cents": 597,
+                "discount_cents": 29,
+                "total_cents": 568,
+            }
+            rejected, rejected_body = _request(
+                base_url, "POST", case.path, {"unit_price_cents": 199, "quantity": 11}
+            )
+            assert rejected == 422
+            assert json.loads(rejected_body) == {
+                "detail": "Request data did not satisfy a receiving operation contract."
+            }
         if case.source == "20_branch_join/app.py":
             assert case.payload is not None
             subtotal = case.payload["unit_price_cents"] * case.payload["quantity"]
@@ -705,13 +821,22 @@ def _verify_case(
         if missing != 404:
             raise AssertionError(f"{case.source} missing route returned {missing}")
 
-        mismatch_method = "PUT"
+        mismatch_method = (
+            "OPTIONS" if case.source == "21_path_methods/app.py" else "PUT"
+        )
         mismatch_path = urllib.parse.urlsplit(case.path).path
         mismatch, _ = _request(base_url, mismatch_method, mismatch_path)
         if mismatch != 405:
             raise AssertionError(f"{case.source} method mismatch returned {mismatch}")
 
-        if case.method == "POST":
+        if case.source == "21_path_methods/app.py":
+            invalid, _ = _request(
+                base_url,
+                case.method,
+                "/transport/not-an-int?text=invalid",
+                payload=case.payload,
+            )
+        elif case.method == "POST":
             invalid, _ = _request(base_url, "POST", case.path, payload={})
         else:
             invalid, _ = _request(

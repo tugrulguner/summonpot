@@ -42,6 +42,11 @@ EXAMPLES = [
     ("18_checkpoint_cleanup/app.py", "/checkpoint-cleanup", "post"),
     ("19_checkpoint_status/app.py", "/checkpoint-status", "post"),
     ("20_branch_join/app.py", "/quotes/combined", "post"),
+    *[
+        ("21_path_methods/app.py", "/transport/{item_id}", method)
+        for method in ("get", "post", "put", "patch", "delete", "head")
+    ],
+    ("22_contract_defaults/app.py", "/quotes/defaults", "post"),
 ]
 
 
@@ -84,9 +89,15 @@ def test_smoke_cases_cover_every_advertised_route(monkeypatch, tmp_path):
         app = _load_example(source, monkeypatch)
         for path, methods in build_app(app).openapi()["paths"].items():
             expected.update((source, method.upper(), path) for method in methods)
-    actual = {(case.source, case.method, urlsplit(case.path).path) for case in cases}
+    actual = {
+        (case.source, case.method, case.schema_path or urlsplit(case.path).path)
+        for case in cases
+    }
     assert len(actual) == len(cases)
     assert actual == expected
+    assert set(EXAMPLES) == {
+        (source, path, method.lower()) for source, method, path in expected
+    }
 
 
 def test_example_entrypoint_inventory_is_complete():
