@@ -32,6 +32,7 @@ from summonpot._validation import (
     _enforced_contract_tool_index,
     _repeated_contract_tool_index,
     _repeated_stage_indices,
+    _resolved_graph_tool_indices,
 )
 from summonpot.contracts import AgentChoice, FromContext, FromRequest, FromResult
 from summonpot.models import EndpointDef, ParamDef, ToolDef
@@ -1165,6 +1166,17 @@ def _compile_endpoint(
                 "Repeated execution requires Pydantic request/response models and exact full response annotation."
             )
     chain_indices = _chain_contract_tool_indices(source_tools)
+    if chain_indices is None:
+        chain_indices = _resolved_graph_tool_indices(source_tools)
+        if chain_indices is not None and (
+            not allow_direct
+            or endpoint.output_model is None
+            or _direct_chain_order(endpoint, source_tools, chain_indices) is None
+        ):
+            raise TypeError(
+                "Resolved graphs require direct execution, Pydantic request/response "
+                "models and at least one FromRequest binding."
+            )
     terminal_contract = (
         source_tools[chain_indices[-1]].contract if chain_indices else None
     )

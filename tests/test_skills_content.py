@@ -32,6 +32,7 @@ def test_description_says_when_to_load_it():
     """An agent reads only the description when deciding to open the skill."""
     assert "@summon" in SKILL_DESCRIPTION
     assert "bounded checkpoints" in SKILL_DESCRIPTION
+    assert "branch/join" in SKILL_DESCRIPTION
     assert len(SKILL_DESCRIPTION) < 500
 
 

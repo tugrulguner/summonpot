@@ -354,3 +354,7 @@ The examples do not claim these planned features exist:
 Authenticated context is an application-owned credential hook, not built-in login or authorization.
 
 For local development, bind to `127.0.0.1`. Before exposing a service, put authentication in front of it and configure runtime limits because every reachable request can spend provider credit.
+
+### 20. Fully resolved branch/join (current source, unreleased)
+
+[Example 20](20_branch_join/README.md) demonstrates a deterministic subtotal branch and independent shipping calculation joining at one total-quote finalizer. This narrow current-source path requires an acyclic, fully resolved required `Exactly(1)` graph with a unique sink reached by every operation and one exact response producer. It runs ready operations sequentially with declaration-order tie-breaking. It does not support `AgentChoice`, general graphs, or parallel execution; published v0.14.0 is unchanged.

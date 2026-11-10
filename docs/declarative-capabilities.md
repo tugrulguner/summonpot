@@ -371,10 +371,12 @@ constraints remain supported. Receiver schemas containing custom functional vali
 string constraints, custom literal values, custom instance-checking metaclasses, or
 unsupported core schemas are rejected at registration rather than silently stripped.
 
-Broader explicit operation shapes are rejected before serving until complete graph semantics
-ship. `FromResult` and `after` are supported only in a sequential chain where each step has
-exactly one ready operation. Producer-backed `AgentChoice(from_result=...)` is supported
-there only for producer outputs `list[ConcreteModel]`, under the bounded tokenized contract
+Broader explicit operation shapes are rejected before serving until their execution
+semantics ship. Published chain behavior requires exactly one ready operation at each
+step. Current source additionally supports `FromResult` and `after` in the fully resolved
+branch/join slice above, with stable sequential readiness and one exact terminal response.
+Producer-backed `AgentChoice(from_result=...)` remains restricted to uniquely ordered
+chains and producer outputs `list[ConcreteModel]`, under the bounded tokenized contract
 described above. Authenticated `FromContext` outside its narrow supported source slice, primitive/untyped collections, broader bounds, and unsupported graph shapes cannot fall through to unenforced model
 arguments. Bare callable dependencies retain the legacy agent path. Continue to validate
 inputs and enforce authorization inside every operation; trusted binding does not grant
@@ -396,3 +398,10 @@ The framework does not insert the context object or its values into model instru
 Principal admission is a non-transforming structural predicate over the authenticator's
 canonical values. Validation hooks, custom initialization/post-init hooks, and transforming
 model configurations fail registration rather than being replayed to change identity.
+
+
+## Current-source branch/join execution (unreleased)
+
+Current source supports a narrow fully resolved branch/join graph without widening the public API. The endpoint must have a Pydantic request and response, at least one `FromRequest` binding, and required `Exactly(1)` operations forming an acyclic graph. Inputs may be supported request bindings, validated `FromResult` values, authenticated `FromContext` values, or supported immutable callable defaults. Every operation must reach the unique sink, and exactly one operation must declare the endpoint's exact full response annotation. `AgentChoice` is not admitted.
+
+Readiness is inferred from result dependencies and `after` ordering. Execution remains sequential; when multiple operations are ready, declaration order is the stable tie-break. `after` imposes business ordering but does not authorize disconnected vertices, multiple sinks, cycles, choices, or unsupported inputs. Existing chain/choice/repetition/checkpoint routes are unchanged. This is not a public graph API or parallel scheduler. Published v0.14.0 is unchanged; milestone 4 is partial and milestone 3 remains partial. See [example 20](../examples/20_branch_join/README.md).

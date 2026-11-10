@@ -156,16 +156,18 @@ def test_changelog_release_section_contains_consumed_fragment() -> None:
         for p in (ROOT / "changelog.d").iterdir()
         if p.is_file() and p.name != "README.md"
     ]
-    existing_fragments = [
-        p
-        for p in fragments
-        if p.name
-        not in {
-            "+checkpoint-progression.added.md",
-            "+operation-output-inference.added.md",
-        }
-    ]
-    assert len(existing_fragments) == 7
+    # Preserve the already-pending feature fragments without freezing the count
+    # of unrelated future additions to the unreleased line.
+    expected_pending = {
+        "+multiple-producer-choices.added.md",
+        "+framework-owned-progression.added.md",
+        "+examples-refresh.changed.md",
+        "+stage-chains.added.md",
+        "+bounded-repeated-calls.added.md",
+        "+repeated-stage-results.added.md",
+        "+choice-before-stage.added.md",
+    }
+    assert expected_pending <= {p.name for p in fragments}
     assert any(p.name == "+checkpoint-progression.added.md" for p in fragments)
     assert any(p.name == "+choice-before-stage.added.md" for p in fragments)
     assert any(p.name == "+stage-chains.added.md" for p in fragments)

@@ -41,6 +41,7 @@ EXAMPLES = [
     ("17_choice_stage/app.py", "/supplier-reviews", "post"),
     ("18_checkpoint_cleanup/app.py", "/checkpoint-cleanup", "post"),
     ("19_checkpoint_status/app.py", "/checkpoint-status", "post"),
+    ("20_branch_join/app.py", "/quotes/combined", "post"),
 ]
 
 

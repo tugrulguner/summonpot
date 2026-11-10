@@ -208,3 +208,8 @@ Version 0.11.0 sequential chains of two or more required operations with exactly
 ## Part of ModePot
 
 Summonpot is an open-source [ModePot](https://modepot.io/) project. Join the [ModePot Discord](https://discord.gg/u3AANZr6RG), explore the [source on GitHub](https://github.com/tugrulguner/summonpot), or read the [README](https://github.com/tugrulguner/summonpot#readme).
+
+
+## Current-source branch/join execution (unreleased)
+
+The narrow model-free branch/join slice in current source accepts fully resolved required `Exactly(1)` acyclic graphs with a Pydantic request/response, at least one `FromRequest`, supported request/result/authenticated-context/default inputs, one unique sink reached by all operations, and one exact full-response producer. No `AgentChoice` is allowed. Operations run sequentially; ties among ready operations follow declaration order, and `after` expresses business ordering. This is not a public graph API, parallel scheduler, or feedback support. Existing execution paths are unchanged. Published v0.14.0 is unchanged; milestone 4 is partial, and milestone 3 remains partial. See [example 20](https://github.com/tugrulguner/summonpot/blob/main/examples/20_branch_join/README.md).

@@ -160,6 +160,12 @@ CASES = (
         "/checkpoint-status",
         {"job_id": "pending"},
     ),
+    ExampleCase(
+        "20_branch_join/app.py",
+        "POST",
+        "/quotes/combined",
+        {"unit_price_cents": 1299, "quantity": 3, "unit_weight_grams": 250},
+    ),
 )
 
 
@@ -465,6 +471,7 @@ def _verify_case(
     auth_headers: dict[str, str] = {}
     if case.source in {
         "08_direct_execution.py",
+        "20_branch_join/app.py",
         "09_contract_boundaries/app.py",
         "10_result_chain/app.py",
         "11_linear_result_chain/app.py",
@@ -525,6 +532,17 @@ def _verify_case(
         if success != 200:
             raise AssertionError(f"{case.source} success returned {success}: {body!r}")
         response_body = json.loads(body)
+        if case.source == "20_branch_join/app.py":
+            assert case.payload is not None
+            subtotal = case.payload["unit_price_cents"] * case.payload["quantity"]
+            weight = case.payload["unit_weight_grams"] * case.payload["quantity"]
+            blocks, remainder = divmod(max(0, weight - 500), 500)
+            shipping = 499 + 199 * (blocks + bool(remainder))
+            assert response_body == {
+                "subtotal_cents": subtotal,
+                "shipping_cents": shipping,
+                "total_cents": subtotal + shipping,
+            }
         side_effects: list[str] = []
         if case.source == "18_checkpoint_cleanup/app.py":
             with sqlite3.connect(environment["CHECKPOINT_CLEANUP_DB"]) as db:
