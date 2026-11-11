@@ -19,6 +19,9 @@ jobs:
     name: website
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --init --shm-size=1g
     defaults:
       run:
         working-directory: website
@@ -26,13 +29,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Trust checkout for container-owned Git
+        working-directory: .
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: website/package-lock.json
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Verify browser image and package version contract
+        run: node --input-type=module -e "import {readFileSync} from 'node:fs'; const p=JSON.parse(readFileSync('package-lock.json')); const version=p.packages['node_modules/playwright'].version; if(version!=='1.63.0') throw Error('Expected locked Playwright 1.63.0, got '+version);"
       - run: npm run check
       - run: npm run build
 
