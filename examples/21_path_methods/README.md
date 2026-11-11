@@ -1,6 +1,6 @@
 # 21 — Path values and HTTP methods
 
-Current-source lesson. Run from this checkout with its installed extras:
+Version 0.15.0 lesson. Run from this checkout with its installed extras:
 
 ```sh
 uv run summonpot serve examples/21_path_methods/app.py

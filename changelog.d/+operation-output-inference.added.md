@@ -1,1 +1,0 @@
-Permit typed Operations to omit `output=` when their callable has a resolved return annotation. Registration snapshots the full output contract without mutating original declarations; explicit outputs and all input bindings remain authoritative.

@@ -1,4 +1,4 @@
-"""Regression checks for the current-source checkpoint documentation boundary."""
+"Regression checks for the version 0.15.0 checkpoint documentation boundary."
 
 from pathlib import Path
 
@@ -18,7 +18,7 @@ def test_checkpoint_contract_is_consistent_across_owned_public_surfaces():
     ]
     for relative in paths:
         text = (ROOT / relative).read_text(encoding="utf-8")
-        assert "Current-source bounded checkpoint progression (unreleased)" in text
+        assert "Version 0.15.0 bounded checkpoint progression" in text
         assert 'Required(check, calls=Between(1, M), until="accepted")' in text
         assert "stored, non-null strict Boolean field" in text
         assert "Mth false closes unresolved" in text
@@ -29,7 +29,7 @@ def test_checkpoint_contract_is_consistent_across_owned_public_surfaces():
             or "not an unresolved result" in text
             or "not unresolved" in text
         )
-        assert "Published v0.14.0 is unchanged" in text
+        assert "0.15.0" in text and "v0.14.0" in text
         assert "rollback" in text.lower() and "recovery" in text.lower()
 
 

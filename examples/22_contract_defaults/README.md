@@ -1,7 +1,7 @@
 # 22 — Callable defaults and annotated contracts
 
-Current source / unreleased output inference lesson. The operation infers the
-full `QuoteOutput` annotation from its callable. For published-version
+Version 0.15.0 output inference lesson. The operation infers the
+full `QuoteOutput` annotation from its callable. For v0.14.0
 compatibility, explicitly declare `output=QuoteOutput` on the operation.
 
 ```sh

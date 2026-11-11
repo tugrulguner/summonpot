@@ -1,4 +1,4 @@
-"""Current source lesson 21: stateless, model-backed HTTP transport echoes.
+"""Version 0.15.0 lesson 21: stateless, model-backed HTTP transport echoes.
 
 These declarations do not persist, update, or delete resources. A configured provider
 is needed for ordinary use. The tests and release smoke use a separate keyless

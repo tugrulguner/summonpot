@@ -1,6 +1,6 @@
-"""Current source / unreleased lesson 22: callable defaults and full annotations.
+"""Version 0.15.0 lesson 22: callable defaults and full annotations.
 
-Output inference requires current source. For published-version compatibility,
+Output inference requires version 0.15.0 or later. For v0.14.0 compatibility,
 declare output=QuoteOutput explicitly on the Operation.
 """
 

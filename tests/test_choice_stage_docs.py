@@ -31,11 +31,11 @@ ROOT = Path(__file__).parents[1]
 def test_composed_source_summary_has_its_complete_boundary(relative):
     text = (ROOT / relative).read_text()
     assert (
-        "Current source (unreleased) also composes exactly one producer-backed choice argument"
+        "Version 0.15.0 also composes exactly one producer-backed choice argument"
         in text
     )
     summary = text.split(
-        "Current source (unreleased) also composes exactly one producer-backed choice argument",
+        "Version 0.15.0 also composes exactly one producer-backed choice argument",
         1,
     )[1].split("Published v0.14.0 is unchanged.", 1)[0]
     for phrase in (

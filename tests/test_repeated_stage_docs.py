@@ -17,7 +17,8 @@ def test_repeated_stage_contract_is_narrow_and_source_only() -> None:
         "canonical validated output",
         "not ready merely because the producer met its minimum",
         "no fallback to an earlier invocation",
-        "Published v0.14.0 is unchanged",
+        "included from version 0.15.0",
+        "v0.14.0",
         "inspect/correct/verify workflow",
     ):
         assert required.lower() in contract.lower()

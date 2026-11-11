@@ -1,6 +1,6 @@
 # Declarative capability endpoints
 
-Current source (unreleased) permits `Operation(fn, bind=...)` to omit `output=` when the callable has a resolved, non-empty return annotation. Registration snapshots the full annotation, including `Annotated` metadata, without mutating the original declaration. Explicit outputs remain authoritative; input bindings are never inferred. Published v0.14.0 requires explicit outputs.
+Version 0.15.0 permits `Operation(fn, bind=...)` to omit `output=` when the callable has a resolved, non-empty return annotation. Registration snapshots the full annotation, including `Annotated` metadata, without mutating the original declaration. Explicit outputs remain authoritative; input bindings are never inferred. Published v0.14.0 requires explicit outputs.
 
 
 A summonpot endpoint is a declaration, not a Python handler.
@@ -119,11 +119,11 @@ credential-free direct slice, [`07_bound_operation.py`](../examples/07_bound_ope
 for the agent-backed enforced slice, and [`06_support_service`](../examples/06_support_service/app.py)
 for a multi-file service using compatible bare callable dependencies.
 
-## Current source: framework-owned decision progression (unreleased)
+## Version 0.15.0: framework-owned decision progression
 
-This is the current source extension, not behavior in published v0.14.0. The released
+This is the version 0.15.0 extension, not behavior in published v0.14.0. The released
 v0.14.0 optimization remains exactly one producer-backed choice argument across an
-otherwise eligible chain, with no other choice. The current source supports one or more
+otherwise eligible chain, with no other choice. The version 0.15.0 supports one or more
 producer-backed choices in an otherwise eligible uniquely ordered chain of at least two
 required `Exactly(1)` operations. It still requires a Pydantic request with at least one
 `FromRequest`, supported request/result/authenticated-context bindings or immutable
@@ -151,7 +151,7 @@ reset the deadline or renew candidate authority. The per-binding caps remain 128
 limits. Projection is bounded and inert; it does not imply secrecy for caller request data or
 application outputs intentionally disclosed by operations.
 
-This unreleased route is unavailable when an explicit `tool_calls_limit` is configured,
+This version 0.15.0 route is unavailable when an explicit `tool_calls_limit` is configured,
 because decision-only structured output reports no business function calls; that setting
 retains the supported legacy agent suffix. `allow_direct=False` likewise preserves the
 existing compatibility route. Declarations outside optimization eligibility retain their
@@ -159,7 +159,7 @@ previous supported behavior. Prefix effects may precede lazy provider-configurat
 there is no rollback, effect replay, durable cross-request resume, repeated-call support,
 general graph compiler or public selector. Historical release sections are unchanged.
 
-## Current source: bounded repeated calls (unreleased)
+## Version 0.15.0: bounded repeated calls
 
 The minimum is the effective bound after existing marker normalization: `Required(op, calls=AtMost(3))` still requires at least one validated success. Optional/zero-success execution is not admitted.
 
@@ -183,11 +183,11 @@ effects, with no repeated-call fallback. Previous-result evidence is capped at 6
 characters per decision; bounded caller request data and declared evidence may be disclosed
 to the selector, but no principal or full result ledger is implicitly exposed.
 
-## Current source: repeated stage with final-result consumer (unreleased)
+## Version 0.15.0: repeated stage with final-result consumer
 
 This describes the original two-operation form. The single-stage chain section below extends its composition without changing final-invocation addressing.
 
-The current source admits a narrow two-operation sequence: one required repeated producer,
+The version 0.15.0 admits a narrow two-operation sequence: one required repeated producer,
 then one required `Exactly(1)` terminal consumer. The producer uses positive finite bounds
 (`minimum >= 1`, `maximum > 1`), a Pydantic request with at least one `FromRequest`, direct
 plain-string `Literal` choices, and supported request/context bindings or immutable defaults.
@@ -206,28 +206,28 @@ finish or maximum completion closes automatically without another acknowledgment
 readiness does not follow from meeting the minimum alone. Failure, cancellation or uncertain
 outcome after any earlier success aborts; no earlier-result fallback is allowed.
 
-This is a current-source, unreleased shape; published v0.14.0 is unchanged. It does not add
+This shape is included from version 0.15.0; published v0.14.0 is unchanged. It does not add
 aggregated repeated results, arbitrary invocation selectors, repeated consumers, producer
 choices from repeated results, optional/unbounded/multiple repeated stages, general graphs,
 cycles, parallelism, or durable resume. The inspect/correct/verify workflow is not thereby
 implemented. See the focused [repeated-stage result contract](repeated-stage-results.added.md).
 
-## Current source: one repeated stage in a sequential chain (unreleased)
+## Version 0.15.0: one repeated stage in a sequential chain
 
-Current source (unreleased) supports a uniquely ordered chain with one nonterminal bounded repeated operation, an optional resolved prefix and a nonempty resolved suffix. Every other operation is required `Exactly(1)` with no agent choices. A Pydantic request needs at least one `FromRequest` across the whole chain, not necessarily on the repeated operation; supported request/result/authenticated-context bindings and immutable defaults remain required. The repeated operation has positive finite bounds (`minimum >= 1`, `maximum > 1`), direct closed plain-string `Literal` choices and a Pydantic intermediate distinct from the response. Ordinary `FromResult` reads single-invocation results; repeated results require `invocation="final"`, with at least one suffix consumer. Exactly one terminal operation owns the endpoint's exact full response annotation. Prefix operations run before one lazy model resolution; suffix operations run after immutable stage closure without further model decisions or acknowledgment. One principal, ledger, absolute deadline and usage budget span the request. Prefix results/context/ledger are not implicitly projected into model prompts; receiving constraints are checked before each start. Explicit function-tool quotas reject before all work. No feedback cycles, external choices, multiple repeated stages, aggregation, parallelism or durable recovery are added. Published v0.14.0 is unchanged.
+Version 0.15.0 supports a uniquely ordered chain with one nonterminal bounded repeated operation, an optional resolved prefix and a nonempty resolved suffix. Every other operation is required `Exactly(1)` with no agent choices. A Pydantic request needs at least one `FromRequest` across the whole chain, not necessarily on the repeated operation; supported request/result/authenticated-context bindings and immutable defaults remain required. The repeated operation has positive finite bounds (`minimum >= 1`, `maximum > 1`), direct closed plain-string `Literal` choices and a Pydantic intermediate distinct from the response. Ordinary `FromResult` reads single-invocation results; repeated results require `invocation="final"`, with at least one suffix consumer. Exactly one terminal operation owns the endpoint's exact full response annotation. Prefix operations run before one lazy model resolution; suffix operations run after immutable stage closure without further model decisions or acknowledgment. One principal, ledger, absolute deadline and usage budget span the request. Prefix results/context/ledger are not implicitly projected into model prompts; receiving constraints are checked before each start. Explicit function-tool quotas reject before all work. No feedback cycles, external choices, multiple repeated stages, aggregation, parallelism or durable recovery are added. Published behavior before v0.15.0 remains unchanged.
 
 The original two-operation shape above remains its zero-prefix, one-consumer case. Meeting the minimum alone never readies downstream work: both final-result bindings and `after` dependencies require the same immutable closure. Prefix effects can precede missing-provider failure; suffix failures can follow committed work without rollback or replay. See the [complete admission and failure contract](stage-chains.added.md).
 
-## Current source: one prefix selection before repetition (unreleased)
+## Version 0.15.0: one prefix selection before repetition
 
-Current source (unreleased) also composes exactly one producer-backed choice argument on one required `Exactly(1)` prefix consumer with one nonterminal bounded repeated stage and a resolved suffix. The candidate producer is an earlier single-start operation returning `list[ConcreteModel]`; repeated choices remain direct closed string `Literal` values, and all other operations remain resolved required `Exactly(1)`. Pydantic request/response, chain-wide `FromRequest`, unique ordering, final-invocation addressing and exact terminal response ownership remain required. Empty/unavailable/oversized candidate domains stop before selection or repeated work; a singleton binds locally, while ambiguity uses canonical request-local tokens. Singleton selection still leads to model-backed repeated decisions. One lazy model-configuration lookup, run, principal, ledger, deadline and usage budget span both phases. No business-function tools, reselection after same-run failure, effect replay or final model acknowledgment are added. A fresh request starts a fresh run. Published v0.14.0 is unchanged. See [the complete composed contract](choice-before-stage.added.md).
+Version 0.15.0 also composes exactly one producer-backed choice argument on one required `Exactly(1)` prefix consumer with one nonterminal bounded repeated stage and a resolved suffix. The candidate producer is an earlier single-start operation returning `list[ConcreteModel]`; repeated choices remain direct closed string `Literal` values, and all other operations remain resolved required `Exactly(1)`. Pydantic request/response, chain-wide `FromRequest`, unique ordering, final-invocation addressing and exact terminal response ownership remain required. Empty/unavailable/oversized candidate domains stop before selection or repeated work; a singleton binds locally, while ambiguity uses canonical request-local tokens. Singleton selection still leads to model-backed repeated decisions. One lazy model-configuration lookup, run, principal, ledger, deadline and usage budget span both phases. No business-function tools, reselection after same-run failure, effect replay or final model acknowledgment are added. A fresh request starts a fresh run. Published behavior before v0.15.0 remains unchanged. See [the complete composed contract](choice-before-stage.added.md).
 
 
-## Current-source bounded checkpoint progression (unreleased)
+## Version 0.15.0 bounded checkpoint progression
 
-Current source supports one explicit `Required(check, calls=Between(1, M), until="accepted")` marker, with finite `M >= 2`. The marker must name a stored, non-null strict Boolean field in the checkpoint's validated Pydantic output; aliases, computed properties, expressions and coercive Boolean fields do not qualify. `until=None` keeps ordinary `Required` behavior. A uniquely ordered required region ends at the checkpoint, with effective bounds `1..M`; a nonempty uniquely ordered optional negative continuation has bounds `0..M-1`. Exactly one `Required(..., calls=Exactly(1))` terminal returns the endpoint's exact full response annotation and reads only fields from the final checkpoint invocation. Invalid marked shapes fail registration, never fall back to the legacy route.
+Version 0.15.0 supports one explicit `Required(check, calls=Between(1, M), until="accepted")` marker, with finite `M >= 2`. The marker must name a stored, non-null strict Boolean field in the checkpoint's validated Pydantic output; aliases, computed properties, expressions and coercive Boolean fields do not qualify. `until=None` keeps ordinary `Required` behavior. A uniquely ordered required region ends at the checkpoint, with effective bounds `1..M`; a nonempty uniquely ordered optional negative continuation has bounds `0..M-1`. Exactly one `Required(..., calls=Exactly(1))` terminal returns the endpoint's exact full response annotation and reads only fields from the final checkpoint invocation. Invalid marked shapes fail registration, never fall back to the legacy route.
 
-True closes to terminal. False runs the declared continuation, then rechecks; the Mth false closes unresolved to terminal without another continuation. The application owns the truth of the check, candidate permissions and truthful report. An empty choice domain fails closed with the existing redacted 409; it is not an unresolved report. Only one frame operation is in flight. Continuation admission retires that round’s authority atomically, so closure cannot race it; only a fresh checkpoint after continuation can close. Every invocation uses the existing shared kernel. The shared request, authenticated principal, invocation ledger, usage budget and absolute deadline span all rounds. There is no rollback, effect replay, durable resume or recovery: a prior write/report may remain after later failure, and a fresh request is not safe recovery. Published v0.14.0 does not include checkpoint progression. See [examples 18 and 19](../examples/README.md#18-bounded-checkpoint-cleanup-current-source-unreleased) and the [complete contract](checkpoint-progression.added.md).
+True closes to terminal. False runs the declared continuation, then rechecks; the Mth false closes unresolved to terminal without another continuation. The application owns the truth of the check, candidate permissions and truthful report. An empty choice domain fails closed with the existing redacted 409; it is not an unresolved report. Only one frame operation is in flight. Continuation admission retires that round’s authority atomically, so closure cannot race it; only a fresh checkpoint after continuation can close. Every invocation uses the existing shared kernel. The shared request, authenticated principal, invocation ledger, usage budget and absolute deadline span all rounds. There is no rollback, effect replay, durable resume or recovery: a prior write/report may remain after later failure, and a fresh request is not safe recovery. Checkpoint progression is included from version 0.15.0; it was not part of version 0.14.0. See [examples 18 and 19](../examples/README.md#18-bounded-checkpoint-cleanup-included-from-version-0150) and the [complete contract](checkpoint-progression.added.md).
 
 ## Deterministic and agentic execution
 
@@ -247,7 +247,7 @@ at least one argument is bound from `FromRequest`, every remaining argument come
 `FromRequest` or an immutable identity-stable callable default, and its declared output is
 the endpoint output model by exact identity, the runtime executes that operation directly
 before model resolution. There is no model fallback after direct execution starts.
-From 0.12.0, fully resolved chains run model-free only with a Pydantic request and at least one `FromRequest`, uniquely ordered required `Exactly(1)` steps, supported request/result/authenticated-context sources and immutable defaults, and an exact full terminal response annotation. Any `AgentChoice` in a published v0.13.0 chain remains agent-mediated. Included from version 0.14.0, a narrow result-dependent path is shipped for exactly one producer-backed choice argument across the entire otherwise eligible chain, with no other choice. A singleton binds locally; multiple candidates cause lazy model handoff after the prefix. Current source (unreleased) supports one or more producer-backed choices with framework-owned progression. In an otherwise eligible uniquely ordered required `Exactly(1)` chain, a Pydantic request, at least one `FromRequest`, supported request/result/authenticated-context bindings or immutable defaults, and exact full terminal response annotation identity remain required. All current consumer domains are checked before selection or start. Singleton bindings resolve locally; a decision-only selector returns ambiguous tokens with no business-operation tools. The shared kernel validates and invokes the operation, then continues locally until another genuine decision is needed. The canonical terminal result returns without a final model acknowledgment. Request/principal, reservations, token domains, usage budgets and one deadline remain request-local across frontiers and corrections. Explicit `tool_calls_limit` retains the previous one-way agent suffix; `allow_direct=False` and other noneligible declarations retain their existing route. Limits remain 128 candidates and 65,536 evidence characters per binding, not an aggregate prompt/context budget. Prefix effects may precede provider-configuration failure; no rollback, effect replay or durable resume is added. Historical v0.14.0 remains exactly-one-choice. See the [operation reference](https://summonpot.modepot.io/reference/operations/) for details.
+From 0.12.0, fully resolved chains run model-free only with a Pydantic request and at least one `FromRequest`, uniquely ordered required `Exactly(1)` steps, supported request/result/authenticated-context sources and immutable defaults, and an exact full terminal response annotation. Any `AgentChoice` in a published v0.13.0 chain remains agent-mediated. Included from version 0.14.0, a narrow result-dependent path is shipped for exactly one producer-backed choice argument across the entire otherwise eligible chain, with no other choice. A singleton binds locally; multiple candidates cause lazy model handoff after the prefix. Version 0.15.0 supports one or more producer-backed choices with framework-owned progression. In an otherwise eligible uniquely ordered required `Exactly(1)` chain, a Pydantic request, at least one `FromRequest`, supported request/result/authenticated-context bindings or immutable defaults, and exact full terminal response annotation identity remain required. All current consumer domains are checked before selection or start. Singleton bindings resolve locally; a decision-only selector returns ambiguous tokens with no business-operation tools. The shared kernel validates and invokes the operation, then continues locally until another genuine decision is needed. The canonical terminal result returns without a final model acknowledgment. Request/principal, reservations, token domains, usage budgets and one deadline remain request-local across frontiers and corrections. Explicit `tool_calls_limit` retains the previous one-way agent suffix; `allow_direct=False` and other noneligible declarations retain their existing route. Limits remain 128 candidates and 65,536 evidence characters per binding, not an aggregate prompt/context budget. Prefix effects may precede provider-configuration failure; no rollback, effect replay or durable resume is added. Historical v0.14.0 remains exactly-one-choice. See the [operation reference](https://summonpot.modepot.io/reference/operations/) for details.
 A direct `AgentChoice` in the admitted shape uses the provider-neutral agent loop. An
 unsupported explicit declaration fails before serving; bare callable dependencies keep their
 legacy agent behavior. `Operation(fn)` is still an explicit contract and is rejected because
@@ -373,7 +373,7 @@ unsupported core schemas are rejected at registration rather than silently strip
 
 Broader explicit operation shapes are rejected before serving until their execution
 semantics ship. Published chain behavior requires exactly one ready operation at each
-step. Current source additionally supports `FromResult` and `after` in the fully resolved
+step. Version 0.15.0 additionally supports `FromResult` and `after` in the fully resolved
 branch/join slice above, with stable sequential readiness and one exact terminal response.
 Producer-backed `AgentChoice(from_result=...)` remains restricted to uniquely ordered
 chains and producer outputs `list[ConcreteModel]`, under the bounded tokenized contract
@@ -400,8 +400,8 @@ canonical values. Validation hooks, custom initialization/post-init hooks, and t
 model configurations fail registration rather than being replayed to change identity.
 
 
-## Current-source branch/join execution (unreleased)
+## Version 0.15.0 branch/join execution
 
-Current source supports a narrow fully resolved branch/join graph without widening the public API. The endpoint must have a Pydantic request and response, at least one `FromRequest` binding, and required `Exactly(1)` operations forming an acyclic graph. Inputs may be supported request bindings, validated `FromResult` values, authenticated `FromContext` values, or supported immutable callable defaults. Every operation must reach the unique sink, and exactly one operation must declare the endpoint's exact full response annotation. `AgentChoice` is not admitted.
+Version 0.15.0 supports a narrow fully resolved branch/join graph without widening the public API. The endpoint must have a Pydantic request and response, at least one `FromRequest` binding, and required `Exactly(1)` operations forming an acyclic graph. Inputs may be supported request bindings, validated `FromResult` values, authenticated `FromContext` values, or supported immutable callable defaults. Every operation must reach the unique sink, and exactly one operation must declare the endpoint's exact full response annotation. `AgentChoice` is not admitted.
 
 Readiness is inferred from result dependencies and `after` ordering. Execution remains sequential; when multiple operations are ready, declaration order is the stable tie-break. `after` imposes business ordering but does not authorize disconnected vertices, multiple sinks, cycles, choices, or unsupported inputs. Existing chain/choice/repetition/checkpoint routes are unchanged. This is not a public graph API or parallel scheduler. Published v0.14.0 is unchanged; milestone 4 is partial and milestone 3 remains partial. See [example 20](../examples/20_branch_join/README.md).

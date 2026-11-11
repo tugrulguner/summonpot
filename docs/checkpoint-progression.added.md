@@ -1,10 +1,10 @@
-# Bounded checkpoint progression (unreleased implementation)
+# Bounded checkpoint progression (version 0.15.0 implementation)
 
 One endpoint can declare a bounded sequence that checks application state, performs
 permitted continuation work only while that check is negative, and returns one
 canonical application result. Summonpot owns progression; application functions do
-not call each other or maintain a handoff loop. This is an unreleased source
-capability, not behavior of published v0.14.0.
+not call each other or maintain a handoff loop. This capability is included from version 0.15.0,
+not behavior of v0.14.0.
 
 The completion declaration is `Required(check, calls=Between(1, M), until="accepted")`.
 It is an explicit execution contract, not a general loop primitive or a hint to a

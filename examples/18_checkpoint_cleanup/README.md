@@ -1,4 +1,4 @@
-# 18. Bounded checkpoint cleanup (current source, unreleased)
+# 18. Bounded checkpoint cleanup (included from version 0.15.0)
 
 One endpoint inspects a record, deterministically verifies its normalization rules,
 discovers permitted corrections, applies a canonical selected correction, and persists
@@ -16,7 +16,7 @@ curl -sS localhost:8000/checkpoint-cleanup \
 
 Configure the chosen provider's credentials in the serving environment. Request JSON
 contains only business record identity, never a framework action, model or mode.
-Published v0.14.0 does not contain `until`; this example requires current source.
+Published v0.14.0 does not contain `until`; this example requires version 0.15.0 or later.
 
 The strict `accepted` check allows up to three checks and two continuation rounds:
 

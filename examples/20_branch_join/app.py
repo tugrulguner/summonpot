@@ -1,6 +1,6 @@
 """Level 20: independent quote calculations join without model orchestration.
 
-Current source only; this branch-and-join shape is not in published v0.14.0.
+Included from version 0.15.0; this branch-and-join shape is not in published v0.14.0.
 """
 
 from pydantic import BaseModel, Field

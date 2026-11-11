@@ -1,7 +1,7 @@
 # 14. Bounded SQLite audit
 
-This source example demonstrates the unreleased bounded repeated-call contract on current
-Summonpot source; it is not part of published v0.14.0. The endpoint's fixed goal asks
+This example demonstrates the bounded repeated-call contract included from Summonpot
+0.15.0; it is not part of v0.14.0. The endpoint's fixed goal asks
 Summonpot to run one to three checks (`stock`, `prices`, or `deliveries`) and return the
 canonical cumulative SQLite snapshot from the final successful invocation. The model
 selects only a closed `Literal` check value. The request supplies the audit ID, while the
