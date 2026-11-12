@@ -215,6 +215,17 @@ CASES = (
         "/quotes/defaults",
         {"unit_price_cents": 199, "quantity": 3},
     ),
+    ExampleCase(
+        "23_choice_branch_join/app.py",
+        "POST",
+        "/quotes/shipping-choice",
+        {
+            "unit_price_cents": 150,
+            "quantity": 2,
+            "unit_weight_grams": 700,
+            "max_delivery_days": 4,
+        },
+    ),
 )
 
 
@@ -484,6 +495,39 @@ summon=example.summon
     return wrapper
 
 
+def _choice_graph_smoke_wrapper(source: Path, workdir: Path) -> Path:
+    """Exercise real graph execution with evidence-derived keyless selections."""
+    wrapper = workdir / "choice_graph_smoke_app.py"
+    wrapper.write_text(
+        f"""import json,runpy
+from pydantic_ai.messages import ModelResponse,ToolCallPart,UserPromptPart
+from pydantic_ai.models.function import FunctionModel
+from summonpot.runtime import Runtime
+summon=runpy.run_path({str(source)!r})['summon']
+def record(event):
+    with open({str(workdir / "choice-graph-events.jsonl")!r},'a') as stream:
+        stream.write(json.dumps({{'event':event}})+'\\n')
+def choose(messages,info):
+    assert not info.function_tools
+    assert 'lowest-price' in info.instructions
+    text=next(p.content for m in reversed(messages) for p in m.parts if isinstance(p,UserPromptPart) and isinstance(p.content,str))
+    domain=json.loads(text.splitlines()[-1])['decision_slot_0']
+    assert domain['argument']=='offer'
+    selected=min(domain['candidates'],key=lambda entry:entry['value']['cents'])
+    record('selection')
+    return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name,{{'decision_slot_0':selected['token']}})])
+fixture=FunctionModel(choose)
+class FixtureRuntime(Runtime):
+    def model_for(self,endpoint):
+        record('model_lookup')
+        return fixture
+summon._runtime=FixtureRuntime(retries=0)
+""",
+        encoding="utf-8",
+    )
+    return wrapper
+
+
 def _path_methods_smoke_wrapper(source: Path, workdir: Path) -> Path:
     """Keyless SDK fixture; derive every echo from the actual model request."""
     wrapper = workdir / "path_methods_smoke_app.py"
@@ -515,7 +559,9 @@ def _verify_case(
     source = (examples_root / case.source).resolve()
     if not source.is_file():
         raise FileNotFoundError(source)
-    if case.source == "21_path_methods/app.py":
+    if case.source == "23_choice_branch_join/app.py":
+        served_source = _choice_graph_smoke_wrapper(source, workdir)
+    elif case.source == "21_path_methods/app.py":
         served_source = _path_methods_smoke_wrapper(source, workdir)
     elif case.source == "06_support_service/app.py":
         served_source = _support_smoke_wrapper(source, workdir)
@@ -648,6 +694,35 @@ def _verify_case(
             assert json.loads(rejected_body) == {
                 "detail": "Request data did not satisfy a receiving operation contract."
             }
+        if case.source == "23_choice_branch_join/app.py":
+            assert response_body == {
+                "merchandise_cents": 300,
+                "shipping_cents": 700,
+                "service": "standard",
+                "total_cents": 1000,
+            }
+            assert case.payload is not None
+            singleton_status, singleton_body = _request(
+                base_url, "POST", case.path, {**case.payload, "max_delivery_days": 1}
+            )
+            assert singleton_status == 200
+            assert json.loads(singleton_body) == {
+                "merchandise_cents": 300,
+                "shipping_cents": 1350,
+                "service": "express",
+                "total_cents": 1650,
+            }
+            events = [
+                json.loads(line)["event"]
+                for line in (workdir / "choice-graph-events.jsonl")
+                .read_text()
+                .splitlines()
+            ]
+            assert events == ["model_lookup", "selection"]
+            invalid_status, _ = _request(
+                base_url, "POST", case.path, {**case.payload, "max_delivery_days": 0}
+            )
+            assert invalid_status == 422
         if case.source == "20_branch_join/app.py":
             assert case.payload is not None
             subtotal = case.payload["unit_price_cents"] * case.payload["quantity"]
