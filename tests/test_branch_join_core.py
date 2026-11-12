@@ -356,22 +356,22 @@ def test_many_vertices_use_exact_identity_and_current_ready_priority():
     assert _resolved_graph_tool_indices(tools) == (2, 1, 3, 4, 5, 6, 7, 8, 0)
 
 
-def test_producer_choice_does_not_gain_nonlinear_admission():
+def test_multiple_producer_choices_do_not_gain_nonlinear_admission():
     def candidates(value: int) -> list[Value]:
         return [Value(value=value)]
 
     def choose(item: Value) -> Value:
         return item
 
-    def independent(value: int) -> Value:
-        return Value(value=value)
+    def independent(item: Value) -> Value:
+        return Value(value=item.value)
 
     def finish(a: int, b: int) -> Response:
         return Response(total=a + b)
 
     producer = Operation(candidates, bind={"value": FromRequest("value")})
     chosen = Operation(choose, bind={"item": AgentChoice(from_result=producer)})
-    other = Operation(independent, bind={"value": FromRequest("value")})
+    other = Operation(independent, bind={"item": AgentChoice(from_result=producer)})
     terminal = Operation(
         finish, bind={"a": FromResult(chosen, "value"), "b": FromResult(other, "value")}
     )

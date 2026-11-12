@@ -47,6 +47,7 @@ EXAMPLES = [
         for method in ("get", "post", "put", "patch", "delete", "head")
     ],
     ("22_contract_defaults/app.py", "/quotes/defaults", "post"),
+    ("23_choice_branch_join/app.py", "/quotes/shipping-choice", "post"),
 ]
 
 

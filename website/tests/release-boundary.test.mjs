@@ -11,7 +11,7 @@ for (const [name, path] of [
     assert.match(html, /0\.11\.0/);
     assert.match(html, /0\.12\.0/);
     assert.match(html, /fully resolved/);
-    assert.doesNotMatch(html, /not yet published|Unreleased source/);
+    assert.doesNotMatch(html, /not yet published/);
     assert.match(html, /agent-mediated/);
     assert.match(html, /model-free/);
     assert.match(html, /128/);
@@ -55,4 +55,16 @@ test('version 0.15.0 checkpoint progression stays bounded', async () => {
     assert.match(page, /Published v0\.14\.0 is unchanged/);
     assert.match(page, /No rollback, replay, durable resume or recovery/);
   }
+});
+
+test('new choice graph is explicitly unreleased without relabeling historical graphs', async () => {
+  const html = await readFile(new URL('../dist/reference/operations/index.html', import.meta.url), 'utf8');
+  const section = html.match(/<h[23] id="unreleased-source[^\"]*">[\s\S]*?(?=<h[23]|$)/)?.[0];
+  assert.ok(section, 'unreleased choice-graph section must render');
+  const text = section.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+  assert.match(text, /exactly one producer-backed/i);
+  assert.match(text, /unique sink/i);
+  assert.match(text, /no global choice barrier/i);
+  assert.match(text, /allow_direct=False/i);
+  assert.match(text, /Historical version 0\.15\.0 branch\/join remains zero-choice/i);
 });

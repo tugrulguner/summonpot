@@ -33,6 +33,7 @@ from summonpot._validation import (
     _repeated_contract_tool_index,
     _repeated_stage_indices,
     _resolved_graph_tool_indices,
+    _single_choice_graph_tool_indices,
 )
 from summonpot.contracts import AgentChoice, FromContext, FromRequest, FromResult
 from summonpot.models import EndpointDef, ParamDef, ToolDef
@@ -188,6 +189,7 @@ class _CompiledEndpoint:
     response_producer: int | None = None
     direct_chain_order: tuple[int, ...] | None = None
     result_dependent_order: tuple[int, ...] | None = None
+    single_choice_graph: bool = False
     repeated_tool: int | None = None
     repeated_terminal: int | None = None
     repeated_order: tuple[int, ...] | None = None
@@ -1166,6 +1168,7 @@ def _compile_endpoint(
                 "Repeated execution requires Pydantic request/response models and exact full response annotation."
             )
     chain_indices = _chain_contract_tool_indices(source_tools)
+    single_choice_graph = False
     if chain_indices is None:
         chain_indices = _resolved_graph_tool_indices(source_tools)
         if chain_indices is not None and (
@@ -1175,6 +1178,24 @@ def _compile_endpoint(
         ):
             raise TypeError(
                 "Resolved graphs require direct execution, Pydantic request/response "
+                "models and at least one FromRequest binding."
+            )
+    if chain_indices is None:
+        chain_indices = _single_choice_graph_tool_indices(source_tools)
+        single_choice_graph = chain_indices is not None
+        if single_choice_graph and (
+            not allow_direct
+            or endpoint.input_model is None
+            or endpoint.output_model is None
+            or not any(
+                type(source) is FromRequest
+                for tool in source_tools
+                if tool.contract is not None and tool.contract.bind is not None
+                for source in tool.contract.bind.values()
+            )
+        ):
+            raise TypeError(
+                "Single-choice graphs require direct execution, Pydantic request/response "
                 "models and at least one FromRequest binding."
             )
     terminal_contract = (
@@ -1289,6 +1310,7 @@ def _compile_endpoint(
             )
             else None
         ),
+        single_choice_graph=single_choice_graph,
         context=context,
         checkpoint=checkpoint,
     )

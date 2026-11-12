@@ -353,6 +353,10 @@ Shows the same rule in a three-operation declaration. Already-accepted state ski
 
 [Example 20](20_branch_join/README.md) demonstrates a deterministic subtotal branch and independent shipping calculation joining at one total-quote finalizer. This narrow version 0.15.0 path requires an acyclic, fully resolved required `Exactly(1)` graph with a unique sink reached by every operation and one exact response producer. It runs ready operations sequentially with declaration-order tie-breaking. It does not support `AgentChoice`, general graphs, or parallel execution; published v0.14.0 is unchanged.
 
+### 23. One producer-backed choice in a required branch/join graph (unreleased source)
+
+[Example 23](23_choice_branch_join/README.md) demonstrates the current-source single-choice exception to the historical zero-choice branch/join form. It retains required sequential operations and one exact response sink; singleton selection needs no model, while ambiguity uses bounded opaque-token selection. This is not in published summonpot 0.15.0. See the [contract](../README.md#unreleased-source-one-producer-backed-choice-in-required-dags).
+
 ### 21. URL path values and HTTP methods (included from version 0.15.0)
 
 Directory: [`21_path_methods/`](21_path_methods/)
