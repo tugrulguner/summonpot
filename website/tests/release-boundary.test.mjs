@@ -68,3 +68,13 @@ test('new choice graph is explicitly unreleased without relabeling historical gr
   assert.match(text, /allow_direct=False/i);
   assert.match(text, /Historical version 0\.15\.0 branch\/join remains zero-choice/i);
 });
+
+test('multiple-choice graphs retain current-consumer decisions and the published boundary', async () => {
+  const html = await readFile(new URL('../dist/reference/operations/index.html', import.meta.url), 'utf8');
+  const section = html.match(/<h[23] id="unreleased-source-multiple[^\"]*">[\s\S]*?(?=<h[23]|$)/)?.[0];
+  assert.ok(section, 'multiple-choice source contract must render');
+  const text = section.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+  for (const pattern of [/one or more producer-backed/i, /same consumer/i, /Distinct consumers/i, /shared usage budget/i, /not published v0\.15\.0/i, /allow_direct=False/]) {
+    assert.match(text, pattern);
+  }
+});

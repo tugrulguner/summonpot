@@ -613,12 +613,12 @@ class Runtime:
 
         plan = self._plan_for(endpoint)
         if (
-            plan.single_choice_graph
+            plan.producer_choice_graph
             and self.usage_limits is not None
             and self.usage_limits.tool_calls_limit is not None
         ):
             raise RuntimeError(
-                "Explicit function-tool quota is unsupported for single-choice graph execution."
+                "Explicit function-tool quota is unsupported for producer-choice graph execution."
             )
         if (
             (plan.repeated_tool is not None or plan.checkpoint is not None)

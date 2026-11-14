@@ -88,11 +88,22 @@ Version 0.15.0 adds one narrow model-free branch/join form. A supported Pydantic
 
 ## Unreleased source: one producer-backed choice in required DAGs
 
-The current source adds one narrow exception to version 0.15.0's fully resolved branch/join form; this is unreleased and is not part of published summonpot 0.15.0. Historical version 0.15.0 branch/join execution remains choice-free. A supported Pydantic request/response must have at least one `FromRequest`; all operations are required `Exactly(1)` in an acyclic graph with one sink reached by every operation and exactly one producer of the endpoint's exact full response annotation. Exactly one argument globally may use producer-backed `AgentChoice(from_result=...)`, from its exact declared producer Operation returning `list[ConcreteModel]`; every other input uses existing supported bindings or immutable defaults. The agent chooses only that argument value; it does not choose which branch runs.
+The initial unreleased source slice added one narrow exception to version 0.15.0's fully resolved branch/join form; this is unreleased and is not part of published summonpot 0.15.0. Historical version 0.15.0 branch/join execution remains choice-free. A supported Pydantic request/response must have at least one `FromRequest`; all operations are required `Exactly(1)` in an acyclic graph with one sink reached by every operation and exactly one producer of the endpoint's exact full response annotation. The initial source slice permitted exactly one argument globally using producer-backed `AgentChoice(from_result=...)`, from its exact declared producer Operation returning `list[ConcreteModel]`; every other input uses existing supported bindings or immutable defaults. The agent chooses only that argument value; it does not choose which branch runs.
 
 Operations execute sequentially in stable declaration-priority order among ready nodes in this acyclic graph with a unique sink. The choice producer is a readiness dependency, but there is no global choice barrier: an independent earlier branch may already have effects if an empty/unavailable/oversized domain fails with the existing redacted 409 before consumer/model work. `after` still expresses business ordering. A singleton binds the canonical member with no model lookup or call; ambiguous choices expose only bounded inert candidate evidence and opaque tokens to a private selector with no business tools. The shared kernel validates the selection and invokes the consumer; no extra context/results are disclosed and no final model acknowledgment is requested. The sink returns its audited canonical result.
 
-Explicit function-tool quota (`UsageLimits.tool_calls_limit`) and private `allow_direct=False` reject this new graph shape before effects; existing linear-chain compatibility, including its multiple-choice behavior, is unchanged. Historical version 0.15.0 branch/join execution remains choice-free, and its zero-choice behavior is preserved. This is not a public graph API, parallel scheduler, repeat/feedback workflow, durable recovery, or general graph compiler. Milestones 3 and 4 remain partial. See [example 23](examples/23_choice_branch_join/README.md), to be added with this source feature.
+Explicit function-tool quota (`UsageLimits.tool_calls_limit`) and private `allow_direct=False` reject this new graph shape before effects; existing linear-chain compatibility, including its multiple-choice behavior, is unchanged. Historical version 0.15.0 branch/join execution remains choice-free, and its zero-choice behavior is preserved. This is not a public graph API, parallel scheduler, repeat/feedback workflow, durable recovery, or general graph compiler. Milestones 3 and 4 remain partial. See [example 23](examples/23_choice_branch_join/README.md).
+
+The current multiple-choice extension is specified next; the initial one-choice limit above is historical.
+
+## Unreleased source: multiple producer-backed choices in required DAGs
+
+Current unreleased source admits **one or more producer-backed** `AgentChoice(from_result=...)` bindings in a required `Exactly(1)` acyclic graph. Preserve Pydantic request/response contracts, at least one `FromRequest`, supported immutable defaults and request/result/context bindings, exact declared `list[ConcreteModel]` producers, a single sink reached by every operation, and one exact full response annotation owner. There is no arbitrary global two-choice cap.
+
+Execution stays sequential in declaration-priority readiness order. All domains for the same consumer are checked before selection or its application call; its ambiguous arguments are selected together. Distinct consumers keep separate decision frontiers and are not batched ahead of effects. Singleton bindings need no model lookup; ambiguity exposes only bounded current evidence and opaque tokens, with no business-function tools or model-authored terminal response. One request, principal, ledger, shared usage budget and deadline span all frontiers. There is no global choice barrier: earlier effects may remain after a later unavailable domain or failure.
+
+Explicit function-tool quota and private `allow_direct=False` reject the non-linear shape before work; existing linear compatibility remains unchanged. This is not published v0.15.0 behavior and adds no parallelism, optional branches, graph repetition/checkpoints, feedback or durable recovery. Milestones 3 and 4 remain partial. See [example 24](examples/24_multiple_choice_branch_join/README.md).
+
 
 ## Version 0.15.0 bounded checkpoint progression
 
@@ -805,6 +816,7 @@ The [`examples/`](examples/) directory grows from one endpoint to a multi-file s
 | 21 | [`21_path_methods/`](examples/21_path_methods/) | Path parameters and HTTP methods (included from version 0.15.0) |
 | 22 | [`22_contract_defaults/`](examples/22_contract_defaults/) | Callable defaults and contract metadata (included from version 0.15.0) |
 | 23 | [`23_choice_branch_join/`](examples/23_choice_branch_join/) | One bounded choice in independent branches (current source / unreleased) |
+| 24 | [`24_multiple_choice_branch_join/`](examples/24_multiple_choice_branch_join/) | Independent shipping and packaging choices (current source / unreleased) |
 
 The [examples guide](examples/README.md) explains capability progression and release boundaries.
 
