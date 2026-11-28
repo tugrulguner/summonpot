@@ -222,3 +222,7 @@ Summonpot is an open-source [ModePot](https://modepot.io/) project. Join the [Mo
 ## Version 0.15.0 branch/join execution
 
 The narrow model-free branch/join slice in version 0.15.0 accepts fully resolved required `Exactly(1)` acyclic graphs with a Pydantic request/response, at least one `FromRequest`, supported request/result/authenticated-context/default inputs, one unique sink reached by all operations, and one exact full-response producer. No `AgentChoice` is allowed. Operations run sequentially; ties among ready operations follow declaration order, and `after` expresses business ordering. This is not a public graph API, parallel scheduler, or feedback support. Existing execution paths are unchanged. Published v0.14.0 is unchanged; milestone 4 is partial, and milestone 3 remains partial. See [example 20](https://github.com/tugrulguner/summonpot/blob/main/examples/20_branch_join/README.md).
+
+## Version 0.16.0: choices across branches
+
+Version 0.16.0 extends required branch/join contracts to one or more producer-backed choices. An endpoint can select shipping and packaging independently and combine both into a quote. Summonpot controls the operation order and returns the validated quote; the agent selects only among the permitted values. If every choice has one candidate, the endpoint runs without a model. See the [operation reference](/reference/operations/#version-0160-producer-backed-choices-in-required-dags).

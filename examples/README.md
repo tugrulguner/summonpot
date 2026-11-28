@@ -353,9 +353,9 @@ Shows the same rule in a three-operation declaration. Already-accepted state ski
 
 [Example 20](20_branch_join/README.md) demonstrates a deterministic subtotal branch and independent shipping calculation joining at one total-quote finalizer. This narrow version 0.15.0 path requires an acyclic, fully resolved required `Exactly(1)` graph with a unique sink reached by every operation and one exact response producer. It runs ready operations sequentially with declaration-order tie-breaking. It does not support `AgentChoice`, general graphs, or parallel execution; published v0.14.0 is unchanged.
 
-### 23. One producer-backed choice in a required branch/join graph (unreleased source)
+### 23. One producer-backed choice in a required branch/join graph (included from version 0.16.0)
 
-[Example 23](23_choice_branch_join/README.md) demonstrates the current-source single-choice exception to the historical zero-choice branch/join form. It retains required sequential operations and one exact response sink; singleton selection needs no model, while ambiguity uses bounded opaque-token selection. This is not in published summonpot 0.15.0. See the [contract](../README.md#unreleased-source-one-producer-backed-choice-in-required-dags).
+[Example 23](23_choice_branch_join/README.md) demonstrates one producer-backed choice in a required branch/join contract. It retains required sequential operations and one exact response sink; singleton selection needs no model, while ambiguity uses bounded opaque-token selection. Version 0.15.0 branch/join execution remains choice-free. See the [contract](../README.md#version-0160-producer-backed-choices-in-required-dags).
 
 ### 21. URL path values and HTTP methods (included from version 0.15.0)
 
@@ -369,7 +369,7 @@ Directory: [`22_contract_defaults/`](22_contract_defaults/)
 
 A real integer quote calculation keeps the immutable discount default application-owned while binding request values explicitly. The operation's tighter `Annotated` quantity constraint rejects an otherwise valid request before the callable starts. Its inferred full annotated output contract preserves response metadata and executes without a model. The [guide](22_contract_defaults/README.md) explains extra-field rejection, rounding and the v0.14.0 explicit-output alternative.
 
-### 24. Independent shipping and packaging choices (unreleased source)
+### 24. Independent shipping and packaging choices (included from version 0.16.0)
 
 [Example 24](24_multiple_choice_branch_join/README.md) uses multiple producer-backed choice consumers in one required single-start graph. Each consumer has its own sequential decision frontier; a singleton needs no model. Multiple arguments on the same consumer are selected together instead. All frontiers share request/principal, usage and deadline; published v0.15.0 remains unchanged. No parallel scheduling, conditional skipping or recovery is introduced.
 

@@ -1,6 +1,6 @@
 # 24 — Independent shipping and packaging choices
 
-**Current source / unreleased.** Use a checkout containing this extension. Published v0.15.0 cannot execute this declaration; the earlier one-choice graph slice alone is also insufficient.
+**Requires summonpot 0.16.0 or later.** Version 0.15.0 does not support producer-backed choices in branch/join contracts.
 
 Five real application operations calculate allowed tariffs, accept a canonical shipping option, independently calculate packaging options, accept one canonical packaging option, and combine the exact quote. There is no artificial `after` edge from shipping to packaging discovery. The local tariffs are arithmetic, not live carrier services, inventory, charges or reservations.
 

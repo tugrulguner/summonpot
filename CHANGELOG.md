@@ -10,6 +10,18 @@ release assembles them here — run `make changelog-draft` to preview them.
 
 <!-- towncrier release notes start -->
 
+## [0.16.0] - 2026-11-28
+
+### Added
+
+- Add two runnable shipping-quote examples for the required branch/join contract: one selects a permitted shipping offer alongside independent merchandise calculation; the other selects shipping and packaging independently. Both exercise singleton and ambiguous domains through the installed CLI and HTTP. Their tariffs are application calculations, not live carrier quotes or payments.
+- Support one or more producer-backed `AgentChoice` bindings in required single-start branch/join contracts, without new public declarations. Summonpot runs ready operations sequentially and returns the validated result of the terminal operation. The agent chooses only permitted argument values, and the endpoint runs without a model when all choices resolve to singletons. Choices at one consumer are selected together; different consumers advance separately under one request budget and deadline. Explicit function-tool quotas reject this graph shape before effects. Existing linear compatibility is unchanged; parallel scheduling, conditional branches, repetition and durable recovery are outside this contract.
+
+### Changed
+
+- Use the pinned Playwright browser image for website checks and deployment.
+
+
 ## [0.15.0] - 2026-11-11
 
 ### Added

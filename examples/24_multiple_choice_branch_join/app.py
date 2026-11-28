@@ -1,7 +1,7 @@
-"""Current-source / unreleased: independent shipping and packaging choices.
+"""Level 24: independent shipping and packaging choices.
 
 Application-defined tariff calculations, not carrier services or charges.
-Published v0.15.0 does not support this branch/join declaration."""
+Requires summonpot 0.16.0 or later."""
 
 from pydantic import BaseModel, Field
 

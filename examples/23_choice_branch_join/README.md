@@ -1,6 +1,6 @@
 # 23 — Independent branches with one shipping choice
 
-**Current source / unreleased.** Published v0.15.0 rejects this choice-bearing branch/join shape. Use a checkout containing this implementation; installing v0.15.0 alone is insufficient.
+**Requires summonpot 0.16.0 or later.** Version 0.15.0 only supports fully resolved branch/join contracts.
 
 The declaration has four application operations:
 
@@ -47,7 +47,7 @@ The keyless release-smoke fixture derives its token from actual projected eviden
 
 ## Boundaries
 
-- This lesson uses one producer-backed choice and one required single-start sink owning the exact response. The initial source slice admitted exactly one choice globally; the current extension also supports multiple choices (see [example 24](../24_multiple_choice_branch_join/README.md)). Existing linear compatibility is unchanged.
+- This lesson uses one producer-backed choice and one required single-start sink owning the exact response. Version 0.16.0 also supports multiple choices (see [example 24](../24_multiple_choice_branch_join/README.md)). Existing linear compatibility is unchanged.
 - Quantity must be 1–100 and the delivery window 1–4 days; invalid requests reject with HTTP 422 before selection.
 - There is no global choice barrier. Declaration order breaks readiness ties, and explicit `after` edges express required business ordering. Earlier effects may remain after a later failure; this example itself performs calculations only.
 - Explicit function-tool quotas reject this new shape before operation/model starts; the decision-only selector does not report business tool calls. Private `allow_direct=False` compilation also rejects the new graph rather than falling back to unchecked scheduling.
