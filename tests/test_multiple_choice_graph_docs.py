@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).parents[1]
-HEADING = "## Unreleased source: multiple producer-backed choices in required DAGs"
+HEADING = "## Version 0.16.0: producer-backed choices in required DAGs"
 
 
 @pytest.mark.parametrize(
@@ -28,7 +28,7 @@ def test_current_multiple_choice_contract(path):
         text[start:].split() if end < 0 else text[start:end].split()
     ).lower()
     for term in [
-        "unreleased",
+        "version 0.16.0 admits",
         "one or more",
         "producer-backed",
         "exactly(1)",
@@ -43,10 +43,11 @@ def test_current_multiple_choice_contract(path):
         "quota",
         "allow_direct=false",
         "linear",
-        "0.15.0",
+        "version 0.15.0 branch/join execution remains choice-free",
     ]:
         assert term in section, (path, term)
     assert "24_multiple_choice_branch_join" in section
+    assert "unreleased" not in section
 
 
 def test_new_example_is_discoverable_in_both_indexes():

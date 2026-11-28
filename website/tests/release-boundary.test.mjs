@@ -57,24 +57,27 @@ test('version 0.15.0 checkpoint progression stays bounded', async () => {
   }
 });
 
-test('new choice graph is explicitly unreleased without relabeling historical graphs', async () => {
+test('choice graphs retain legacy links and the 0.15.0 boundary', async () => {
   const html = await readFile(new URL('../dist/reference/operations/index.html', import.meta.url), 'utf8');
-  const section = html.match(/<h[23] id="unreleased-source[^\"]*">[\s\S]*?(?=<h[23]|$)/)?.[0];
-  assert.ok(section, 'unreleased choice-graph section must render');
+  for (const kind of ['one-producer-backed-choice', 'multiple-producer-backed-choices']) {
+    assert.equal(html.split(`id="unreleased-source-${kind}-in-required-dags"`).length - 1, 1);
+  }
+  const section = html.match(/<h[23] id="version-0160-producer-backed-choices-in-required-dags">[\s\S]*?(?=<h[23]|$)/)?.[0];
+  assert.ok(section, 'versioned choice-graph section must render');
   const text = section.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
-  assert.match(text, /exactly one producer-backed/i);
-  assert.match(text, /unique sink/i);
+  assert.match(text, /Version 0\.16\.0 admits one or more producer-backed/i);
+  assert.match(text, /single sink/i);
   assert.match(text, /no global choice barrier/i);
   assert.match(text, /allow_direct=False/i);
-  assert.match(text, /Historical version 0\.15\.0 branch\/join remains zero-choice/i);
+  assert.match(text, /Version 0\.15\.0 branch\/join execution remains choice-free/i);
 });
 
 test('multiple-choice graphs retain current-consumer decisions and the published boundary', async () => {
   const html = await readFile(new URL('../dist/reference/operations/index.html', import.meta.url), 'utf8');
-  const section = html.match(/<h[23] id="unreleased-source-multiple[^\"]*">[\s\S]*?(?=<h[23]|$)/)?.[0];
-  assert.ok(section, 'multiple-choice source contract must render');
+  const section = html.match(/<h[23] id="version-0160-producer-backed-choices-in-required-dags">[\s\S]*?(?=<h[23]|$)/)?.[0];
+  assert.ok(section, 'multiple-choice release contract must render');
   const text = section.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
-  for (const pattern of [/one or more producer-backed/i, /same consumer/i, /Distinct consumers/i, /shared usage budget/i, /not published v0\.15\.0/i, /allow_direct=False/]) {
+  for (const pattern of [/one or more producer-backed/i, /same consumer/i, /Distinct consumers/i, /shared usage budget/i, /0\.15\.0 branch\/join execution remains choice-free/i, /allow_direct=False/]) {
     assert.match(text, pattern);
   }
 });

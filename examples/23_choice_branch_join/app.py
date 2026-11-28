@@ -1,6 +1,6 @@
 """Level 23: independent quote work with one bounded shipping choice.
 
-Current-source/unreleased lesson; published v0.15.0 rejects this graph shape.
+Requires summonpot 0.16.0 or later.
 Tariffs are application-defined calculations, not live carrier quotes.
 """
 

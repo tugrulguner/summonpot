@@ -34,23 +34,17 @@ For the full version 0.15.0 contract—including selector authority, prechecks, 
 
 
 
-## Unreleased source: one producer-backed choice in required DAGs
+<span id="unreleased-source-one-producer-backed-choice-in-required-dags"></span>
 
-The initial unreleased source slice added one narrow exception to the historical version 0.15.0 fully resolved branch/join shape. This is unreleased and is not part of published summonpot 0.15.0. The endpoint needs supported Pydantic request/response models, at least one `FromRequest`, required `Exactly(1)` operations in an acyclic graph, one unique sink reached by all operations, and exactly one producer of the endpoint's exact full response annotation. The initial source slice permitted exactly one argument globally using producer-backed `AgentChoice(from_result=...)` from its exact declared `Operation` returning `list[ConcreteModel]`. Other arguments use supported existing bindings or immutable defaults. The agent chooses only the argument value, never which branch runs.
+<span id="unreleased-source-multiple-producer-backed-choices-in-required-dags"></span>
 
-Execution is sequential in stable declaration-priority order among ready operations in this acyclic graph with a unique sink; the producer is a dependency of its choice consumer. There is no global choice barrier. An earlier independent branch may have effects before an empty, unavailable, or oversized domain fails with the existing redacted 409 before consumer/model work. Singleton candidates bind canonically with no model lookup or call. Ambiguous choices expose only bounded inert candidate evidence and opaque tokens to a private selector with no business tools; the shared invocation kernel validates and invokes the consumer. No extra results/context are disclosed and no final model acknowledgment is added. `after` continues to impose business ordering.
+## Version 0.16.0: producer-backed choices in required DAGs
 
-Explicit function-tool quota (`UsageLimits.tool_calls_limit`) and private `allow_direct=False` reject this new graph form before effects. Existing uniquely ordered linear-chain compatibility, including multiple-choice behavior, is unchanged. Historical v0.15.0 branch/join remains choice-free. This is not a public graph API, parallel scheduler, repeat/feedback feature, durable recovery, or general graph compiler; milestones 3 and 4 remain partial. See the [contract](https://github.com/tugrulguner/summonpot/blob/main/docs/declarative-capabilities.md#unreleased-source-one-producer-backed-choice-in-required-dags) and [example 23](https://github.com/tugrulguner/summonpot/blob/main/examples/23_choice_branch_join/README.md).
+Version 0.16.0 admits **one or more producer-backed** `AgentChoice(from_result=...)` bindings in a required `Exactly(1)` acyclic graph. Preserve Pydantic request/response contracts, at least one `FromRequest`, supported immutable defaults and request/result/context bindings, exact declared `list[ConcreteModel]` producers, a single sink reached by every operation, and one exact full response annotation owner. There is no arbitrary global two-choice cap.
 
-The current multiple-choice extension is specified next; the initial one-choice limit above is historical.
+Execution stays sequential in declaration-priority readiness order. All domains for the same consumer are checked before selection or its application call; its ambiguous arguments are selected together. Distinct consumers keep separate decision frontiers and are not batched ahead of effects. When all bound choices resolve to singletons, the endpoint needs no model lookup or call; ambiguity exposes only bounded current evidence and opaque tokens, with no business-function tools or model-authored terminal response. One request, principal, ledger, shared usage budget and deadline span all frontiers. There is no global choice barrier. An empty, unavailable or oversized domain returns HTTP 409 before selection or invocation of its consumer; earlier effects may remain.
 
-## Unreleased source: multiple producer-backed choices in required DAGs
-
-Current unreleased source admits **one or more producer-backed** `AgentChoice(from_result=...)` bindings in a required `Exactly(1)` acyclic graph. Preserve Pydantic request/response contracts, at least one `FromRequest`, supported immutable defaults and request/result/context bindings, exact declared `list[ConcreteModel]` producers, a single sink reached by every operation, and one exact full response annotation owner. There is no arbitrary global two-choice cap.
-
-Execution stays sequential in declaration-priority readiness order. All domains for the same consumer are checked before selection or its application call; its ambiguous arguments are selected together. Distinct consumers keep separate decision frontiers and are not batched ahead of effects. Singleton bindings need no model lookup; ambiguity exposes only bounded current evidence and opaque tokens, with no business-function tools or model-authored terminal response. One request, principal, ledger, shared usage budget and deadline span all frontiers. There is no global choice barrier: earlier effects may remain after a later unavailable domain or failure.
-
-Explicit function-tool quota and private `allow_direct=False` reject the non-linear shape before work; existing linear compatibility remains unchanged. This is not published v0.15.0 behavior and adds no parallelism, optional branches, graph repetition/checkpoints, feedback or durable recovery. Milestones 3 and 4 remain partial. See [example 24](https://github.com/tugrulguner/summonpot/blob/main/examples/24_multiple_choice_branch_join/README.md).
+Explicit function-tool quota and private `allow_direct=False` reject the non-linear shape before work; existing linear compatibility remains unchanged. Version 0.15.0 branch/join execution remains choice-free. This adds no public graph API, parallelism, optional branches, graph repetition/checkpoints, feedback or durable recovery. Milestones 3 and 4 remain partial. See [example 24](https://github.com/tugrulguner/summonpot/blob/main/examples/24_multiple_choice_branch_join/README.md).
 
 
 ## Version 0.15.0 bounded repeated calls
@@ -251,7 +245,7 @@ annotation must exactly equal the endpoint response annotation. Summonpot return
 canonical validated terminal result, not model-authored claims. Intermediate canonical
 results stay hidden from the model. Tool results are completion acknowledgments;
 producer-backed choice arguments separately disclose bounded inert candidate evidence.
-Collection-backed choices are supported in the sequential-chain contract below and, in current unreleased source only, the single-choice required-DAG exception described above. In chains they require a
+Collection-backed choices are supported in the sequential-chain contract below and, from 0.16.0, in the required-DAG contract described above. In chains they require a
 declared producer with `output=list[ConcreteModel]`, and accept at most 128 candidates
 and 65,536 JSON characters per binding. The model receives opaque request-local tokens
 and inert projected candidate descriptions, not canonical result objects or full
