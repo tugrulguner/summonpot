@@ -72,7 +72,7 @@ def register(count=2, *, order=None, join=False, late_request=False, invalid=Non
     if join:
         bindings["extra"] = FromResult(helper_op, "n")
     consumer = Operation(consume, bind=bindings)
-    if invalid == "two_choices":
+    if invalid == "duplicate_callable_names":
         helper_op = Operation(
             consume,
             bind={"candidate": AgentChoice(from_result=producer)},
@@ -224,7 +224,9 @@ def test_private_compatibility_compilation_rejects_new_shape():
     assert starts == []
 
 
-@pytest.mark.parametrize("invalid", ["foreign", "two_choices", "multiple_sinks"])
+@pytest.mark.parametrize(
+    "invalid", ["foreign", "duplicate_callable_names", "multiple_sinks"]
+)
 def test_unsupported_graphs_still_reject_at_registration(invalid):
     with pytest.raises(TypeError):
         register(invalid=invalid)

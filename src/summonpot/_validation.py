@@ -582,8 +582,8 @@ def _resolved_graph_tool_indices(tools: Sequence[Any]) -> tuple[int, ...] | None
     return _ordered_contract_tool_indices(tools, allow_branches=True)
 
 
-def _single_choice_graph_tool_indices(tools: Sequence[Any]) -> tuple[int, ...] | None:
-    """Identify a required DAG with exactly one producer-backed choice."""
+def _producer_choice_graph_tool_indices(tools: Sequence[Any]) -> tuple[int, ...] | None:
+    """Identify a required DAG with one or more producer-backed choices."""
     order = _ordered_contract_tool_indices(
         tools, allow_branches=True, allow_producer_choices=True
     )
@@ -595,7 +595,7 @@ def _single_choice_graph_tool_indices(tools: Sequence[Any]) -> tuple[int, ...] |
         for source in tool.contract.bind.values()
         if type(source) is AgentChoice
     ]
-    return order if len(choices) == 1 else None
+    return order if choices else None
 
 
 def _ordered_contract_tool_indices(
@@ -717,7 +717,7 @@ def _validate_runtime_admission(*, endpoint: str, tools: list[Any]) -> None:
     chain = (
         _chain_contract_tool_indices(tools)
         or _resolved_graph_tool_indices(tools)
-        or _single_choice_graph_tool_indices(tools)
+        or _producer_choice_graph_tool_indices(tools)
     )
     stage = _repeated_stage_indices(tools)
     for index, tool in enumerate(tools):

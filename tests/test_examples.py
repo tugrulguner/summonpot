@@ -48,6 +48,7 @@ EXAMPLES = [
     ],
     ("22_contract_defaults/app.py", "/quotes/defaults", "post"),
     ("23_choice_branch_join/app.py", "/quotes/shipping-choice", "post"),
+    ("24_multiple_choice_branch_join/app.py", "/quotes/fulfillment", "post"),
 ]
 
 

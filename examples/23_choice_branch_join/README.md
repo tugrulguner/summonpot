@@ -47,7 +47,7 @@ The keyless release-smoke fixture derives its token from actual projected eviden
 
 ## Boundaries
 
-- Exactly one producer-backed choice argument is allowed across this new non-linear graph, with one required single-start sink owning the exact response. Existing linear chains retain their multiple-choice support.
+- This lesson uses one producer-backed choice and one required single-start sink owning the exact response. The initial source slice admitted exactly one choice globally; the current extension also supports multiple choices (see [example 24](../24_multiple_choice_branch_join/README.md)). Existing linear compatibility is unchanged.
 - Quantity must be 1–100 and the delivery window 1–4 days; invalid requests reject with HTTP 422 before selection.
 - There is no global choice barrier. Declaration order breaks readiness ties, and explicit `after` edges express required business ordering. Earlier effects may remain after a later failure; this example itself performs calculations only.
 - Explicit function-tool quotas reject this new shape before operation/model starts; the decision-only selector does not report business tool calls. Private `allow_direct=False` compilation also rejects the new graph rather than falling back to unchecked scheduling.

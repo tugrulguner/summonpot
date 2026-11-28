@@ -369,6 +369,10 @@ Directory: [`22_contract_defaults/`](22_contract_defaults/)
 
 A real integer quote calculation keeps the immutable discount default application-owned while binding request values explicitly. The operation's tighter `Annotated` quantity constraint rejects an otherwise valid request before the callable starts. Its inferred full annotated output contract preserves response metadata and executes without a model. The [guide](22_contract_defaults/README.md) explains extra-field rejection, rounding and the v0.14.0 explicit-output alternative.
 
+### 24. Independent shipping and packaging choices (unreleased source)
+
+[Example 24](24_multiple_choice_branch_join/README.md) uses multiple producer-backed choice consumers in one required single-start graph. Each consumer has its own sequential decision frontier; a singleton needs no model. Multiple arguments on the same consumer are selected together instead. All frontiers share request/principal, usage and deadline; published v0.15.0 remains unchanged. No parallel scheduling, conditional skipping or recovery is introduced.
+
 ## What is intentionally not shown as shipped
 
 The examples do not claim these planned features exist:

@@ -356,7 +356,7 @@ def test_many_vertices_use_exact_identity_and_current_ready_priority():
     assert _resolved_graph_tool_indices(tools) == (2, 1, 3, 4, 5, 6, 7, 8, 0)
 
 
-def test_multiple_producer_choices_do_not_gain_nonlinear_admission():
+def test_multiple_consumers_choose_from_the_same_declared_producer(monkeypatch):
     def candidates(value: int) -> list[Value]:
         return [Value(value=value)]
 
@@ -375,19 +375,28 @@ def test_multiple_producer_choices_do_not_gain_nonlinear_admission():
     terminal = Operation(
         finish, bind={"a": FromResult(chosen, "value"), "b": FromResult(other, "value")}
     )
-    app = Summon("choice-negative")
-    with pytest.raises(TypeError, match="unenforced"):
 
-        @app("/invalid")
-        def endpoint(
-            request: Request,
-            a=Required(producer, calls=Exactly(1)),
-            b=Required(chosen, calls=Exactly(1)),
-            c=Required(other, calls=Exactly(1)),
-            d=Required(terminal, calls=Exactly(1)),
-        ) -> Response:
-            """Do not widen the producer choice contract."""
-            ...
+    def forbidden(*args, **kwargs):
+        pytest.fail("Singleton choice consumers must not resolve a model")
+
+    monkeypatch.setattr(Runtime, "model_for", forbidden)
+    monkeypatch.setattr(Runtime, "_agent_for", forbidden)
+    app = Summon("shared-candidate-producer")
+
+    @app("/combine")
+    def endpoint(
+        request: Request,
+        a=Required(producer, calls=Exactly(1)),
+        b=Required(chosen, calls=Exactly(1)),
+        c=Required(other, calls=Exactly(1)),
+        d=Required(terminal, calls=Exactly(1)),
+    ) -> Response:
+        """Choose independently from one exact declared producer."""
+        ...
+
+    assert asyncio.run(app._runtime.call(app.endpoints[0], {"value": 3})) == Response(
+        total=6
+    )
 
 
 def test_context_receivers_are_preflighted_before_any_graph_effect():

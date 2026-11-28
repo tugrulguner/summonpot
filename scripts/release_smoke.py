@@ -216,6 +216,12 @@ CASES = (
         {"unit_price_cents": 199, "quantity": 3},
     ),
     ExampleCase(
+        "24_multiple_choice_branch_join/app.py",
+        "POST",
+        "/quotes/fulfillment",
+        {"units": 2, "goods_cents": 1000, "rush": False, "protective": False},
+    ),
+    ExampleCase(
         "23_choice_branch_join/app.py",
         "POST",
         "/quotes/shipping-choice",
@@ -495,7 +501,13 @@ summon=example.summon
     return wrapper
 
 
-def _choice_graph_smoke_wrapper(source: Path, workdir: Path) -> Path:
+def _choice_graph_smoke_wrapper(
+    source: Path,
+    workdir: Path,
+    *,
+    argument: str = "offer",
+    event_name: str = "choice-graph-events.jsonl",
+) -> Path:
     """Exercise real graph execution with evidence-derived keyless selections."""
     wrapper = workdir / "choice_graph_smoke_app.py"
     wrapper.write_text(
@@ -505,14 +517,14 @@ from pydantic_ai.models.function import FunctionModel
 from summonpot.runtime import Runtime
 summon=runpy.run_path({str(source)!r})['summon']
 def record(event):
-    with open({str(workdir / "choice-graph-events.jsonl")!r},'a') as stream:
+    with open({str(workdir / event_name)!r},'a') as stream:
         stream.write(json.dumps({{'event':event}})+'\\n')
 def choose(messages,info):
     assert not info.function_tools
     assert 'lowest-price' in info.instructions
     text=next(p.content for m in reversed(messages) for p in m.parts if isinstance(p,UserPromptPart) and isinstance(p.content,str))
     domain=json.loads(text.splitlines()[-1])['decision_slot_0']
-    assert domain['argument']=='offer'
+    assert domain['argument']=={argument!r}
     selected=min(domain['candidates'],key=lambda entry:entry['value']['cents'])
     record('selection')
     return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name,{{'decision_slot_0':selected['token']}})])
@@ -559,7 +571,14 @@ def _verify_case(
     source = (examples_root / case.source).resolve()
     if not source.is_file():
         raise FileNotFoundError(source)
-    if case.source == "23_choice_branch_join/app.py":
+    if case.source == "24_multiple_choice_branch_join/app.py":
+        served_source = _choice_graph_smoke_wrapper(
+            source,
+            workdir,
+            argument="option",
+            event_name="multiple-choice-graph-events.jsonl",
+        )
+    elif case.source == "23_choice_branch_join/app.py":
         served_source = _choice_graph_smoke_wrapper(source, workdir)
     elif case.source == "21_path_methods/app.py":
         served_source = _path_methods_smoke_wrapper(source, workdir)
@@ -694,6 +713,58 @@ def _verify_case(
             assert json.loads(rejected_body) == {
                 "detail": "Request data did not satisfy a receiving operation contract."
             }
+        if case.source == "24_multiple_choice_branch_join/app.py":
+            assert response_body == {
+                "shipping": "standard",
+                "packaging": "lightweight",
+                "total_cents": 1480,
+            }
+            assert case.payload is not None
+            status, body = _request(
+                base_url,
+                "POST",
+                case.path,
+                {**case.payload, "rush": True, "protective": True},
+            )
+            assert status == 200
+            assert json.loads(body) == {
+                "shipping": "express",
+                "packaging": "protective",
+                "total_cents": 2060,
+            }
+            events = [
+                json.loads(line)["event"]
+                for line in (workdir / "multiple-choice-graph-events.jsonl")
+                .read_text()
+                .splitlines()
+            ]
+            assert events == ["model_lookup", "selection", "selection"]
+            status, body = _request(
+                base_url, "POST", case.path, {**case.payload, "rush": True}
+            )
+            assert status == 200
+            assert json.loads(body) == {
+                "shipping": "express",
+                "packaging": "lightweight",
+                "total_cents": 1890,
+            }
+            events = [
+                json.loads(line)["event"]
+                for line in (workdir / "multiple-choice-graph-events.jsonl")
+                .read_text()
+                .splitlines()
+            ]
+            assert events == [
+                "model_lookup",
+                "selection",
+                "selection",
+                "model_lookup",
+                "selection",
+            ]
+            status, _ = _request(
+                base_url, "POST", case.path, {**case.payload, "units": 0}
+            )
+            assert status == 422
         if case.source == "23_choice_branch_join/app.py":
             assert response_body == {
                 "merchandise_cents": 300,
